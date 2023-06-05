@@ -1,25 +1,27 @@
-from fastapi import FastAPI
+from fastapi import APIRouter
 
-app = FastAPI()
+router = APIRouter(
+    responses={404: {"description": "Not found"}},
+)
 
 
 # ACTIVITY
-@app.post("/initiative/{initiative_id}/activity")
+@router.post("/initiative/{initiative_id}/activity")
 async def root(initiative_id: int):
     return {"name": "Eerste Activiteit"}
 
 
-@app.put("/initiative/{initiative_id}/activity/{activity_id}")
+@router.put("/initiative/{initiative_id}/activity/{activity_id}")
 async def root(initiative_id: int, activity_id: int):
     return {"name": "Eerste Activiteit"}
 
 
-@app.delete("/initiative/{initiative_id}/activity/{activity_id}")
+@router.delete("/initiative/{initiative_id}/activity/{activity_id}")
 async def root(initiative_id: int, activity_id: int):
     return {"name": "Eerste Activiteit"}
 
 
-@app.get("/initiative/{initiative_id}/activity/{activity_id}/users")
+@router.get("/initiative/{initiative_id}/activity/{activity_id}/users")
 async def root(initiative_id: int, activity_id: int):
     return [
         {"first_name": "Mark", "last_name": "de Wijk"},
@@ -28,43 +30,45 @@ async def root(initiative_id: int, activity_id: int):
 
 
 # ACTIVITY - PAYMENT
-@app.post("/initiative/{initiative_id}/activity/{activity_id}/payment")
+@router.post("/initiative/{initiative_id}/activity/{activity_id}/payment")
 async def root(initiative_id: int, activity_id: int):
     return {"amount": 10.01, "debitor": "Mark de Wijk"}
 
 
-@app.put("/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}")
+@router.put("/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}")
 async def root(initiative_id: int, activity_id: int, payment_id: int):
     return {"amount": 10.01, "debitor": "Mark de Wijk"}
 
 
-@app.delete("/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}")
+@router.delete(
+    "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}"
+)
 async def root(initiative_id: int, activity_id: int, payment_id: int):
     return {"status_code": 204, "content": "Succesfully deleted."}
 
 
-@app.get("/initiative/{initiative_id}/activity/{activity_id}/payments")
+@router.get("/initiative/{initiative_id}/activity/{activity_id}/payments")
 async def root(initiative_id: int, activity_id: int):
     return {"status_code": 200, "content": "to implement"}
 
 
 # INITIATIVE
-@app.post("/initiative")
+@router.post("/initiative")
 async def root():
     return {"name": "Buurtproject", "created_at": "2022-6-6"}
 
 
-@app.put("/initiative/{initiative_id}")
+@router.put("/initiative/{initiative_id}")
 async def root(initiative_id: int):
     return {"name": "Buurtproject", "created_at": "2022-6-6"}
 
 
-@app.delete("/initiative/{initiative_id}")
+@router.delete("/initiative/{initiative_id}")
 async def root(initiative_id: int):
     return {"status_code": 204, "content": "Succesfully deleted."}
 
 
-@app.get("/initiatives")
+@router.get("/initiatives")
 async def root():
     return [
         {"name": "Buurtproject", "created_at": "2022-6-6"},
@@ -72,14 +76,14 @@ async def root():
     ]
 
 
-@app.get("/initiatives/aggregate-numbers")
+@router.get("/initiatives/aggregate-numbers")
 async def root():
     # TODO: Merge into /initiatives?
     # NOTE: Can't merge, because /initiatives will be paginated.
     return {"total_spent": 100, "total_earned": 100, "initiative_count": 22}
 
 
-@app.get("/initiative/{initiative_id}/users")
+@router.get("/initiative/{initiative_id}/users")
 async def root(initiative_id: int):
     return [
         {"first_name": "Mark", "last_name": "de Wijk"},
@@ -87,7 +91,7 @@ async def root(initiative_id: int):
     ]
 
 
-@app.get("/initiative/{initiative_id}/activities")
+@router.get("/initiative/{initiative_id}/activities")
 async def root(initiative_id: int):
     return [
         {"name": "Eerste Activiteit"},
@@ -96,22 +100,22 @@ async def root(initiative_id: int):
 
 
 # INITIATIVE - PAYMENT
-@app.post("/initiative/{initiative_id}/payment")
+@router.post("/initiative/{initiative_id}/payment")
 async def root(initiative_id: int):
     return {"amount": 10.01, "debitor": "Mark de Wijk"}
 
 
-@app.put("/initiative/{initiative_id}/payment/{payment_id}")
+@router.put("/initiative/{initiative_id}/payment/{payment_id}")
 async def root(initiative_id: int, payment_id: int):
     return {"amount": 10.01, "debitor": "Mark de Wijk"}
 
 
-@app.delete("/initiative/{initiative_id}/payment/{payment_id}")
+@router.delete("/initiative/{initiative_id}/payment/{payment_id}")
 async def root(initiative_id: int, payment_id: int):
     return {"status_code": 204, "content": "Succesfully deleted."}
 
 
-@app.get("/initiative/{initiative_id}/payments")
+@router.get("/initiative/{initiative_id}/payments")
 async def root(initiative_id: int):
     return [
         {"amount": 10.01, "debitor": "Mark de Wijk"},
@@ -120,18 +124,18 @@ async def root(initiative_id: int):
 
 
 # INITIATIVE - DEBIT CARD
-@app.post("/initiative/{initiative_id}/debit-card")
+@router.post("/initiative/{initiative_id}/debit-card")
 async def root(initiative_id: int):
     return {"card_number": 12345678, "created_at": "2011-8-1"}
 
 
-@app.put("/initiative/{initiative_id}/debit-card/{debit_card_id}")
+@router.put("/initiative/{initiative_id}/debit-card/{debit_card_id}")
 async def root(initiative_id: int, debit_card_id: int):
     # Use this to (de)couple a debit card from/to an initiative.
     return {"card_number": 12345678, "created_at": "2011-8-1"}
 
 
-@app.get("/initiative/{initiative_id}/debit-cards")
+@router.get("/initiative/{initiative_id}/debit-cards")
 async def root(initiative_id: int):
     return [
         {"card_number": 12345678, "created_at": "2011-8-1"},
@@ -139,7 +143,7 @@ async def root(initiative_id: int):
     ]
 
 
-@app.get("/initiative/{initiative_id}/debit-cards/aggregate-numbers")
+@router.get("/initiative/{initiative_id}/debit-cards/aggregate-numbers")
 async def root(initiative_id: int):
     return [
         {"card_number": 12345678, "received": 2000, "spent": 199},
@@ -148,23 +152,23 @@ async def root(initiative_id: int):
 
 
 # USER
-@app.post("/user")
+@router.post("/user")
 async def root():
     return {"first_name": "Mark", "last_name": "de Wijk"}
 
 
-@app.put("/user/{user_id}")
+@router.put("/user/{user_id}")
 async def root(user_id: int):
     # Use this to link a user to an initiative.
     return {"first_name": "Mark", "last_name": "de Wijk"}
 
 
-@app.delete("/user/{user_id}")
+@router.delete("/user/{user_id}")
 async def root(user_id: int):
     return {"status_code": 204, "content": "Succesfully deleted."}
 
 
-@app.get("/users")
+@router.get("/users")
 async def root():
     return [
         {"first_name": "Mark", "last_name": "de Wijk"},
@@ -173,23 +177,23 @@ async def root():
 
 
 # FUNDER
-@app.post("/funder")
+@router.post("/funder")
 async def root():
     # If we continue linking to initiatives, we need to add such a query param.
     return {"name": "Gemeente Amsterdam", "created_at": "2022-4-1"}
 
 
-@app.put("/funder/{funder_id}")
+@router.put("/funder/{funder_id}")
 async def root(funder_id: int):
     return {"name": "Gemeente Amsterdam", "created_at": "2022-4-1"}
 
 
-@app.delete("/funder/{funder_id}")
+@router.delete("/funder/{funder_id}")
 async def root(funder_id: int):
     return {"status_code": 204, "content": "Succesfully deleted."}
 
 
-@app.get("/funders")
+@router.get("/funders")
 async def root():
     # If we continue linking to initiatives, we need to add such a query param.
     return [
@@ -199,24 +203,24 @@ async def root():
 
 
 # BNG
-@app.post("/bng-connection")
+@router.post("/bng-connection")
 async def root():
     # Should accept IBAN and only available to admins.
     return {"IBAN": "NL32INGB00039845938"}
 
 
-@app.delete("/bng-connection")
+@router.delete("/bng-connection")
 async def root():
     return {"status_code": 204, "content": "Succesfully deleted."}
 
 
-@app.get("/bng-connection")
+@router.get("/bng-connection")
 async def root():
     # Only available to admins.
     return {"IBAN": "NL32INGB00039845938"}
 
 
-@app.get("/bng-connection/status")
+@router.get("/bng-connection/status")
 async def root():
     return {
         "present": True,
