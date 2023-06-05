@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "open-poen-api"
+version = "0.1.0"
+description = "The API of Open Poen - an open spending platform where we make publicly available how money from the community is spent."
+authors = ["Mark de Wijk <dewijkmark@gmail.com>"]
+license = "EUPL-1.2"
+readme = "README.md"
+packages = [{include = "open_poen_api"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.96.0"
+uvicorn = {extras = ["standard"], version = "^0.22.0"}
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.3.0"
+isort = "^5.12.0"
+mypy = "^1.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
