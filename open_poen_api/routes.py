@@ -1,14 +1,19 @@
-from fastapi import APIRouter
+from sqlmodel import Session
+from fastapi import APIRouter, Depends
+from open_poen_api.database import get_session
+import open_poen_api.models as m
 
-router = APIRouter(
-    responses={404: {"description": "Not found"}},
-)
+router = APIRouter()
 
 
 # ACTIVITY
 @router.post("/initiative/{initiative_id}/activity")
-async def root(initiative_id: int):
-    return {"name": "Eerste Activiteit"}
+async def root(
+    initiative_id: int,
+    activity: m.ActivityBase,
+    session: Session = Depends(get_session),
+):
+    return activity
 
 
 @router.put("/initiative/{initiative_id}/activity/{activity_id}")

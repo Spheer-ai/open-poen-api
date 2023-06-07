@@ -1,0 +1,19 @@
+version: '3.3'
+
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: mark
+      POSTGRES_PASSWORD: mark
+      POSTGRES_DB: open-poen-dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - 5432:5432
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+volumes:
+  postgres_data:
