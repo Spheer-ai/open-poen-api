@@ -6,3 +6,13 @@ The API of Open Poen - an open spending platform where we make publicly availabl
 ```
 poetry run uvicorn open_poen_api.app:app --reload
 ```
+
+Start DB.
+```
+docker compose up
+```
+
+Stop and wipe DB.
+```
+docker compose down -v
+```

@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from open_poen_api.app import app
 
+
 client = TestClient(app)
 
 

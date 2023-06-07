@@ -1,9 +1,67 @@
 from sqlmodel import Session
-from fastapi import APIRouter, Depends
-from open_poen_api.database import get_session
-import open_poen_api.models as m
+from fastapi import APIRouter, Depends, HTTPException, status
+from .database import get_session
+from . import models as m
+from typing import Annotated
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from pydantic import BaseModel
+import string
+import random
 
 router = APIRouter()
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+SECRET_KEY = "bladiebla"
+ALGORITHM = "HS256"
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+def authenticate_user(email: str, password: str, session: Session):
+    user = session.query(m.User).filter(m.User.email == email).first()
+    if not user:
+        return False
+    if not pwd_context.verify(password, user.hashed_password):
+        return False
+    return user
+
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorith=ALGORITHM)
+    return encoded_jwt
+
+
+@router.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    session: Session = Depends(get_session),
+):
+    user = authenticate_user(form_data.username, form_data.password, session)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=15)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # ACTIVITY
@@ -156,10 +214,26 @@ async def root(initiative_id: int):
     ]
 
 
+def temp_password_generator(
+    size: int = 10, chars=string.ascii_uppercase + string.digits
+) -> str:
+    return "".join(random.choice(chars) for _ in range(size))
+
+
 # USER
 @router.post("/user")
-async def root():
-    return {"first_name": "Mark", "last_name": "de Wijk"}
+async def root(
+    user: m.UserBase,
+    session: Session = Depends(get_session),
+) -> m.UserReturn:
+    # TODO: Send an email with the temporary password. Otherwise
+    # The user isn't notified and he can't login!
+    temp_password = temp_password_generator()
+    new_user = m.User(email=user.email, hashed_password=pwd_context.hash(temp_password))
+    # TODO: Error handling for double email adres.
+    session.add(new_user)
+    session.commit()
+    return m.UserReturn(email=user.email, plain_password=temp_password)
 
 
 @router.put("/user/{user_id}")
