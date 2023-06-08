@@ -4,7 +4,7 @@ from pydantic import EmailStr
 
 
 class UserBase(SQLModel):
-    username: EmailStr = Field(sa_column=Column("username", VARCHAR, unique=True))
+    email: EmailStr = Field(sa_column=Column("email", VARCHAR, unique=True))
 
 
 class User(UserBase, table=True):
@@ -15,8 +15,15 @@ class User(UserBase, table=True):
     hashed_password: str
 
 
-class UserReturn(UserBase):
+class UserCreateReturn(UserBase):
+    id: int
     plain_password: str
+
+
+class UserUpdate(UserBase):
+    id: int
+    first_name: str | None
+    last_name: str | None
 
 
 class ActivityBase(SQLModel):

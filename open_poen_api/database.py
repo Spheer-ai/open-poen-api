@@ -4,6 +4,8 @@ from sqlmodel import create_engine, SQLModel, Session
 # TODO: Configure this with environment variables.
 DATABASE_URL = "postgresql://mark:mark@localhost:5432/open-poen-dev"
 engine = create_engine(DATABASE_URL)
+# TODO: Don't recreate db every time.
+SQLModel.metadata.drop_all(engine)
 SQLModel.metadata.create_all(engine)
 
 

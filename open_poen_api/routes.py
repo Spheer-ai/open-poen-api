@@ -1,8 +1,8 @@
-from sqlmodel import Session
-from fastapi import APIRouter, Depends, HTTPException, status
+from sqlmodel import Session, select, SQLModel
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from .database import get_session
 from . import models as m
-from typing import Annotated
+from typing import Annotated, List, get_type_hints, TypeVar, Type
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -10,6 +10,8 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 import string
 import random
+from sqlalchemy.exc import IntegrityError
+
 
 router = APIRouter()
 
@@ -41,7 +43,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorith=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
@@ -225,34 +227,82 @@ def temp_password_generator(
 async def root(
     user: m.UserBase,
     session: Session = Depends(get_session),
-) -> m.UserReturn:
-    # TODO: Send an email with the temporary password. Otherwise
-    # The user isn't notified and he can't login!
-    temp_password = temp_password_generator()
-    new_user = m.User(email=user.email, hashed_password=pwd_context.hash(temp_password))
-    # TODO: Error handling for double email adres.
-    session.add(new_user)
-    session.commit()
-    return m.UserReturn(email=user.email, plain_password=temp_password)
+    response_model=m.UserCreateReturn,
+):
+    try:
+        # TODO: Send an email with the temporary password. Otherwise
+        # The user isn't notified and he can't login!
+        temp_password = temp_password_generator()
+        new_user = m.User(
+            email=user.email, hashed_password=pwd_context.hash(temp_password)
+        )
+        session.add(new_user)
+        session.commit()
+        return m.UserCreateReturn(
+            id=new_user.id, email=user.email, plain_password=temp_password
+        )
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Email address already registered")
 
 
 @router.put("/user/{user_id}")
-async def root(user_id: int):
-    # Use this to link a user to an initiative.
-    return {"first_name": "Mark", "last_name": "de Wijk"}
+async def update_user(
+    user_id: int,
+    user: m.UserUpdate,
+    session: Session = Depends(get_session),
+    response_model=m.UserUpdate,
+):
+    user_db = session.get(m.User, user_id)
+    if not user_db:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user_db.id == user.id:
+        raise HTTPException(
+            status_code=400, detail="Query and body parameters for id are incongruent"
+        )
+    user_db.email = user.email
+    user_db.first_name = user.first_name
+    user_db.last_name = user.last_name
+    session.commit()
+    return user
 
 
 @router.delete("/user/{user_id}")
-async def root(user_id: int):
-    return {"status_code": 204, "content": "Succesfully deleted."}
+async def delete_user(
+    user_id: int, session: Session = Depends(get_session), response_model=Response
+):
+    user = session.get(m.User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    session.delete(user)
+    session.commit()
+    return Response(status_code=204)
 
 
-@router.get("/users")
-async def root():
-    return [
-        {"first_name": "Mark", "last_name": "de Wijk"},
-        {"first_name": "Jamal", "last_name": "Vleij"},
-    ]
+TSource = TypeVar("TSource", bound=SQLModel)
+TTarget = TypeVar("TTarget", bound=SQLModel)
+
+
+def convert_instances(
+    source_model: Type[TSource], target_model: Type[TTarget], instances: List[TSource]
+) -> List[TTarget]:
+    subset_instances = []
+
+    for instance in instances:
+        subset_instance = {}
+        for column in get_type_hints(target_model).keys():
+            if hasattr(instance, column):
+                subset_instance[column] = getattr(instance, column)
+        subset_instances.append(target_model(**subset_instance))
+
+    return subset_instances
+
+
+@router.get("/users", response_model=List[m.UserUpdate])
+def get_users(session: Session = Depends(get_session)):
+    users = session.exec(select(m.User)).all()
+    return convert_instances(m.User, m.UserUpdate, users)
 
 
 # FUNDER
