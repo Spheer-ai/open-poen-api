@@ -12,6 +12,8 @@ def client():
 def created_user(client):
     user_data = {
         "email": "johndoe@gmail.com",
+        "role": "admin",
+        "initiative_ids": [],
     }
 
     response = client.post("/user", json=user_data)

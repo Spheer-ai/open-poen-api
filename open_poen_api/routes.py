@@ -2,7 +2,7 @@ from sqlmodel import Session, select, SQLModel, col
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from .database import get_session
 from . import models as m
-from typing import Annotated, List, get_type_hints, TypeVar, Type
+from typing import Annotated, List, get_type_hints, TypeVar, Type, Tuple
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -11,6 +11,13 @@ from pydantic import BaseModel
 import string
 import random
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import FlushError
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+DEBUG = os.getenv("DEBUG") == "true"
 
 
 router = APIRouter()
@@ -67,13 +74,13 @@ async def login_for_access_token(
 
 
 # ACTIVITY
-@router.post("/initiative/{initiative_id}/activity")
-async def root(
-    initiative_id: int,
-    activity: m.ActivityBase,
-    session: Session = Depends(get_session),
-):
-    return activity
+# @router.post("/initiative/{initiative_id}/activity")
+# async def root(
+#     initiative_id: int,
+#     activity: m.ActivityBase,
+#     session: Session = Depends(get_session),
+# ):
+#     return activity
 
 
 @router.put("/initiative/{initiative_id}/activity/{activity_id}")
@@ -120,7 +127,7 @@ async def root(initiative_id: int, activity_id: int):
 # INITIATIVE
 @router.post("/initiative", response_model=m.Initiative)
 async def create_initiative(
-    initiative: m.InitiativeCreate,
+    initiative: m.InitiativeCreateIn,
     session: Session = Depends(get_session),
 ):
     # NOTE: THIS WORKS AND CREATES A NEW USER
@@ -243,39 +250,55 @@ async def root(initiative_id: int):
 def temp_password_generator(
     size: int = 10, chars=string.ascii_uppercase + string.digits
 ) -> str:
-    return "".join(random.choice(chars) for _ in range(size))
+    if not DEBUG:
+        return "".join(random.choice(chars) for _ in range(size))
+    else:
+        return "DEBUG_PASSWORD"
+
+
+def get_fields_dict(model: SQLModel) -> dict:
+    fields_dict = {}
+    for key, value in model.dict().items():
+        if not key.endswith("_ids"):
+            fields_dict[key] = value
+    return fields_dict
 
 
 # USER
-@router.post("/user")
-async def root(
-    user: m.UserBase,
+@router.post("/user", response_model=m.UserOutWithInitiatives)
+async def create_user(
+    user: m.UserCreateIn,
     session: Session = Depends(get_session),
-    response_model=m.UserCreateReturn,
 ):
+    # TODO: Send an email with the temporary password. Otherwise
+    # The user isn't notified and he can't login!
+    temp_password = temp_password_generator()
+    fields = get_fields_dict(user)
+    new_user = m.User(**fields, hashed_password=pwd_context.hash(temp_password))
+    new_user.initiatives = session.exec(
+        select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
+    ).all()
     try:
-        # TODO: Send an email with the temporary password. Otherwise
-        # The user isn't notified and he can't login!
-        temp_password = temp_password_generator()
-        new_user = m.User(
-            email=user.email, hashed_password=pwd_context.hash(temp_password)
-        )
         session.add(new_user)
         session.commit()
-        return m.UserCreateReturn(
-            id=new_user.id, email=user.email, plain_password=temp_password
-        )
+        session.refresh(new_user)
+        return new_user
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Email address already registered")
+    except FlushError:
+        session.rollback()
+        raise HTTPException(
+            status_code=404, detail="One or more initiatves do not exist"
+        )
 
 
 @router.put("/user/{user_id}")
 async def update_user(
     user_id: int,
-    user: m.UserUpdate,
+    user: m.UserUpdateIn,
     session: Session = Depends(get_session),
-    response_model=m.UserUpdate,
+    response_model=m.UserOut,
 ):
     user_db = session.get(m.User, user_id)
     if not user_db:
@@ -323,12 +346,12 @@ def convert_instances(
     return subset_instances
 
 
-@router.get("/users", response_model=m.TempUser)
-def get_users(session: Session = Depends(get_session)):
-    users = session.exec(select(m.User)).all()
-    # return convert_instances(m.User, m.UserUpdate, users)
-    # return [m.UserUpdate.from_orm(i) for i in users]
-    return {"users": users}
+# @router.get("/users", response_model=m.TempUser)
+# def get_users(session: Session = Depends(get_session)):
+#     users = session.exec(select(m.User)).all()
+#     # return convert_instances(m.User, m.UserUpdate, users)
+#     # return [m.UserUpdate.from_orm(i) for i in users]
+#     return {"users": users}
 
 
 # FUNDER
