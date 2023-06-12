@@ -93,5 +93,8 @@ def test_add_non_existing_initiative(client):
 
     response = client.post("/user", json=user_data)
     assert response.status_code == 404
-    assert response.json()["detail"] == "One or more initiatves do not exist"
+    assert (
+        response.json()["detail"]
+        == "One or more instances of Initiative to link do not exist"
+    )
     return response.json()

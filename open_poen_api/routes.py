@@ -11,9 +11,9 @@ from pydantic import BaseModel
 import string
 import random
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm.exc import FlushError
 from dotenv import load_dotenv
 import os
+from .utils import get_entities_by_ids
 
 load_dotenv()
 
@@ -133,14 +133,9 @@ async def create_initiative(
     fields = get_fields_dict(initiative)
     new_initiative = m.Initiative(**fields)
     if initiative.initiative_owner_ids is not None:
-        initiative_owners = session.exec(
-            select(m.User).where(col(m.User.id).in_(initiative.initiative_owner_ids))
-        ).all()
-        if len(initiative_owners) != len(initiative.initiative_owner_ids):
-            raise HTTPException(
-                status_code=404, detail="One or more initiatves do not exist"
-            )
-        new_initiative.initiative_owners = initiative_owners
+        new_initiative.initiative_owners = get_entities_by_ids(
+            session, m.User, initiative.initiative_owner_ids
+        )
     try:
         session.add(new_initiative)
         session.commit()
@@ -151,9 +146,30 @@ async def create_initiative(
         raise HTTPException(status_code=400, detail="Name already registered")
 
 
-@router.put("/initiative/{initiative_id}")
-async def root(initiative_id: int):
-    return {"name": "Buurtproject", "created_at": "2022-6-6"}
+@router.put("/initiative/{initiative_id}", response_model=m.InitiativeOutWithOwners)
+async def update_initiative(
+    initiative_id: int,
+    initiative: m.InitiativeUpdateIn,
+    session: Session = Depends(get_session),
+):
+    initiative_db = session.get(m.Initiative, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    fields = get_fields_dict(initiative)
+    for key, value in fields.items():
+        setattr(initiative_db, key, value)
+    if initiative.initiative_owner_ids is not None:
+        initiative_db.initiative_owners = get_entities_by_ids(
+            session, m.User, initiative.initiative_owner_ids
+        )
+    try:
+        session.add(initiative_db)
+        session.commit()
+        session.refresh(initiative_db)
+        return initiative_db
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Name already registered")
 
 
 @router.delete("/initiative/{initiative_id}")
@@ -275,14 +291,9 @@ async def create_user(
     fields = get_fields_dict(user)
     new_user = m.User(**fields, hashed_password=pwd_context.hash(temp_password))
     if user.initiative_ids is not None:
-        initiatives = session.exec(
-            select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
-        ).all()
-        if len(initiatives) != len(user.initiative_ids):
-            raise HTTPException(
-                status_code=404, detail="One or more initiatves do not exist"
-            )
-        new_user.initiatives = initiatives
+        new_user.initiatives = get_entities_by_ids(
+            session, m.Initiative, user.initiative_ids
+        )
     try:
         session.add(new_user)
         session.commit()
@@ -306,14 +317,9 @@ async def update_user(
     for key, value in fields.items():
         setattr(user_db, key, value)
     if user.initiative_ids is not None:
-        initiatives = session.exec(
-            select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
-        ).all()
-        if len(initiatives) != len(user.initiative_ids):
-            raise HTTPException(
-                status_code=404, detail="One or more initiatves do not exist"
-            )
-        user_db.initiatives = initiatives
+        user_db.initiatives = get_entities_by_ids(
+            session, m.Initiative, user.initiative_ids
+        )
     try:
         session.add(user_db)
         session.commit()
