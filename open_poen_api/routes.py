@@ -1,23 +1,15 @@
-from sqlmodel import Session, select, SQLModel, col
+from sqlmodel import Session, select
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from .database import get_session
 from . import models as m
-from typing import Annotated, List, get_type_hints, TypeVar, Type, Tuple
+from typing import Annotated
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from pydantic import BaseModel
-import string
-import random
 from sqlalchemy.exc import IntegrityError
-from dotenv import load_dotenv
-import os
-from .utils import get_entities_by_ids
-
-load_dotenv()
-
-DEBUG = os.getenv("DEBUG") == "true"
+from .utils import get_entities_by_ids, temp_password_generator, get_fields_dict
 
 
 router = APIRouter()
@@ -258,25 +250,6 @@ async def root(initiative_id: int):
         {"card_number": 12345678, "received": 2000, "spent": 199},
         {"card_number": 12345679, "received": 0, "spent": 0},
     ]
-
-
-def temp_password_generator(
-    size: int = 10, chars=string.ascii_uppercase + string.digits
-) -> str:
-    if not DEBUG:
-        return "".join(random.choice(chars) for _ in range(size))
-    else:
-        return "DEBUG_PASSWORD"
-
-
-def get_fields_dict(model: SQLModel) -> dict:
-    """An input schema can have ids of entities for which we want to establish
-    a relationship. Those we process separately, so we filter those out here."""
-    fields_dict = {}
-    for key, value in model.dict().items():
-        if not key.endswith("_ids"):
-            fields_dict[key] = value
-    return fields_dict
 
 
 # USER
