@@ -1,4 +1,4 @@
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Session, SQLModel, select, col
 from typing import Type, TypeVar
 from fastapi import HTTPException
 import os
@@ -17,14 +17,15 @@ T = TypeVar("T", bound=SQLModel)
 def get_entities_by_ids(
     session: Session, model: Type[T], entity_ids: list[int]
 ) -> list[T]:
-    if not hasattr(model, "id"):
-        raise ValueError(f"Model {model} does not have an id attribute/column.")
-
+    """Helper function that's useful to check that all ids of model that the user
+    wants to link to an entity actually exist. Is used when a user created an initiatives
+    and wants to links users to it by id for example."""
     entities = session.exec(select(model).where(model.id.in_(entity_ids))).all()
 
     if len(entities) != len(entity_ids):
         raise HTTPException(
             status_code=404,
+            # TODO: Specify which ids are missing.
             detail=f"One or more instances of {model.__name__} to link do not exist",
         )
 

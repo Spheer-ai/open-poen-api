@@ -165,16 +165,25 @@ async def update_initiative(
 
 
 @router.delete("/initiative/{initiative_id}")
-async def root(initiative_id: int):
-    return {"status_code": 204, "content": "Succesfully deleted."}
+async def delete_initiative(
+    initiative_id: int, session: Session = Depends(get_session)
+):
+    initiative = session.get(m.Initiative, initiative_id)
+    if not initiative:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+
+    session.delete(initiative)
+    session.commit()
+    return Response(status_code=204)
 
 
-@router.get("/initiatives")
-async def root():
-    return [
-        {"name": "Buurtproject", "created_at": "2022-6-6"},
-        {"name": "Smoelenboek", "created_at": "2022-2-22"},
-    ]
+@router.get("/initiatives", response_model=m.InitiativeOutList)
+async def get_initiatives(session: Session = Depends(get_session)):
+    # TODO: Enable searching by name, ordering by creation date and
+    # initiative ownership.
+    # TODO: pagination.
+    initiatives = session.exec(select(m.Initiative)).all()
+    return {"initiatives": initiatives}
 
 
 @router.get("/initiatives/aggregate-numbers")
@@ -317,6 +326,7 @@ async def delete_user(user_id: int, session: Session = Depends(get_session)):
 @router.get("/users", response_model=m.UserOutList)
 def get_users(session: Session = Depends(get_session)):
     # TODO: Enable searching by email.
+    # TODO: pagination.
     users = session.exec(select(m.User)).all()
     return {"users": users}
 

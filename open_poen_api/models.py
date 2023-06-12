@@ -94,6 +94,10 @@ class InitiativeOut(InitiativeBase):
     id: int
 
 
+class InitiativeOutList(BaseModel):
+    initiatives: list[InitiativeOut]
+
+
 class InitiativeOutWithOwners(InitiativeOut):
     initiative_owners: list[UserOut]
 
