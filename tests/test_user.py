@@ -1,33 +1,14 @@
-import pytest
-from fastapi.testclient import TestClient
 from open_poen_api.app import app
 from open_poen_api.database import get_session
 import open_poen_api.models as m
-
-
-client = TestClient(app)
-
-
-@pytest.fixture(scope="module")
-def created_user():
-    user_data = {
-        "email": "johndoe@gmail.com",
-    }
-
-    response = client.post("/user", json=user_data)
-    try:
-        r = response.json()
-        parsed_response = {k: r[k] for k in ["plain_password", "id", "email"]}
-    except:
-        parsed_response = None
-    return parsed_response
+from .fixtures import client, created_user
 
 
 def test_create_user(created_user):
     assert created_user is not None
 
 
-def test_duplicate_email(created_user):
+def test_duplicate_email(client, created_user):
     # We create johndoe@gmail.com for the second time by
     # having user_password as a fixture here.
     user_data = {
@@ -39,7 +20,7 @@ def test_duplicate_email(created_user):
     assert response.json()["detail"] == "Email address already registered"
 
 
-def test_create_and_delete_user():
+def test_create_and_delete_user(client):
     user_data = {
         "email": "janedoe@gmail.com",
     }
@@ -52,12 +33,12 @@ def test_create_and_delete_user():
     assert delete_response.status_code == 204
 
 
-def test_delete_non_existing_user():
+def test_delete_non_existing_user(client):
     response = client.delete("/user/42")
     assert response.status_code == 404
 
 
-def test_update_user(created_user):
+def test_update_user(client, created_user):
     user_data = {
         "id": created_user["id"],
         "first_name": "John",
@@ -74,7 +55,7 @@ def test_update_user(created_user):
     s.close()
 
 
-def test_get_users(created_user):
+def test_get_users(client, created_user):
     response = client.get("/users")
     assert response.status_code == 200
     user_data = {
@@ -86,7 +67,7 @@ def test_get_users(created_user):
     assert response.json() == [user_data]
 
 
-def test_retrieve_token(created_user):
+def test_retrieve_token(client, created_user):
     data = {"username": "johndoe@gmail.com", "password": created_user["plain_password"]}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 

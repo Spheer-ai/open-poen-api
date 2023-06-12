@@ -1,4 +1,4 @@
-from sqlmodel import Session, select, SQLModel
+from sqlmodel import Session, select, SQLModel, col
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from .database import get_session
 from . import models as m
@@ -118,9 +118,33 @@ async def root(initiative_id: int, activity_id: int):
 
 
 # INITIATIVE
-@router.post("/initiative")
-async def root():
-    return {"name": "Buurtproject", "created_at": "2022-6-6"}
+@router.post("/initiative", response_model=m.Initiative)
+async def create_initiative(
+    initiative: m.InitiativeCreate,
+    session: Session = Depends(get_session),
+):
+    # NOTE: THIS WORKS AND CREATES A NEW USER
+    # u = m.User(email="testje@gmail.com", hashed_password="kdjflkdjf")
+    # ni = m.Initiative(name="testje", initiative_owners=[u])
+    # session.add(ni)
+    # session.commit()
+
+    try:
+        users = session.exec(
+            select(m.User).where(col(m.User.email).in_([initiative.initiative_owners]))
+        ).all()
+        if len(users) != len(initiative.initiative_owners):
+            raise HTTPException(
+                status_code=400,
+                detail="One or more email addresses do not have associated users",
+            )
+        new_initiative = m.Initiative(name=initiative.name, initiative_owners=users)
+        session.add(new_initiative)
+        session.commit()
+        return new_initiative
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Initiative creation failed")
 
 
 @router.put("/initiative/{initiative_id}")
@@ -299,10 +323,12 @@ def convert_instances(
     return subset_instances
 
 
-@router.get("/users", response_model=List[m.UserUpdate])
+@router.get("/users", response_model=m.TempUser)
 def get_users(session: Session = Depends(get_session)):
     users = session.exec(select(m.User)).all()
-    return convert_instances(m.User, m.UserUpdate, users)
+    # return convert_instances(m.User, m.UserUpdate, users)
+    # return [m.UserUpdate.from_orm(i) for i in users]
+    return {"users": users}
 
 
 # FUNDER
