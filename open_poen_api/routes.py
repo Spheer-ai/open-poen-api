@@ -117,7 +117,11 @@ async def root(initiative_id: int, activity_id: int):
 
 
 # INITIATIVE
-@router.post("/initiative", response_model=m.InitiativeOutWithOwners)
+@router.post(
+    "/initiative",
+    response_model=m.InitiativeOutWithOwners,
+    responses={400: {"description": "Name already registered"}},
+)
 async def create_initiative(
     initiative: m.InitiativeCreateIn,
     session: Session = Depends(get_session),
