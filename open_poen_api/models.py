@@ -17,10 +17,6 @@ class Role(str, Enum):
     FINANCIAL = "financial"
     USER = "user"
 
-    @classmethod
-    def choices(cls):
-        return [(role.value, role.name.title()) for role in cls]
-
 
 class UserBase(SQLModel):
     email: EmailStr = Field(sa_column=Column("email", VARCHAR, unique=True))
@@ -62,7 +58,7 @@ class UserOutList(BaseModel):
 
 
 class InitiativeBase(SQLModel):
-    name: str = Field(index=True)
+    name: str = Field(index=True, unique=True)
     description: str
     purpose: str
     target_audience: str
@@ -87,7 +83,11 @@ class Initiative(InitiativeBase, table=True):
 
 
 class InitiativeCreateIn(InitiativeBase):
-    initiative_owner_ids: list[int]
+    initiative_owner_ids: list[int] | None
+
+
+class InitiativeUpdateIn(InitiativeBase):
+    initiative_owner_ids: list[int] | None
 
 
 class InitiativeOut(InitiativeBase):

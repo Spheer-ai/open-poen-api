@@ -125,33 +125,30 @@ async def root(initiative_id: int, activity_id: int):
 
 
 # INITIATIVE
-@router.post("/initiative", response_model=m.Initiative)
+@router.post("/initiative", response_model=m.InitiativeOutWithOwners)
 async def create_initiative(
     initiative: m.InitiativeCreateIn,
     session: Session = Depends(get_session),
 ):
-    # NOTE: THIS WORKS AND CREATES A NEW USER
-    # u = m.User(email="testje@gmail.com", hashed_password="kdjflkdjf")
-    # ni = m.Initiative(name="testje", initiative_owners=[u])
-    # session.add(ni)
-    # session.commit()
-
-    try:
-        users = session.exec(
-            select(m.User).where(col(m.User.email).in_([initiative.initiative_owners]))
+    fields = get_fields_dict(initiative)
+    new_initiative = m.Initiative(**fields)
+    if initiative.initiative_owner_ids is not None:
+        initiative_owners = session.exec(
+            select(m.User).where(col(m.User.id).in_(initiative.initiative_owner_ids))
         ).all()
-        if len(users) != len(initiative.initiative_owners):
+        if len(initiative_owners) != len(initiative.initiative_owner_ids):
             raise HTTPException(
-                status_code=400,
-                detail="One or more email addresses do not have associated users",
+                status_code=404, detail="One or more initiatves do not exist"
             )
-        new_initiative = m.Initiative(name=initiative.name, initiative_owners=users)
+        new_initiative.initiative_owners = initiative_owners
+    try:
         session.add(new_initiative)
         session.commit()
+        session.refresh(new_initiative)
         return new_initiative
     except IntegrityError:
         session.rollback()
-        raise HTTPException(status_code=400, detail="Initiative creation failed")
+        raise HTTPException(status_code=400, detail="Name already registered")
 
 
 @router.put("/initiative/{initiative_id}")
@@ -278,9 +275,14 @@ async def create_user(
     fields = get_fields_dict(user)
     new_user = m.User(**fields, hashed_password=pwd_context.hash(temp_password))
     if user.initiative_ids is not None:
-        new_user.initiatives = session.exec(
+        initiatives = session.exec(
             select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
         ).all()
+        if len(initiatives) != len(user.initiative_ids):
+            raise HTTPException(
+                status_code=404, detail="One or more initiatves do not exist"
+            )
+        new_user.initiatives = initiatives
     try:
         session.add(new_user)
         session.commit()
@@ -289,11 +291,6 @@ async def create_user(
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Email address already registered")
-    except FlushError:
-        session.rollback()
-        raise HTTPException(
-            status_code=404, detail="One or more initiatves do not exist"
-        )
 
 
 @router.put("/user/{user_id}", response_model=m.UserOutWithInitiatives)
@@ -309,9 +306,14 @@ async def update_user(
     for key, value in fields.items():
         setattr(user_db, key, value)
     if user.initiative_ids is not None:
-        user_db.initiatives = session.exec(
+        initiatives = session.exec(
             select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
         ).all()
+        if len(initiatives) != len(user.initiative_ids):
+            raise HTTPException(
+                status_code=404, detail="One or more initiatves do not exist"
+            )
+        user_db.initiatives = initiatives
     try:
         session.add(user_db)
         session.commit()
@@ -320,11 +322,6 @@ async def update_user(
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Email address already registered")
-    except FlushError:
-        session.rollback()
-        raise HTTPException(
-            status_code=404, detail="One or more initiatves do not exist"
-        )
 
 
 @router.delete("/user/{user_id}")
@@ -340,9 +337,8 @@ async def delete_user(user_id: int, session: Session = Depends(get_session)):
 
 @router.get("/users", response_model=m.UserOutList)
 def get_users(session: Session = Depends(get_session)):
+    # TODO: Enable searching by email.
     users = session.exec(select(m.User)).all()
-    # return convert_instances(m.User, m.UserUpdate, users)
-    # return [m.UserUpdate.from_orm(i) for i in users]
     return {"users": users}
 
 

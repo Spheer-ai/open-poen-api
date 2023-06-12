@@ -82,3 +82,16 @@ def test_retrieve_token(client, created_user):
     assert (
         "access_token" in response.json() and response.json()["token_type"] == "bearer"
     )
+
+
+def test_add_non_existing_initiative(client):
+    user_data = {
+        "email": "johndoe@gmail.com",
+        "role": "admin",
+        "initiative_ids": [42],
+    }
+
+    response = client.post("/user", json=user_data)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "One or more initiatves do not exist"
+    return response.json()
