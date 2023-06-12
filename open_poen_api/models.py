@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Column, VARCHAR, Relationship
 from datetime import datetime
-from pydantic import EmailStr
+from pydantic import EmailStr, BaseModel
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
 
@@ -46,16 +46,19 @@ class User(UserBase, table=True):
 
 
 class UserCreateIn(UserBase):
-    initiative_ids: list[int]
+    initiative_ids: list[int] | None
 
 
 class UserUpdateIn(UserBase):
-    id: int
-    initiative_ids: list[int]
+    initiative_ids: list[int] | None
 
 
 class UserOut(UserBase):
     id: int
+
+
+class UserOutList(BaseModel):
+    users: list[UserOut]
 
 
 class InitiativeBase(SQLModel):

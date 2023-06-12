@@ -13,13 +13,8 @@ def created_user(client):
     user_data = {
         "email": "johndoe@gmail.com",
         "role": "admin",
-        "initiative_ids": [],
     }
 
     response = client.post("/user", json=user_data)
-    try:
-        r = response.json()
-        parsed_response = {k: r[k] for k in ["plain_password", "id", "email"]}
-    except:
-        parsed_response = None
-    return parsed_response
+    assert response.status_code == 200
+    return response.json()

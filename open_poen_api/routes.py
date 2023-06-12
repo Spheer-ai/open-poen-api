@@ -257,6 +257,8 @@ def temp_password_generator(
 
 
 def get_fields_dict(model: SQLModel) -> dict:
+    """An input schema can have ids of entities for which we want to establish
+    a relationship. Those we process separately, so we filter those out here."""
     fields_dict = {}
     for key, value in model.dict().items():
         if not key.endswith("_ids"):
@@ -275,9 +277,10 @@ async def create_user(
     temp_password = temp_password_generator()
     fields = get_fields_dict(user)
     new_user = m.User(**fields, hashed_password=pwd_context.hash(temp_password))
-    new_user.initiatives = session.exec(
-        select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
-    ).all()
+    if user.initiative_ids is not None:
+        new_user.initiatives = session.exec(
+            select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
+        ).all()
     try:
         session.add(new_user)
         session.commit()
@@ -293,31 +296,39 @@ async def create_user(
         )
 
 
-@router.put("/user/{user_id}")
+@router.put("/user/{user_id}", response_model=m.UserOutWithInitiatives)
 async def update_user(
     user_id: int,
     user: m.UserUpdateIn,
     session: Session = Depends(get_session),
-    response_model=m.UserOut,
 ):
     user_db = session.get(m.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    if not user_db.id == user.id:
+    fields = get_fields_dict(user)
+    for key, value in fields.items():
+        setattr(user_db, key, value)
+    if user.initiative_ids is not None:
+        user_db.initiatives = session.exec(
+            select(m.Initiative).where(col(m.Initiative.id).in_(user.initiative_ids))
+        ).all()
+    try:
+        session.add(user_db)
+        session.commit()
+        session.refresh(user_db)
+        return user_db
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Email address already registered")
+    except FlushError:
+        session.rollback()
         raise HTTPException(
-            status_code=400, detail="Query and body parameters for id are incongruent"
+            status_code=404, detail="One or more initiatves do not exist"
         )
-    user_db.email = user.email
-    user_db.first_name = user.first_name
-    user_db.last_name = user.last_name
-    session.commit()
-    return user
 
 
 @router.delete("/user/{user_id}")
-async def delete_user(
-    user_id: int, session: Session = Depends(get_session), response_model=Response
-):
+async def delete_user(user_id: int, session: Session = Depends(get_session)):
     user = session.get(m.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -327,31 +338,12 @@ async def delete_user(
     return Response(status_code=204)
 
 
-TSource = TypeVar("TSource", bound=SQLModel)
-TTarget = TypeVar("TTarget", bound=SQLModel)
-
-
-def convert_instances(
-    source_model: Type[TSource], target_model: Type[TTarget], instances: List[TSource]
-) -> List[TTarget]:
-    subset_instances = []
-
-    for instance in instances:
-        subset_instance = {}
-        for column in get_type_hints(target_model).keys():
-            if hasattr(instance, column):
-                subset_instance[column] = getattr(instance, column)
-        subset_instances.append(target_model(**subset_instance))
-
-    return subset_instances
-
-
-# @router.get("/users", response_model=m.TempUser)
-# def get_users(session: Session = Depends(get_session)):
-#     users = session.exec(select(m.User)).all()
-#     # return convert_instances(m.User, m.UserUpdate, users)
-#     # return [m.UserUpdate.from_orm(i) for i in users]
-#     return {"users": users}
+@router.get("/users", response_model=m.UserOutList)
+def get_users(session: Session = Depends(get_session)):
+    users = session.exec(select(m.User)).all()
+    # return convert_instances(m.User, m.UserUpdate, users)
+    # return [m.UserUpdate.from_orm(i) for i in users]
+    return {"users": users}
 
 
 # FUNDER
