@@ -10,6 +10,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from .utils import get_entities_by_ids, temp_password_generator, get_fields_dict
+from sqlalchemy.orm.exc import NoResultFound
 
 
 router = APIRouter()
@@ -66,31 +67,112 @@ async def login_for_access_token(
 
 
 # ACTIVITY
-# @router.post("/initiative/{initiative_id}/activity")
-# async def root(
-#     initiative_id: int,
-#     activity: m.ActivityBase,
-#     session: Session = Depends(get_session),
-# ):
-#     return activity
+@router.post(
+    "/initiative/{initiative_id}/activity",
+    response_model=m.ActivityOutWithLinkedEntities,
+    responses={
+        404: {"description": "Initiative not found"},
+        400: {"description": "Initiative already has an activity with this name"},
+    },
+)
+async def create_activity(
+    initiative_id: int,
+    activity: m.ActivityIn,
+    session: Session = Depends(get_session),
+):
+    initiative_db = session.get(m.Initiative, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    fields = get_fields_dict(activity)
+    new_activity = m.Activity(initiative_id=initiative_id, **fields)
+    if activity.activity_owner_ids is not None:
+        new_activity.activity_owners = get_entities_by_ids(
+            session, m.User, activity.activity_owner_ids
+        )
+    try:
+        session.add(new_activity)
+        session.commit()
+        session.refresh(new_activity)
+        return new_activity
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=400, detail="Initiative already has an activity with this name"
+        )
 
 
-@router.put("/initiative/{initiative_id}/activity/{activity_id}")
-async def root(initiative_id: int, activity_id: int):
-    return {"name": "Eerste Activiteit"}
+@router.put(
+    "/initiative/{initiative_id}/activity/{activity_id}",
+    response_model=m.ActivityOutWithLinkedEntities,
+)
+async def update_activity(
+    initiative_id: int,
+    activity_id: int,
+    activity: m.ActivityIn,
+    session: Session = Depends(get_session),
+):
+    try:
+        initiative_db = session.get(m.Initiative, initiative_id)
+        activity_db = session.get(m.Activity, activity_id)
+
+        if (
+            not initiative_db
+            or not activity_db
+            or activity_db.initiative_id != initiative_id
+        ):
+            raise NoResultFound
+
+        fields = get_fields_dict(activity)
+        for key, value in fields.items():
+            setattr(activity_db, key, value)
+
+        if activity.activity_owner_ids is not None:
+            activity_db.activity_owners = get_entities_by_ids(
+                session, m.User, activity.activity_owner_ids
+            )
+
+        session.add(activity_db)
+        session.commit()
+        session.refresh(activity_db)
+        return activity_db
+
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Activity or Initiative not found")
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Name already registered")
 
 
 @router.delete("/initiative/{initiative_id}/activity/{activity_id}")
-async def root(initiative_id: int, activity_id: int):
-    return {"name": "Eerste Activiteit"}
+async def delete_activity(
+    initiative_id: int,
+    activity_id: int,
+    session: Session = Depends(get_session),
+):
+    activity = session.get(m.Activity, activity_id)
+    if not activity or activity.initiative_id != initiative_id:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    session.delete(activity)
+    session.commit()
+    return Response(status_code=204)
 
 
-@router.get("/initiative/{initiative_id}/activity/{activity_id}/users")
-async def root(initiative_id: int, activity_id: int):
-    return [
-        {"first_name": "Mark", "last_name": "de Wijk"},
-        {"first_name": "Jamal", "last_name": "Vleij"},
-    ]
+@router.get(
+    "/initiative/{initiative_id}/activities",
+    response_model=m.ActivityOutList,
+)
+async def get_activities_by_initiative(
+    initiative_id: int, session: Session = Depends(get_session)
+):
+    initiative = session.get(m.Initiative, initiative_id)
+    if not initiative:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+
+    activities = session.exec(
+        select(m.Activity).where(m.Activity.initiative_id == initiative_id)
+    ).all()
+    return {"activities": activities}
 
 
 # ACTIVITY - PAYMENT
@@ -119,11 +201,11 @@ async def root(initiative_id: int, activity_id: int):
 # INITIATIVE
 @router.post(
     "/initiative",
-    response_model=m.InitiativeOutWithOwners,
+    response_model=m.InitiativeOutWithLinkedEntities,
     responses={400: {"description": "Name already registered"}},
 )
 async def create_initiative(
-    initiative: m.InitiativeCreateIn,
+    initiative: m.InitiativeIn,
     session: Session = Depends(get_session),
 ):
     fields = get_fields_dict(initiative)
@@ -131,6 +213,10 @@ async def create_initiative(
     if initiative.initiative_owner_ids is not None:
         new_initiative.initiative_owners = get_entities_by_ids(
             session, m.User, initiative.initiative_owner_ids
+        )
+    if initiative.activity_ids is not None:
+        new_initiative.activities = get_entities_by_ids(
+            session, m.Activity, initiative.activity_ids
         )
     try:
         session.add(new_initiative)
@@ -142,10 +228,12 @@ async def create_initiative(
         raise HTTPException(status_code=400, detail="Name already registered")
 
 
-@router.put("/initiative/{initiative_id}", response_model=m.InitiativeOutWithOwners)
+@router.put(
+    "/initiative/{initiative_id}", response_model=m.InitiativeOutWithLinkedEntities
+)
 async def update_initiative(
     initiative_id: int,
-    initiative: m.InitiativeUpdateIn,
+    initiative: m.InitiativeIn,
     session: Session = Depends(get_session),
 ):
     initiative_db = session.get(m.Initiative, initiative_id)
@@ -157,6 +245,10 @@ async def update_initiative(
     if initiative.initiative_owner_ids is not None:
         initiative_db.initiative_owners = get_entities_by_ids(
             session, m.User, initiative.initiative_owner_ids
+        )
+    if initiative.activity_ids is not None:
+        initiative_db.activities = get_entities_by_ids(
+            session, m.Activity, initiative.activity_ids
         )
     try:
         session.add(initiative_db)
@@ -175,7 +267,6 @@ async def delete_initiative(
     initiative = session.get(m.Initiative, initiative_id)
     if not initiative:
         raise HTTPException(status_code=404, detail="Initiative not found")
-
     session.delete(initiative)
     session.commit()
     return Response(status_code=204)
@@ -195,22 +286,6 @@ async def root():
     # TODO: Merge into /initiatives?
     # NOTE: Can't merge, because /initiatives will be paginated.
     return {"total_spent": 100, "total_earned": 100, "initiative_count": 22}
-
-
-@router.get("/initiative/{initiative_id}/users")
-async def root(initiative_id: int):
-    return [
-        {"first_name": "Mark", "last_name": "de Wijk"},
-        {"first_name": "Jamal", "last_name": "Vleij"},
-    ]
-
-
-@router.get("/initiative/{initiative_id}/activities")
-async def root(initiative_id: int):
-    return [
-        {"name": "Eerste Activiteit"},
-        {"name": "Tweede Activiteit"},
-    ]
 
 
 # INITIATIVE - PAYMENT
@@ -266,19 +341,24 @@ async def root(initiative_id: int):
 
 
 # USER
-@router.post("/user", response_model=m.UserOutWithInitiatives)
+@router.post("/user", response_model=m.UserOutWithLinkedEntities)
 async def create_user(
-    user: m.UserCreateIn,
+    user: m.UserIn,
     session: Session = Depends(get_session),
 ):
     # TODO: Send an email with the temporary password. Otherwise
     # The user isn't notified and he can't login!
+    # TODO: Route for resetting the password.
     temp_password = temp_password_generator()
     fields = get_fields_dict(user)
     new_user = m.User(**fields, hashed_password=pwd_context.hash(temp_password))
     if user.initiative_ids is not None:
         new_user.initiatives = get_entities_by_ids(
             session, m.Initiative, user.initiative_ids
+        )
+    if user.activity_ids is not None:
+        new_user.activities = get_entities_by_ids(
+            session, m.Activity, user.activity_ids
         )
     try:
         session.add(new_user)
@@ -290,10 +370,10 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Email address already registered")
 
 
-@router.put("/user/{user_id}", response_model=m.UserOutWithInitiatives)
+@router.put("/user/{user_id}", response_model=m.UserOutWithLinkedEntities)
 async def update_user(
     user_id: int,
-    user: m.UserUpdateIn,
+    user: m.UserIn,
     session: Session = Depends(get_session),
 ):
     user_db = session.get(m.User, user_id)
@@ -306,6 +386,8 @@ async def update_user(
         user_db.initiatives = get_entities_by_ids(
             session, m.Initiative, user.initiative_ids
         )
+    if user.activity_ids is not None:
+        user_db.activities = get_entities_by_ids(session, m.Activity, user.activity_ids)
     try:
         session.add(user_db)
         session.commit()

@@ -1,4 +1,4 @@
-from .fixtures import client, created_user
+# from .fixtures import client, created_user
 import pytest
 
 

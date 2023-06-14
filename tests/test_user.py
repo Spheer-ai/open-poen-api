@@ -1,27 +1,11 @@
 from open_poen_api.app import app
 from open_poen_api.database import get_session
 import open_poen_api.models as m
-from .fixtures import client, created_user
+from .conftest import client, session
+from sqlmodel import select
 
 
-def test_create_user(created_user):
-    assert created_user["id"] == 1
-    assert created_user["email"] == "johndoe@gmail.com"
-
-
-def test_duplicate_email(client, created_user):
-    # We create johndoe@gmail.com for the second time by
-    # having user_password as a fixture here.
-    user_data = {
-        "email": "johndoe@gmail.com",
-    }
-
-    response = client.post("/user", json=user_data)
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Email address already registered"
-
-
-def test_create_and_delete_user(client):
+def test_create_user(client, session):
     user_data = {
         "email": "janedoe@gmail.com",
         "role": "financial",
@@ -29,52 +13,54 @@ def test_create_and_delete_user(client):
 
     response = client.post("/user", json=user_data)
     assert response.status_code == 200
-    assert response.json()["role"] == "financial"
-
-    user_id = response.json()["id"]
-    delete_response = client.delete(f"/user/{user_id}")
-    assert delete_response.status_code == 204
+    assert "janedoe@gmail.com" in [i.email for i in session.exec(select(m.User)).all()]
 
 
-def test_delete_non_existing_user(client):
+def test_duplicate_email(client, session):
+    user_data = {
+        "email": "user1@example.com",
+    }
+
+    response = client.post("/user", json=user_data)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Email address already registered"
+    assert "user1@example" not in [i.email for i in session.exec(select(m.User)).all()]
+
+
+def test_delete_non_existing_user(client, session):
     response = client.delete("/user/42")
     assert response.status_code == 404
+    assert session.get(m.User, 44) is None
 
 
-def test_update_user(client, created_user):
-    user_data = {
-        "id": created_user["id"],
+def test_update_user(client, session):
+    existing_user = session.exec(
+        select(m.User).where(m.User.email == "user1@example.com")
+    ).one()
+    assert existing_user.first_name != "John"
+    assert existing_user.last_name != "Doe"
+    new_user_data = {
+        "id": existing_user.id,
         "first_name": "John",
         "last_name": "Doe",
-        "email": created_user["email"],
+        "email": "different@address.com",
     }
-    response = client.put(f"/user/{user_data['id']}", json=user_data)
+    response = client.put(f"/user/{existing_user.id}", json=new_user_data)
     assert response.status_code == 200
-    s = next(get_session())
-    user = s.get(m.User, created_user["id"])
-    assert user.first_name == "John"
-    assert user.last_name == "Doe"
-    assert user.role == "user"
-    s.close()
+    session.refresh(existing_user)
+    assert existing_user.first_name == "John"
+    assert existing_user.last_name == "Doe"
+    assert existing_user.email == "different@address.com"
 
 
-def test_get_users(client, created_user):
+def test_get_users(client, session):
     response = client.get("/users")
     assert response.status_code == 200
-    s = next(get_session())
-    user = s.get(m.User, created_user["id"])
-
-    def check_user_fields(user, user_dict):
-        for field, value in user_dict.items():
-            if getattr(user, field) != value:
-                return False
-        return True
-
-    assert check_user_fields(user, response.json()["users"][0])
+    assert len(response.json()["users"]) == 3
 
 
-def test_retrieve_token(client, created_user):
-    data = {"username": "johndoe@gmail.com", "password": "DEBUG_PASSWORD"}
+def test_retrieve_token(client, session):
+    data = {"username": "user1@example.com", "password": "DEBUG_PASSWORD"}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     response = client.post("/token", headers=headers, data=data)
@@ -84,7 +70,7 @@ def test_retrieve_token(client, created_user):
     )
 
 
-def test_add_non_existing_initiative(client):
+def test_add_non_existing_initiative(client, session):
     user_data = {
         "email": "johndoe@gmail.com",
         "role": "admin",
@@ -98,3 +84,37 @@ def test_add_non_existing_initiative(client):
         == "One or more instances of Initiative to link do not exist"
     )
     return response.json()
+
+
+def test_add_existing_initiative(client, session):
+    user_data = {
+        "email": "johndoe@gmail.com",
+        "role": "admin",
+        "initiative_ids": [1],
+    }
+    response = client.post("/user", json=user_data)
+    assert response.status_code == 200
+    assert response.json()["initiatives"][0]["id"] == 1
+
+
+def test_add_duplicate_initiatives(client, session):
+    user_data = {
+        "email": "johndoe@gmail.com",
+        "role": "admin",
+        "initiative_ids": [1, 1],
+    }
+    response = client.post("/user", json=user_data)
+    assert response.status_code == 404
+
+
+def test_add_two_initiatives(client, session):
+    user_data = {
+        "email": "johndoe@gmail.com",
+        "role": "admin",
+        "initiative_ids": [1, 2],
+    }
+    response = client.post("/user", json=user_data)
+    assert response.status_code == 200
+    assert response.json()["initiatives"][0]["id"] in (1, 2)
+    assert response.json()["initiatives"][1]["id"] in (1, 2)
+    assert len(response.json()["initiatives"]) == 2
