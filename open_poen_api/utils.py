@@ -26,7 +26,7 @@ def get_entities_by_ids(
         raise HTTPException(
             status_code=404,
             # TODO: Specify which ids are missing.
-            # TODO: Separate error if duplicate.
+            # TODO: Separate error if duplicate ids.
             detail=f"One or more instances of {model.__name__} to link do not exist",
         )
 

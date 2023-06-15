@@ -29,7 +29,7 @@ class Role(str, Enum):
 
 
 class UserBase(SQLModel):
-    email: EmailStr = Field(sa_column=Column("email", VARCHAR, unique=True))
+    email: EmailStr = Field(sa_column=Column("email", VARCHAR, unique=True, index=True))
     first_name: str | None
     last_name: str | None
     biography: str | None

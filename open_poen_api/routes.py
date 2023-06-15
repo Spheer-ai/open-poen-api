@@ -22,6 +22,9 @@ SECRET_KEY = "bladiebla"
 ALGORITHM = "HS256"
 
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -45,6 +48,57 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: Session = Depends(get_session),
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str | None = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = session.exec(select(m.User).where(m.User.email == email)).first()
+    if user is None:
+        raise credentials_exception
+    if not user.active:
+        raise HTTPException(status_code=403, detail="User is inactive")
+    return user
+
+
+def get_financial_or_admin(current_user: Annotated[m.User, Depends(get_current_user)]):
+    if not current_user.role in (m.Role.FINANCIAL, m.Role.ADMIN):
+        raise HTTPException(
+            status_code=403, detail="Financial or admin authorization required"
+        )
+    # TODO: We can also return None for more complex logic in the route.
+    return current_user
+
+
+def get_admin(current_user: Annotated[m.User, Depends(get_current_user)]):
+    if not current_user.role == m.Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Admin authorization required")
+    # TODO: We can also return None for more complex logic in the route.
+    return current_user
+
+
+def get_initiative_owner(
+    current_user: Annotated[m.User, Depends(get_current_user)],
+    initiative_id: int,
+    session: Session = Depends(get_session),
+):
+    initiative = session.get(m.Initiative, initiative_id)
+    if initiative is None:
+        return HTTPException(status_code=404, detail="Initiative not found")
+    
 
 
 @router.post("/token", response_model=Token)
