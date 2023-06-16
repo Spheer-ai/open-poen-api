@@ -98,7 +98,6 @@ def get_initiative_owner(
     initiative = session.get(m.Initiative, initiative_id)
     if initiative is None:
         return HTTPException(status_code=404, detail="Initiative not found")
-    
 
 
 @router.post("/token", response_model=Token)
@@ -174,7 +173,9 @@ async def update_activity(
             or not activity_db
             or activity_db.initiative_id != initiative_id
         ):
-            raise NoResultFound
+            raise HTTPException(
+                status_code=404, detail="Activity or Initiative not found"
+            )
 
         fields = get_fields_dict(activity)
         for key, value in fields.items():
@@ -189,9 +190,6 @@ async def update_activity(
         session.commit()
         session.refresh(activity_db)
         return activity_db
-
-    except NoResultFound:
-        raise HTTPException(status_code=404, detail="Activity or Initiative not found")
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Name already registered")
