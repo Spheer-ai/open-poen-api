@@ -2,13 +2,13 @@ import open_poen_api.models as m
 from sqlmodel import select
 
 
-def test_create_user(client, session_2):
+def test_create_user(client, session_2, admin_authorization_header):
     user_data = {
         "email": "janedoe@gmail.com",
         "role": "financial",
     }
 
-    response = client.post("/user", json=user_data)
+    response = client.post("/user", json=user_data, headers=admin_authorization_header)
     assert response.status_code == 200
     assert "janedoe@gmail.com" in [
         i.email for i in session_2.exec(select(m.User)).all()

@@ -107,3 +107,30 @@ def session_3(session_2):
     session_2.commit()
 
     yield session_2
+
+
+def generate_auth_header(username: str, client, session_2):
+    data = {"username": username, "password": "DEBUG_PASSWORD"}
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+    response = client.post("/token", headers=headers, data=data)
+    assert response.status_code == 200
+    assert (
+        "access_token" in response.json() and response.json()["token_type"] == "bearer"
+    )
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture(scope="function")
+def admin_authorization_header(client, session_2):
+    return generate_auth_header("user1@example.com", client, session_2)
+
+
+@pytest.fixture(scope="function")
+def financial_authorization_header(client, session_2):
+    return generate_auth_header("user2@example.com", client, session_2)
+
+
+@pytest.fixture(scope="function")
+def user_authorization_header(client, session_2):
+    return generate_auth_header("user3@example.com", client, session_2)

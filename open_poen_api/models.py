@@ -27,6 +27,11 @@ class HiddenMixin(BaseModel):
     hidden: bool = Field(nullable=False, default=False)
 
 
+class ORMMixin(BaseModel):
+    class Config:
+        orm_mode = True
+
+
 # LINK MODELS
 class InitiativeToUser(SQLModel, table=True):
     initiative_id: int | None = Field(
@@ -52,7 +57,7 @@ class Role(str, Enum):
     USER = "user"
 
 
-class UserBase(SQLModel, HiddenMixin):
+class UserInputBase(SQLModel, HiddenMixin):
     email: EmailStr = Field(sa_column=Column("email", VARCHAR, unique=True, index=True))
     first_name: str | None
     last_name: str | None
@@ -66,7 +71,7 @@ class UserBase(SQLModel, HiddenMixin):
     image: str | None
 
 
-class User(UserBase, TimeStampMixin, table=True):
+class User(UserInputBase, TimeStampMixin, table=True):
     id: int | None = Field(default=None, primary_key=True)
     hashed_password: str
     initiatives: list["Initiative"] = Relationship(
@@ -77,17 +82,45 @@ class User(UserBase, TimeStampMixin, table=True):
     )
 
 
-class UserIn(UserBase):
+class UserCreateAdmin(UserInputBase):
     initiative_ids: list[int] | None
     activity_ids: list[int] | None
 
 
-class UserOut(UserBase, TimeStampMixin):
+class UserUpdateUser(BaseModel):
+    email: EmailStr | None
+    first_name: str | None
+    last_name: str | None
+    biography: str | None
+
+
+class UserUpdateAdmin(UserUpdateUser):
+    role: Role | None
+    active: bool | None
+    initiative_ids: list[int] | None
+    activity_ids: list[int] | None
+
+
+class UserOutputUser(BaseModel):
     id: int
+    first_name: str | None
+    last_name: str | None
+    biography: str | None
+    role: Role
+    image: str | None
 
 
-class UserOutList(BaseModel):
-    users: list[UserOut]
+class UserOutputAdmin(UserOutputUser, TimeStampMixin, HiddenMixin):
+    email: EmailStr | None
+    active: bool | None
+
+
+class UserOutputUserList(BaseModel):
+    users: list[UserOutputUser]
+
+
+class UserOutputAdminList(BaseModel):
+    users: list[UserOutputAdmin]
 
 
 # INITIATIVE
@@ -250,15 +283,20 @@ class PaymentOutList(BaseModel):
 
 # OUTPUT MODELS WITH LINKED ENTITIES
 class InitiativeOutWithLinkedEntities(InitiativeOut):
-    initiative_owners: list[UserOut]
+    initiative_owners: list[UserOutputUser]
     activities: list[ActivityOut]
 
 
-class UserOutWithLinkedEntities(UserOut):
+class UserOutputUserWithLinkedEntities(UserOutputUser, ORMMixin):
+    initiatives: list[InitiativeOut]
+    activities: list[ActivityOut]
+
+
+class UserOutputAdminWithLinkedEntities(UserOutputAdmin, ORMMixin):
     initiatives: list[InitiativeOut]
     activities: list[ActivityOut]
 
 
 class ActivityOutWithLinkedEntities(ActivityOut):
-    activity_owners: list[UserOut]
+    activity_owners: list[UserOutputUser]
     initiative: InitiativeOut

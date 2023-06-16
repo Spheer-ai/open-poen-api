@@ -393,10 +393,11 @@ async def root(initiative_id: int):
 
 
 # USER
-@router.post("/user", response_model=m.UserOutWithLinkedEntities)
+@router.post("/user", response_model=m.UserOutputAdminWithLinkedEntities)
 async def create_user(
-    user: m.UserIn,
+    user: m.UserCreateAdmin,
     session: Session = Depends(get_session),
+    current_user: m.User = Depends(get_current_user),
 ):
     # TODO: Send an email with the temporary password. Otherwise
     # The user isn't notified and he can't login!
@@ -416,16 +417,16 @@ async def create_user(
         session.add(new_user)
         session.commit()
         session.refresh(new_user)
-        return new_user
+        return m.UserOutputAdminWithLinkedEntities.from_orm(new_user)
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Email address already registered")
 
 
-@router.put("/user/{user_id}", response_model=m.UserOutWithLinkedEntities)
+@router.put("/user/{user_id}", response_model=m.UserOutputUserWithLinkedEntities)
 async def update_user(
     user_id: int,
-    user: m.UserIn,
+    user: m.UserCreateAdmin,
     session: Session = Depends(get_session),
 ):
     user_db = session.get(m.User, user_id)
@@ -461,7 +462,7 @@ async def delete_user(user_id: int, session: Session = Depends(get_session)):
     return Response(status_code=204)
 
 
-@router.get("/users", response_model=m.UserOutList)
+@router.get("/users", response_model=m.UserOutputUserList)
 def get_users(session: Session = Depends(get_session)):
     # TODO: Enable searching by email.
     # TODO: pagination.
