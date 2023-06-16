@@ -1,18 +1,30 @@
 import open_poen_api.models as m
 from sqlmodel import select
+import pytest
 
 
-def test_create_user(client, session_2, admin_authorization_header):
+@pytest.mark.parametrize(
+    "authorization_header_name, status_code, email_in_db",
+    [
+        ("admin_authorization_header", 200, True),
+        ("financial_authorization_header", 403, False),
+        ("user_authorization_header", 403, False),
+    ],
+)
+def test_create_user(
+    client, session_2, authorization_header_name, status_code, email_in_db, request
+):
+    authorization_header = request.getfixturevalue(authorization_header_name)
     user_data = {
         "email": "janedoe@gmail.com",
         "role": "financial",
     }
-
-    response = client.post("/user", json=user_data, headers=admin_authorization_header)
-    assert response.status_code == 200
-    assert "janedoe@gmail.com" in [
+    response = client.post("/user", json=user_data, headers=authorization_header)
+    assert response.status_code == status_code
+    email_exists = "janedoe@gmail.com" in [
         i.email for i in session_2.exec(select(m.User)).all()
     ]
+    assert email_exists == email_in_db
 
 
 def test_duplicate_email(client, session_2):

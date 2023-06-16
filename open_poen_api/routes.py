@@ -397,7 +397,7 @@ async def root(initiative_id: int):
 async def create_user(
     user: m.UserCreateAdmin,
     session: Session = Depends(get_session),
-    current_user: m.User = Depends(get_current_user),
+    admin: m.User = Depends(get_admin),
 ):
     # TODO: Send an email with the temporary password. Otherwise
     # The user isn't notified and he can't login!

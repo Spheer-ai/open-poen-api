@@ -27,11 +27,6 @@ class HiddenMixin(BaseModel):
     hidden: bool = Field(nullable=False, default=False)
 
 
-class ORMMixin(BaseModel):
-    class Config:
-        orm_mode = True
-
-
 # LINK MODELS
 class InitiativeToUser(SQLModel, table=True):
     initiative_id: int | None = Field(
@@ -86,6 +81,9 @@ class UserCreateAdmin(UserInputBase):
     initiative_ids: list[int] | None
     activity_ids: list[int] | None
 
+    class Config:
+        title = "UserCreate"
+
 
 class UserUpdateUser(BaseModel):
     email: EmailStr | None
@@ -99,6 +97,9 @@ class UserUpdateAdmin(UserUpdateUser):
     active: bool | None
     initiative_ids: list[int] | None
     activity_ids: list[int] | None
+
+    class Config:
+        title = "UserUpdate"
 
 
 class UserOutputUser(BaseModel):
@@ -114,6 +115,9 @@ class UserOutputAdmin(UserOutputUser, TimeStampMixin, HiddenMixin):
     email: EmailStr | None
     active: bool | None
 
+    class Config:
+        title = "UserOutput"
+
 
 class UserOutputUserList(BaseModel):
     users: list[UserOutputUser]
@@ -121,6 +125,9 @@ class UserOutputUserList(BaseModel):
 
 class UserOutputAdminList(BaseModel):
     users: list[UserOutputAdmin]
+
+    class Config:
+        title = "UserOutputList"
 
 
 # INITIATIVE
@@ -287,14 +294,21 @@ class InitiativeOutWithLinkedEntities(InitiativeOut):
     activities: list[ActivityOut]
 
 
-class UserOutputUserWithLinkedEntities(UserOutputUser, ORMMixin):
+class UserOutputUserWithLinkedEntities(UserOutputUser):
     initiatives: list[InitiativeOut]
     activities: list[ActivityOut]
 
+    class Config:
+        orm_mode = True
 
-class UserOutputAdminWithLinkedEntities(UserOutputAdmin, ORMMixin):
+
+class UserOutputAdminWithLinkedEntities(UserOutputAdmin):
     initiatives: list[InitiativeOut]
     activities: list[ActivityOut]
+
+    class Config:
+        orm_mode = True
+        title = "UserOutputWithLinkedEntities"
 
 
 class ActivityOutWithLinkedEntities(ActivityOut):
