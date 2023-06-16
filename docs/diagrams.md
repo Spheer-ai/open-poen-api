@@ -19,8 +19,9 @@ erDiagram
     %% Should categories be linked to activities? Why?
     %% Related to this: why do we have initiatives -> activities again? What's the reasoning?
     CATEGORY }o--|| ACTIVITY : linked_to
-    NORDIGEN_ACCOUNT }o--|| USER : created_by
-    NORDIGEN_ACCOUNT }o--|| INITIATIVE : linked_to
+    NORDIGEN_BANK_ACCOUNT }o--|| USER : created_by
+    NORDIGEN_BANK_ACCOUNT }o--|| INITIATIVE : linked_to
+    NORDIGEN_REQUISITION }|--|| NORDIGEN_BANK_ACCOUNT : linked_to
 
     INITIATIVE {
         str image_url

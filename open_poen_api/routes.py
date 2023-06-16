@@ -1,16 +1,16 @@
-from sqlmodel import Session, select, SQLModel, col
+from sqlmodel import Session, select
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from .database import get_session
 from . import models as m
-from typing import Annotated, List, get_type_hints, TypeVar, Type
+from typing import Annotated
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from pydantic import BaseModel
-import string
-import random
 from sqlalchemy.exc import IntegrityError
+from .utils import get_entities_by_ids, temp_password_generator, get_fields_dict
+from sqlalchemy.orm.exc import NoResultFound
 
 
 router = APIRouter()
@@ -20,6 +20,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SECRET_KEY = "bladiebla"
 ALGORITHM = "HS256"
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 class Token(BaseModel):
@@ -47,6 +50,57 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
+def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: Session = Depends(get_session),
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str | None = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = session.exec(select(m.User).where(m.User.email == email)).first()
+    if user is None:
+        raise credentials_exception
+    if not user.active:
+        raise HTTPException(status_code=403, detail="User is inactive")
+    return user
+
+
+def get_financial_or_admin(current_user: Annotated[m.User, Depends(get_current_user)]):
+    if not current_user.role in (m.Role.FINANCIAL, m.Role.ADMIN):
+        raise HTTPException(
+            status_code=403, detail="Financial or admin authorization required"
+        )
+    # TODO: We can also return None for more complex logic in the route.
+    return current_user
+
+
+def get_admin(current_user: Annotated[m.User, Depends(get_current_user)]):
+    if not current_user.role == m.Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Admin authorization required")
+    # TODO: We can also return None for more complex logic in the route.
+    return current_user
+
+
+def get_initiative_owner(
+    current_user: Annotated[m.User, Depends(get_current_user)],
+    initiative_id: int,
+    session: Session = Depends(get_session),
+):
+    initiative = session.get(m.Initiative, initiative_id)
+    if initiative is None:
+        return HTTPException(status_code=404, detail="Initiative not found")
+    
+
+
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -67,31 +121,112 @@ async def login_for_access_token(
 
 
 # ACTIVITY
-@router.post("/initiative/{initiative_id}/activity")
-async def root(
+@router.post(
+    "/initiative/{initiative_id}/activity",
+    response_model=m.ActivityOutWithLinkedEntities,
+    responses={
+        404: {"description": "Initiative not found"},
+        400: {"description": "Initiative already has an activity with this name"},
+    },
+)
+async def create_activity(
     initiative_id: int,
-    activity: m.ActivityBase,
+    activity: m.ActivityIn,
     session: Session = Depends(get_session),
 ):
-    return activity
+    initiative_db = session.get(m.Initiative, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    fields = get_fields_dict(activity)
+    new_activity = m.Activity(initiative_id=initiative_id, **fields)
+    if activity.activity_owner_ids is not None:
+        new_activity.activity_owners = get_entities_by_ids(
+            session, m.User, activity.activity_owner_ids
+        )
+    try:
+        session.add(new_activity)
+        session.commit()
+        session.refresh(new_activity)
+        return new_activity
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=400, detail="Initiative already has an activity with this name"
+        )
 
 
-@router.put("/initiative/{initiative_id}/activity/{activity_id}")
-async def root(initiative_id: int, activity_id: int):
-    return {"name": "Eerste Activiteit"}
+@router.put(
+    "/initiative/{initiative_id}/activity/{activity_id}",
+    response_model=m.ActivityOutWithLinkedEntities,
+)
+async def update_activity(
+    initiative_id: int,
+    activity_id: int,
+    activity: m.ActivityIn,
+    session: Session = Depends(get_session),
+):
+    try:
+        initiative_db = session.get(m.Initiative, initiative_id)
+        activity_db = session.get(m.Activity, activity_id)
+
+        if (
+            not initiative_db
+            or not activity_db
+            or activity_db.initiative_id != initiative_id
+        ):
+            raise NoResultFound
+
+        fields = get_fields_dict(activity)
+        for key, value in fields.items():
+            setattr(activity_db, key, value)
+
+        if activity.activity_owner_ids is not None:
+            activity_db.activity_owners = get_entities_by_ids(
+                session, m.User, activity.activity_owner_ids
+            )
+
+        session.add(activity_db)
+        session.commit()
+        session.refresh(activity_db)
+        return activity_db
+
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Activity or Initiative not found")
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Name already registered")
 
 
 @router.delete("/initiative/{initiative_id}/activity/{activity_id}")
-async def root(initiative_id: int, activity_id: int):
-    return {"name": "Eerste Activiteit"}
+async def delete_activity(
+    initiative_id: int,
+    activity_id: int,
+    session: Session = Depends(get_session),
+):
+    activity = session.get(m.Activity, activity_id)
+    if not activity or activity.initiative_id != initiative_id:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    session.delete(activity)
+    session.commit()
+    return Response(status_code=204)
 
 
-@router.get("/initiative/{initiative_id}/activity/{activity_id}/users")
-async def root(initiative_id: int, activity_id: int):
-    return [
-        {"first_name": "Mark", "last_name": "de Wijk"},
-        {"first_name": "Jamal", "last_name": "Vleij"},
-    ]
+@router.get(
+    "/initiative/{initiative_id}/activities",
+    response_model=m.ActivityOutList,
+)
+async def get_activities_by_initiative(
+    initiative_id: int, session: Session = Depends(get_session)
+):
+    initiative = session.get(m.Initiative, initiative_id)
+    if not initiative:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+
+    activities = session.exec(
+        select(m.Activity).where(m.Activity.initiative_id == initiative_id)
+    ).all()
+    return {"activities": activities}
 
 
 # ACTIVITY - PAYMENT
@@ -118,51 +253,86 @@ async def root(initiative_id: int, activity_id: int):
 
 
 # INITIATIVE
-@router.post("/initiative", response_model=m.Initiative)
+@router.post(
+    "/initiative",
+    response_model=m.InitiativeOutWithLinkedEntities,
+    responses={400: {"description": "Name already registered"}},
+)
 async def create_initiative(
-    initiative: m.InitiativeCreate,
+    initiative: m.InitiativeIn,
     session: Session = Depends(get_session),
 ):
-    # NOTE: THIS WORKS AND CREATES A NEW USER
-    # u = m.User(email="testje@gmail.com", hashed_password="kdjflkdjf")
-    # ni = m.Initiative(name="testje", initiative_owners=[u])
-    # session.add(ni)
-    # session.commit()
-
+    fields = get_fields_dict(initiative)
+    new_initiative = m.Initiative(**fields)
+    if initiative.initiative_owner_ids is not None:
+        new_initiative.initiative_owners = get_entities_by_ids(
+            session, m.User, initiative.initiative_owner_ids
+        )
+    if initiative.activity_ids is not None:
+        new_initiative.activities = get_entities_by_ids(
+            session, m.Activity, initiative.activity_ids
+        )
     try:
-        users = session.exec(
-            select(m.User).where(col(m.User.email).in_([initiative.initiative_owners]))
-        ).all()
-        if len(users) != len(initiative.initiative_owners):
-            raise HTTPException(
-                status_code=400,
-                detail="One or more email addresses do not have associated users",
-            )
-        new_initiative = m.Initiative(name=initiative.name, initiative_owners=users)
         session.add(new_initiative)
         session.commit()
+        session.refresh(new_initiative)
         return new_initiative
     except IntegrityError:
         session.rollback()
-        raise HTTPException(status_code=400, detail="Initiative creation failed")
+        raise HTTPException(status_code=400, detail="Name already registered")
 
 
-@router.put("/initiative/{initiative_id}")
-async def root(initiative_id: int):
-    return {"name": "Buurtproject", "created_at": "2022-6-6"}
+@router.put(
+    "/initiative/{initiative_id}", response_model=m.InitiativeOutWithLinkedEntities
+)
+async def update_initiative(
+    initiative_id: int,
+    initiative: m.InitiativeIn,
+    session: Session = Depends(get_session),
+):
+    initiative_db = session.get(m.Initiative, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    fields = get_fields_dict(initiative)
+    for key, value in fields.items():
+        setattr(initiative_db, key, value)
+    if initiative.initiative_owner_ids is not None:
+        initiative_db.initiative_owners = get_entities_by_ids(
+            session, m.User, initiative.initiative_owner_ids
+        )
+    if initiative.activity_ids is not None:
+        initiative_db.activities = get_entities_by_ids(
+            session, m.Activity, initiative.activity_ids
+        )
+    try:
+        session.add(initiative_db)
+        session.commit()
+        session.refresh(initiative_db)
+        return initiative_db
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Name already registered")
 
 
 @router.delete("/initiative/{initiative_id}")
-async def root(initiative_id: int):
-    return {"status_code": 204, "content": "Succesfully deleted."}
+async def delete_initiative(
+    initiative_id: int, session: Session = Depends(get_session)
+):
+    initiative = session.get(m.Initiative, initiative_id)
+    if not initiative:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    session.delete(initiative)
+    session.commit()
+    return Response(status_code=204)
 
 
-@router.get("/initiatives")
-async def root():
-    return [
-        {"name": "Buurtproject", "created_at": "2022-6-6"},
-        {"name": "Smoelenboek", "created_at": "2022-2-22"},
-    ]
+@router.get("/initiatives", response_model=m.InitiativeOutList)
+async def get_initiatives(session: Session = Depends(get_session)):
+    # TODO: Enable searching by name, ordering by creation date and
+    # initiative ownership.
+    # TODO: pagination.
+    initiatives = session.exec(select(m.Initiative)).all()
+    return {"initiatives": initiatives}
 
 
 @router.get("/initiatives/aggregate-numbers")
@@ -170,22 +340,6 @@ async def root():
     # TODO: Merge into /initiatives?
     # NOTE: Can't merge, because /initiatives will be paginated.
     return {"total_spent": 100, "total_earned": 100, "initiative_count": 22}
-
-
-@router.get("/initiative/{initiative_id}/users")
-async def root(initiative_id: int):
-    return [
-        {"first_name": "Mark", "last_name": "de Wijk"},
-        {"first_name": "Jamal", "last_name": "Vleij"},
-    ]
-
-
-@router.get("/initiative/{initiative_id}/activities")
-async def root(initiative_id: int):
-    return [
-        {"name": "Eerste Activiteit"},
-        {"name": "Tweede Activiteit"},
-    ]
 
 
 # INITIATIVE - PAYMENT
@@ -240,61 +394,66 @@ async def root(initiative_id: int):
     ]
 
 
-def temp_password_generator(
-    size: int = 10, chars=string.ascii_uppercase + string.digits
-) -> str:
-    return "".join(random.choice(chars) for _ in range(size))
-
-
 # USER
-@router.post("/user")
-async def root(
-    user: m.UserBase,
+@router.post("/user", response_model=m.UserOutWithLinkedEntities)
+async def create_user(
+    user: m.UserIn,
     session: Session = Depends(get_session),
-    response_model=m.UserCreateReturn,
 ):
-    try:
-        # TODO: Send an email with the temporary password. Otherwise
-        # The user isn't notified and he can't login!
-        temp_password = temp_password_generator()
-        new_user = m.User(
-            email=user.email, hashed_password=pwd_context.hash(temp_password)
+    # TODO: Send an email with the temporary password. Otherwise
+    # The user isn't notified and he can't login!
+    # TODO: Route for resetting the password.
+    temp_password = temp_password_generator()
+    fields = get_fields_dict(user)
+    new_user = m.User(**fields, hashed_password=pwd_context.hash(temp_password))
+    if user.initiative_ids is not None:
+        new_user.initiatives = get_entities_by_ids(
+            session, m.Initiative, user.initiative_ids
         )
+    if user.activity_ids is not None:
+        new_user.activities = get_entities_by_ids(
+            session, m.Activity, user.activity_ids
+        )
+    try:
         session.add(new_user)
         session.commit()
-        return m.UserCreateReturn(
-            id=new_user.id, email=user.email, plain_password=temp_password
-        )
+        session.refresh(new_user)
+        return new_user
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Email address already registered")
 
 
-@router.put("/user/{user_id}")
+@router.put("/user/{user_id}", response_model=m.UserOutWithLinkedEntities)
 async def update_user(
     user_id: int,
-    user: m.UserUpdate,
+    user: m.UserIn,
     session: Session = Depends(get_session),
-    response_model=m.UserUpdate,
 ):
     user_db = session.get(m.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    if not user_db.id == user.id:
-        raise HTTPException(
-            status_code=400, detail="Query and body parameters for id are incongruent"
+    fields = get_fields_dict(user)
+    for key, value in fields.items():
+        setattr(user_db, key, value)
+    if user.initiative_ids is not None:
+        user_db.initiatives = get_entities_by_ids(
+            session, m.Initiative, user.initiative_ids
         )
-    user_db.email = user.email
-    user_db.first_name = user.first_name
-    user_db.last_name = user.last_name
-    session.commit()
-    return user
+    if user.activity_ids is not None:
+        user_db.activities = get_entities_by_ids(session, m.Activity, user.activity_ids)
+    try:
+        session.add(user_db)
+        session.commit()
+        session.refresh(user_db)
+        return user_db
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Email address already registered")
 
 
 @router.delete("/user/{user_id}")
-async def delete_user(
-    user_id: int, session: Session = Depends(get_session), response_model=Response
-):
+async def delete_user(user_id: int, session: Session = Depends(get_session)):
     user = session.get(m.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -304,30 +463,11 @@ async def delete_user(
     return Response(status_code=204)
 
 
-TSource = TypeVar("TSource", bound=SQLModel)
-TTarget = TypeVar("TTarget", bound=SQLModel)
-
-
-def convert_instances(
-    source_model: Type[TSource], target_model: Type[TTarget], instances: List[TSource]
-) -> List[TTarget]:
-    subset_instances = []
-
-    for instance in instances:
-        subset_instance = {}
-        for column in get_type_hints(target_model).keys():
-            if hasattr(instance, column):
-                subset_instance[column] = getattr(instance, column)
-        subset_instances.append(target_model(**subset_instance))
-
-    return subset_instances
-
-
-@router.get("/users", response_model=m.TempUser)
+@router.get("/users", response_model=m.UserOutList)
 def get_users(session: Session = Depends(get_session)):
+    # TODO: Enable searching by email.
+    # TODO: pagination.
     users = session.exec(select(m.User)).all()
-    # return convert_instances(m.User, m.UserUpdate, users)
-    # return [m.UserUpdate.from_orm(i) for i in users]
     return {"users": users}
 
 
