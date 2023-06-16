@@ -32,7 +32,7 @@ def pwd_context():
 
 
 @pytest.fixture(scope="function")
-def session(clean_session, pwd_context):
+def session_2(clean_session, pwd_context):
     # We add some entities to the database that don't require a
     # relationship upon instantiation.
     hashed_debug_password = pwd_context.hash(temp_password_generator())
@@ -85,3 +85,25 @@ def session(clean_session, pwd_context):
 
     yield clean_session
     return
+
+
+@pytest.fixture(scope="function")
+def session_3(session_2):
+    activity1 = Activity(
+        name="Activity 1",
+        description="Description 1",
+        purpose="Purpose 1",
+        target_audience="Target Audience 1",
+        initiative_id=1,
+    )
+    activity2 = Activity(
+        name="Activity 2",
+        description="Description 2",
+        purpose="Purpose 2",
+        target_audience="Target Audience 2",
+        initiative_id=1,
+    )
+    session_2.add_all([activity1, activity2])
+    session_2.commit()
+
+    yield session_2

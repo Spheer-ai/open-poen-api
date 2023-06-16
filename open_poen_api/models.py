@@ -129,7 +129,9 @@ class Activity(ActivityBase, table=True):
         back_populates="activities", link_model=ActivityToUser
     )
     initiative_id: int = Field(
-        sa_column=Column(Integer, ForeignKey("initiative.id", ondelete="CASCADE"))
+        sa_column=Column(
+            Integer, ForeignKey("initiative.id", ondelete="CASCADE"), nullable=False
+        )
     )
     initiative: Initiative = Relationship(back_populates="activities")
 
