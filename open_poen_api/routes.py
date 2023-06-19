@@ -349,7 +349,7 @@ async def update_user(
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
 
-    auth.validate_request_data(
+    auth.validate_input_data(
         unified_input_schema=user,
         parse_schemas=[
             (auth.AuthLevel.ADMIN, m.UserUpdateAdmin),
@@ -371,7 +371,14 @@ async def update_user(
         session.add(user_db)
         session.commit()
         session.refresh(user_db)
-        return m.UserOutputAdminWithLinkedEntities.from_orm(user_db)
+        return auth.validate_output_data(
+            user_db,
+            parse_schemas=[
+                (auth.AuthLevel.ADMIN, m.UserOutputAdminWithLinkedEntities),
+                (auth.AuthLevel.USER_OWNER, m.UserOutputUserWithLinkedEntities),
+            ],
+            auth_levels=auth_levels,
+        )
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Email address already registered")

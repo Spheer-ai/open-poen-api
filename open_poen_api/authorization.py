@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, SQLModel
 from fastapi import Depends, HTTPException, status
 from .database import get_session
 from . import models as m
@@ -132,7 +132,7 @@ def requires_login(logged_in_user: Annotated[m.User, Depends(get_logged_in_user)
     pass
 
 
-def validate_request_data(
+def validate_input_data(
     unified_input_schema: BaseModel,
     parse_schemas: list[tuple[AuthLevel, Type[BaseModel]]],
     auth_levels: list[AuthLevel],
@@ -152,3 +152,14 @@ def validate_request_data(
         status_code=403,
         detail=f"Unauthorized - Invalid authentication level(s) {auth_levels}",
     )
+
+
+def validate_output_data(
+    output_schema_instance: SQLModel,
+    parse_schemas: list[tuple[AuthLevel, Type[BaseModel]]],
+    auth_levels: list[AuthLevel],
+):
+    for level, schema in parse_schemas:
+        if level in auth_levels:
+            return schema.from_orm(output_schema_instance)
+    raise HTTPException(status_code=500)

@@ -116,6 +116,26 @@ def test_allowed_update_user_by_admin(client, session_2, admin_authorization_hea
     assert existing_user.hidden
 
 
+def test_allowed_update_user_by_user_owner(
+    client, session_2, user_authorization_header
+):
+    existing_user = session_2.exec(
+        select(m.User).where(m.User.email == "user3@example.com")
+    ).one()
+    assert existing_user.first_name != "John"
+    new_user_data = {"first_name": "John"}
+    header, _ = user_authorization_header
+    response = client.patch(
+        f"/user/{existing_user.id}",
+        json=new_user_data,
+        headers=header,
+    )
+    assert response.status_code == 200
+    session_2.refresh(existing_user)
+    assert existing_user.first_name == "John"
+    print("stop")
+
+
 def test_forbidden_update_by_user_owner(client, session_2, user_authorization_header):
     existing_user = session_2.exec(
         select(m.User).where(m.User.email == "user3@example.com")
