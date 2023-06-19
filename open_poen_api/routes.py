@@ -317,7 +317,7 @@ async def create_user(
     # The user isn't notified and he can't login!
     # TODO: Route for resetting the password.
     temp_password = temp_password_generator()
-    fields = get_fields_dict(user)
+    fields = get_fields_dict(user.dict())
     new_user = m.User(**fields, hashed_password=auth.PWD_CONTEXT.hash(temp_password))
     if user.initiative_ids is not None:
         new_user.initiatives = get_entities_by_ids(
@@ -341,6 +341,7 @@ async def create_user(
 async def update_user(
     user_id: int,
     user: m.UserUpdateAdmin,
+    requires_login=Depends(auth.requires_login),
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
 ):
@@ -348,15 +349,14 @@ async def update_user(
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if auth.AuthLevel.ADMIN in auth_levels:
-        pass
-    elif auth.AuthLevel.USER_OWNER in auth_levels:
-        try:
-            m.UserUpdateUser(**user.dict(exclude_unset=True))
-        except ValidationError:
-            raise HTTPException(status_code=403, detail="Unauthorized")
-    else:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    auth.validate_request_data(
+        unified_input_schema=user,
+        parse_schemas=[
+            (auth.AuthLevel.ADMIN, m.UserUpdateAdmin),
+            (auth.AuthLevel.USER_OWNER, m.UserUpdateUser),
+        ],
+        auth_levels=auth_levels,
+    )
 
     fields = get_fields_dict(user.dict(exclude_unset=True))
     for key, value in fields.items():
@@ -378,7 +378,11 @@ async def update_user(
 
 
 @router.delete("/user/{user_id}")
-async def delete_user(user_id: int, session: Session = Depends(get_session)):
+async def delete_user(
+    user_id: int,
+    requires_admin=Depends(auth.requires_admin),
+    session: Session = Depends(get_session),
+):
     user = session.get(m.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

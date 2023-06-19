@@ -2,12 +2,13 @@ from sqlmodel import Session, select
 from fastapi import Depends, HTTPException, status
 from .database import get_session
 from . import models as m
-from typing import Annotated
+from typing import Annotated, Type, TypeVar
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from enum import Enum
+from pydantic import BaseModel, ValidationError
 
 
 SECRET_KEY = "bladiebla"
@@ -71,22 +72,6 @@ def get_logged_in_user(requester: Annotated[m.User | None, Depends(get_requester
         return requester
 
 
-# def get_financial_or_admin(current_user: Annotated[m.User, Depends(get_current_user)]):
-#     if not current_user.role in (m.Role.FINANCIAL, m.Role.ADMIN):
-#         raise HTTPException(
-#             status_code=403, detail="Financial or admin authorization required"
-#         )
-#     # TODO: We can also return None for more complex logic in the route.
-#     return current_user
-
-
-# def get_admin(current_user: Annotated[m.User, Depends(get_current_user)]):
-#     if not current_user.role == m.Role.ADMIN:
-#         raise HTTPException(status_code=403, detail="Admin authorization required")
-#     # TODO: We can also return None for more complex logic in the route.
-#     return current_user
-
-
 class AuthLevel(str, Enum):
     """
     Enum representing various authorization levels in the Open Poen application:
@@ -143,16 +128,27 @@ def requires_admin(logged_in_user: Annotated[m.User, Depends(get_logged_in_user)
         raise HTTPException(status_code=403, detail="Admin authorization required")
 
 
-# def get_initiative_owner(
-#     current_user: Annotated[m.User, Depends(get_current_user)],
-#     initiative_id: int,
-#     session: Session = Depends(get_session),
-# ):
-#     initiative = session.get(m.Initiative, initiative_id)
-#     if initiative is None:
-#         return HTTPException(status_code=404, detail="Initiative not found")
+def requires_login(logged_in_user: Annotated[m.User, Depends(get_logged_in_user)]):
+    pass
 
-# roles in db
-# USER
-# FINANCIAL
-# ADMIN
+
+def validate_request_data(
+    unified_input_schema: BaseModel,
+    parse_schemas: list[tuple[AuthLevel, Type[BaseModel]]],
+    auth_levels: list[AuthLevel],
+):
+    # TODO: Document this / make it more readable.
+    for level, schema in parse_schemas:
+        if level in auth_levels:
+            try:
+                schema(**unified_input_schema.dict(exclude_unset=True))
+                return
+            except ValidationError:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Unauthorized - Invalid data for level {level}",
+                )
+    raise HTTPException(
+        status_code=403,
+        detail=f"Unauthorized - Invalid authentication level(s) {auth_levels}",
+    )
