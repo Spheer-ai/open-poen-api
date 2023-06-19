@@ -9,6 +9,7 @@ import pytest
         ("admin_authorization_header", 200, True),
         ("financial_authorization_header", 403, False),
         ("user_authorization_header", 403, False),
+        ("guest_authorization_header", 401, False),
     ],
 )
 def test_create_user(
@@ -43,7 +44,18 @@ def test_delete_non_existing_user(client, session_2):
     assert session_2.get(m.User, 42) is None
 
 
-def test_update_user(client, session_2):
+@pytest.mark.parametrize(
+    "authorization_header_name, status_code",
+    [
+        ("admin_authorization_header", 200),
+        ("financial_authorization_header", 200),
+        ("user_authorization_header", 200),
+        ("guest_authorization_header", 401),
+    ],
+)
+def test_update_user(
+    client, session_2, authorization_header_name, status_code, request
+):
     existing_user = session_2.exec(
         select(m.User).where(m.User.email == "user1@example.com")
     ).one()
@@ -55,8 +67,13 @@ def test_update_user(client, session_2):
         "last_name": "Doe",
         "email": "different@address.com",
     }
-    response = client.put(f"/user/{existing_user.id}", json=new_user_data)
-    assert response.status_code == 200
+    authorization_header = request.getfixturevalue(authorization_header_name)
+    response = client.patch(
+        f"/user/{existing_user.id}",
+        json=new_user_data,
+        headers=authorization_header,
+    )
+    assert response.status_code == status_code
     session_2.refresh(existing_user)
     assert existing_user.first_name == "John"
     assert existing_user.last_name == "Doe"

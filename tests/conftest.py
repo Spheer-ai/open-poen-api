@@ -134,3 +134,8 @@ def financial_authorization_header(client, session_2):
 @pytest.fixture(scope="function")
 def user_authorization_header(client, session_2):
     return generate_auth_header("user3@example.com", client, session_2)
+
+
+@pytest.fixture(scope="function")
+def guest_authorization_header(client, session_2):
+    return {}

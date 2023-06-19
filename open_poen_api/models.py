@@ -314,3 +314,9 @@ class UserOutputAdminWithLinkedEntities(UserOutputAdmin):
 class ActivityOutWithLinkedEntities(ActivityOut):
     activity_owners: list[UserOutputUser]
     initiative: InitiativeOut
+
+
+# AUTHORIZATON
+class Token(BaseModel):
+    access_token: str
+    token_type: str
