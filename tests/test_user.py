@@ -15,7 +15,7 @@ import pytest
 def test_create_user(
     client, session_2, authorization_header_name, status_code, email_in_db, request
 ):
-    authorization_header = request.getfixturevalue(authorization_header_name)
+    authorization_header, email = request.getfixturevalue(authorization_header_name)
     user_data = {
         "email": "janedoe@gmail.com",
         "role": "financial",
@@ -48,8 +48,8 @@ def test_delete_non_existing_user(client, session_2):
     "authorization_header_name, status_code",
     [
         ("admin_authorization_header", 200),
-        ("financial_authorization_header", 200),
-        ("user_authorization_header", 200),
+        ("financial_authorization_header", 403),
+        ("user_authorization_header", 403),
         ("guest_authorization_header", 401),
     ],
 )
@@ -62,12 +62,11 @@ def test_update_user(
     assert existing_user.first_name != "John"
     assert existing_user.last_name != "Doe"
     new_user_data = {
-        "id": existing_user.id,
         "first_name": "John",
         "last_name": "Doe",
         "email": "different@address.com",
     }
-    authorization_header = request.getfixturevalue(authorization_header_name)
+    authorization_header, email = request.getfixturevalue(authorization_header_name)
     response = client.patch(
         f"/user/{existing_user.id}",
         json=new_user_data,
@@ -78,6 +77,56 @@ def test_update_user(
     assert existing_user.first_name == "John"
     assert existing_user.last_name == "Doe"
     assert existing_user.email == "different@address.com"
+
+
+def test_allowed_update_user_by_admin(client, session_2, admin_authorization_header):
+    existing_user = session_2.exec(
+        select(m.User).where(m.User.email == "user3@example.com")
+    ).one()
+    assert existing_user.first_name != "John"
+    assert existing_user.last_name != "Doe"
+    new_user_data = {
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "different@address.com",
+        "role": "admin",
+        "hidden": True,
+    }
+    header, _ = admin_authorization_header
+    response = client.patch(
+        f"/user/{existing_user.id}",
+        json=new_user_data,
+        headers=header,
+    )
+    assert response.status_code == 200
+    session_2.refresh(existing_user)
+    assert existing_user.first_name == "John"
+    assert existing_user.last_name == "Doe"
+    assert existing_user.email == "different@address.com"
+    assert existing_user.role == "admin"
+    assert existing_user.hidden
+
+
+def test_forbidden_update_by_user(client, session_2, user_authorization_header):
+    existing_user = session_2.exec(
+        select(m.User).where(m.User.email == "user3@example.com")
+    ).one()
+    assert existing_user.role != "admin"
+    assert existing_user.hidden
+    new_user_data = {
+        "role": "admin",
+        "hidden": False,
+    }
+    header, _ = user_authorization_header
+    response = client.patch(
+        f"/user/{existing_user.id}",
+        json=new_user_data,
+        headers=header,
+    )
+    assert response.status_code == 403
+    session_2.refresh(existing_user)
+    assert existing_user.role != "admin"
+    assert existing_user.hidden
 
 
 def test_get_users(client, session_2):

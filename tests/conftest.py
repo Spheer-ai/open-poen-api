@@ -123,19 +123,22 @@ def generate_auth_header(username: str, client, session_2):
 
 @pytest.fixture(scope="function")
 def admin_authorization_header(client, session_2):
-    return generate_auth_header("user1@example.com", client, session_2)
+    email = "user1@example.com"
+    return generate_auth_header(email, client, session_2), email
 
 
 @pytest.fixture(scope="function")
 def financial_authorization_header(client, session_2):
-    return generate_auth_header("user2@example.com", client, session_2)
+    email = "user2@example.com"
+    return generate_auth_header(email, client, session_2), email
 
 
 @pytest.fixture(scope="function")
 def user_authorization_header(client, session_2):
-    return generate_auth_header("user3@example.com", client, session_2)
+    email = "user3@example.com"
+    return generate_auth_header(email, client, session_2), email
 
 
 @pytest.fixture(scope="function")
 def guest_authorization_header(client, session_2):
-    return {}
+    return {}, None

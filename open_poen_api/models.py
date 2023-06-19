@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Column, VARCHAR, Relationship, UniqueConstraint
 from datetime import datetime
-from pydantic import EmailStr, BaseModel
+from pydantic import EmailStr, BaseModel, Extra
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
 from sqlalchemy import Column, Integer, ForeignKey, DateTime
@@ -83,6 +83,7 @@ class UserCreateAdmin(UserInputBase):
 
     class Config:
         title = "UserCreate"
+        extra = Extra.forbid
 
 
 class UserUpdateUser(BaseModel):
@@ -91,8 +92,12 @@ class UserUpdateUser(BaseModel):
     last_name: str | None
     biography: str | None
 
+    class Config:
+        extra = Extra.forbid
+        orm_mode = True
 
-class UserUpdateAdmin(UserUpdateUser):
+
+class UserUpdateAdmin(UserUpdateUser, HiddenMixin):
     role: Role | None
     active: bool | None
     initiative_ids: list[int] | None
@@ -100,6 +105,7 @@ class UserUpdateAdmin(UserUpdateUser):
 
     class Config:
         title = "UserUpdate"
+        extra = Extra.forbid
 
 
 class UserOutputUser(BaseModel):

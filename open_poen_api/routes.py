@@ -8,6 +8,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
 from .utils import get_entities_by_ids, temp_password_generator, get_fields_dict
+from pydantic import ValidationError
 
 
 router = APIRouter()
@@ -339,14 +340,25 @@ async def create_user(
 @router.patch("/user/{user_id}", response_model=m.UserOutputAdminWithLinkedEntities)
 async def update_user(
     user_id: int,
-    user: m.UserCreateAdmin,
+    user: m.UserUpdateAdmin,
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
 ):
     user_db = session.get(m.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    fields = get_fields_dict(user)
+
+    if auth.AuthLevel.ADMIN in auth_levels:
+        pass
+    elif auth.AuthLevel.USER_OWNER in auth_levels:
+        try:
+            m.UserUpdateUser(**user.dict(exclude_unset=True))
+        except ValidationError:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+    else:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    fields = get_fields_dict(user.dict(exclude_unset=True))
     for key, value in fields.items():
         setattr(user_db, key, value)
     if user.initiative_ids is not None:
