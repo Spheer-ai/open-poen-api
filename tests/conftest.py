@@ -142,3 +142,18 @@ def user_authorization_header(client, session_2):
 @pytest.fixture(scope="function")
 def guest_authorization_header(client, session_2):
     return {}, None
+
+
+@pytest.fixture
+def initiative_data():
+    return {
+        "name": "Piets Buurtbarbeque",
+        "description": "Piet wordt vijftig.",
+        "purpose": "Saamhorigheid in de buurt bevorderen.",
+        "target_audience": "Mensen uit buurt De Florijn.",
+        "owner": "Mark de Wijk",
+        "owner_email": "markdewijk@spheer.ai",
+        "address_applicant": "Het stoepje 42, Assen, 9408DT, Nederland",
+        "kvk_registration": "12345678",
+        "location": "Amsterdam",
+    }

@@ -100,7 +100,7 @@ class UserCreateAdmin(UserInputBase):
         extra = Extra.forbid
 
 
-class UserUpdateUser(BaseModel, NotNullValidatorMixin):
+class UserUpdateUserOwner(BaseModel, NotNullValidatorMixin):
     email: EmailStr | None
     first_name: str | None
     last_name: str | None
@@ -115,7 +115,7 @@ class UserUpdateUser(BaseModel, NotNullValidatorMixin):
         return cls.not_null(value, field)
 
 
-class UserUpdateAdmin(UserUpdateUser, HiddenMixin):
+class UserUpdateAdmin(UserUpdateUserOwner, HiddenMixin):
     role: Role | None
     active: bool | None
     initiative_ids: list[int] | None
@@ -130,20 +130,27 @@ class UserUpdateAdmin(UserUpdateUser, HiddenMixin):
         return cls.not_null(value, field)
 
 
-class UserOutputUser(BaseModel):
+class UserOutputGuest(BaseModel):
     id: int
     first_name: str | None
-    last_name: str | None
     biography: str | None
     role: Role
     image: str | None
+
+
+class UserOutputUser(UserOutputGuest):
+    last_name: str | None
 
 
 class UserOutputUserOwner(UserOutputUser):
     pass
 
 
-class UserOutputAdmin(UserOutputUserOwner, TimeStampMixin, HiddenMixin):
+class UserOutputActivityOwner(UserOutputUserOwner):
+    pass
+
+
+class UserOutputAdmin(UserOutputActivityOwner, TimeStampMixin, HiddenMixin):
     email: EmailStr | None
     active: bool | None
 
@@ -180,7 +187,7 @@ class InitiativeBase(SQLModel, HiddenMixin):
     purpose: str
     target_audience: str
     owner: str
-    owner_email: EmailStr = Field(sa_column=Column("email", VARCHAR))
+    owner_email: EmailStr = Field(sa_column=Column("email", VARCHAR, nullable=False))
     # legal_entity
     address_applicant: str
     kvk_registration: str
@@ -203,17 +210,106 @@ class Initiative(InitiativeBase, TimeStampMixin, table=True):
     payments: list["Payment"] = Relationship(back_populates="initiative")
 
 
-class InitiativeIn(InitiativeBase):
+class InitiativeCreateAdmin(InitiativeBase):
     initiative_owner_ids: list[int] | None
+    # TODO: Remove this.
     activity_ids: list[int] | None
 
+    class Config:
+        title = "InitiativeCreate"
+        extra = Extra.forbid
 
-class InitiativeOut(InitiativeBase, TimeStampMixin):
+
+class InitiativeUpdateInitiativeOwner(BaseModel, NotNullValidatorMixin):
+    description: str | None
+
+    class Config:
+        extra = Extra.forbid
+        orm_mode = True
+
+    @validator("description")
+    def val_description(cls, value, field):
+        return cls.not_null(value, field)
+
+
+class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
+    name: str | None
+    purpose: str | None
+    target_audience: str | None
+    owner: str | None
+    owner_email: EmailStr | None
+    address_applicant: str | None
+    kvk_registration: str | None
+    location: str | None
+    hidden_sponsors: bool | None
+    initiative_owner_ids: list[int] | None
+    # TODO: Remove this.
+    activity_ids: list[int] | None
+
+    class Config:
+        title = "InitiativeUpdate"
+        extra = Extra.forbid
+
+    @validator(
+        "name",
+        "purpose",
+        "target_audience",
+        "owner",
+        "owner_email",
+        "address_applicant",
+        "kvk_registration",
+        "location",
+        "hidden_sponsors",
+    )
+    def val_fields(cls, value, field):
+        return cls.not_null(value, field)
+
+
+class InitiativeOutputGuest(BaseModel):
     id: int
+    name: str
+    description: str
+    purpose: str
+    target_audience: str
+    kvk_registration: str
+    location: str
 
 
-class InitiativeOutList(BaseModel):
-    initiatives: list[InitiativeOut]
+class InitiativeOutputUser(InitiativeOutputGuest):
+    pass
+
+
+class InitiativeOutputUserOwner(InitiativeOutputUser):
+    pass
+
+
+class InitiativeOutputActivityOwner(InitiativeOutputUserOwner):
+    owner: str
+    owner_email: str
+    address_applicant: str
+    hidden_sponsors: bool
+
+
+class InitiativeOutputAdmin(InitiativeOutputActivityOwner):
+    pass
+
+    class Config:
+        title = "InitiativeOutput"
+
+
+class InitiativeOutputGuestList(BaseModel):
+    initiatives: list[InitiativeOutputGuest]
+
+    class Config:
+        orm_mode = True
+
+
+class InitiativeOutputActivityOwnerList(BaseModel):
+    initiatives: list[InitiativeOutputActivityOwner]
+
+    class Config:
+        title = "InitiativeOutputList"
+        orm_mode = True
 
 
 # ACTIVITY
@@ -332,13 +428,22 @@ class PaymentOutList(BaseModel):
 
 
 # OUTPUT MODELS WITH LINKED ENTITIES
-class InitiativeOutWithLinkedEntities(InitiativeOut):
-    initiative_owners: list[UserOutputUserOwner]
+class InitiativeOutputGuestWithLinkedEntities(InitiativeOutputGuest):
+    initiative_owners: list[UserOutputGuest]
     activities: list[ActivityOut]
 
 
+class InitiativeOutputActivityOwnerWithLinkedEntities(InitiativeOutputActivityOwner):
+    initiative_owners: list[UserOutputActivityOwner]
+    activities: list[ActivityOut]
+
+    class Config:
+        orm_mode = True
+        title = "InitiativeOutputWithLinkedEntities"
+
+
 class UserOutputUserWithLinkedEntities(UserOutputUser):
-    initiatives: list[InitiativeOut]
+    initiatives: list[InitiativeOutputUser]
     activities: list[ActivityOut]
 
     class Config:
@@ -346,7 +451,7 @@ class UserOutputUserWithLinkedEntities(UserOutputUser):
 
 
 class UserOutputUserOwnerWithLinkedEntities(UserOutputUserOwner):
-    initiatives: list[InitiativeOut]
+    initiatives: list[InitiativeOutputUserOwner]
     activities: list[ActivityOut]
 
     class Config:
@@ -354,7 +459,7 @@ class UserOutputUserOwnerWithLinkedEntities(UserOutputUserOwner):
 
 
 class UserOutputAdminWithLinkedEntities(UserOutputAdmin):
-    initiatives: list[InitiativeOut]
+    initiatives: list[InitiativeOutputAdmin]
     activities: list[ActivityOut]
 
     class Config:
@@ -364,7 +469,7 @@ class UserOutputAdminWithLinkedEntities(UserOutputAdmin):
 
 class ActivityOutWithLinkedEntities(ActivityOut):
     activity_owners: list[UserOutputUserOwner]
-    initiative: InitiativeOut
+    initiative: InitiativeOutputActivityOwner
 
 
 # AUTHORIZATON

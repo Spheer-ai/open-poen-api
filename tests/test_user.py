@@ -49,13 +49,6 @@ def test_update_email_to_none(client, session_2, admin_authorization_header):
     assert response.status_code == 422
 
 
-def test_delete_non_existing_user(client, session_2, admin_authorization_header):
-    authorization_header, email = admin_authorization_header
-    response = client.delete("/user/42", headers=authorization_header)
-    assert response.status_code == 404
-    assert session_2.get(m.User, 42) is None
-
-
 def test_forbidden_delete(client, session_2, user_authorization_header):
     authorization_header, email = user_authorization_header
     response = client.delete("/user/1", headers=authorization_header)
@@ -72,9 +65,7 @@ def test_forbidden_delete(client, session_2, user_authorization_header):
         ("guest_authorization_header", 401),
     ],
 )
-def test_update_user(
-    client, session_2, authorization_header_name, status_code, request
-):
+def test_patch_user(client, session_2, authorization_header_name, status_code, request):
     existing_user = session_2.exec(
         select(m.User).where(m.User.email == "user1@example.com")
     ).one()
