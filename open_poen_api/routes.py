@@ -36,7 +36,7 @@ async def login_for_access_token(
 # ACTIVITY
 @router.post(
     "/initiative/{initiative_id}/activity",
-    response_model=m.ActivityOutWithLinkedEntities,
+    response_model=m.ActivityOutputGuestWithLinkedEntities,
     responses={
         404: {"description": "Initiative not found"},
         400: {"description": "Initiative already has an activity with this name"},
@@ -44,7 +44,7 @@ async def login_for_access_token(
 )
 async def create_activity(
     initiative_id: int,
-    activity: m.ActivityIn,
+    activity: m.ActivityCreateAdmin,
     session: Session = Depends(get_session),
 ):
     initiative_db = session.get(m.Initiative, initiative_id)
@@ -70,12 +70,12 @@ async def create_activity(
 
 @router.put(
     "/initiative/{initiative_id}/activity/{activity_id}",
-    response_model=m.ActivityOutWithLinkedEntities,
+    response_model=m.ActivityOutputGuestWithLinkedEntities,
 )
 async def update_activity(
     initiative_id: int,
     activity_id: int,
-    activity: m.ActivityIn,
+    activity: m.ActivityCreateAdmin,
     session: Session = Depends(get_session),
 ):
     try:
@@ -126,7 +126,7 @@ async def delete_activity(
 
 @router.get(
     "/initiative/{initiative_id}/activities",
-    response_model=m.ActivityOutList,
+    response_model=m.ActivityOutputGuestList,
 )
 async def get_activities_by_initiative(
     initiative_id: int, session: Session = Depends(get_session)

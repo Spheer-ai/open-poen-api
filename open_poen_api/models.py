@@ -290,7 +290,7 @@ class InitiativeOutputActivityOwner(InitiativeOutputUserOwner):
     hidden_sponsors: bool
 
 
-class InitiativeOutputAdmin(InitiativeOutputActivityOwner):
+class InitiativeOutputAdmin(InitiativeOutputActivityOwner, TimeStampMixin, HiddenMixin):
     pass
 
     class Config:
@@ -342,16 +342,75 @@ class Activity(ActivityBase, TimeStampMixin, table=True):
     )
 
 
-class ActivityIn(ActivityBase):
+class ActivityCreateAdmin(ActivityBase):
     activity_owner_ids: list[int] | None
 
+    class Config:
+        title = "ActivityCreate"
+        extra = Extra.forbid
 
-class ActivityOut(ActivityBase, TimeStampMixin):
+
+class ActivityUpdateActivtyOwner(BaseModel, NotNullValidatorMixin):
+    name: str | None
+    description: str | None
+    purpose: str | None
+    target_audience: str | None
+    image: str | None
+    # NOTE: Purposefully leaving out fields related to finishing.
+    # I'll probably make a separate endpoint for this.
+
+    class Config:
+        title = "ActivityUpdate"
+        extra = Extra.forbid
+
+    @validator("name", "descriptioen", "purpose", "target_audience", "image")
+    def val_fields(cls, value, field):
+        return cls.not_null(value, field)
+
+
+class ActivityOutputGuest(BaseModel):
     id: int
+    name: str
+    description: str
+    purpose: str
+    target_audience: str
+    image: str
+    finished_description: str | None
+    finished: bool
 
 
-class ActivityOutList(BaseModel):
-    activities: list[ActivityOut]
+class ActivityOutputUser(ActivityOutputGuest):
+    pass
+
+
+class ActivityOutputUserOwner(ActivityOutputUser):
+    pass
+
+
+class ActivityOutputActivityOwner(ActivityOutputUserOwner):
+    pass
+
+
+class ActivityOutputAdmin(ActivityOutputActivityOwner, HiddenMixin, TimeStampMixin):
+    pass
+
+    class Config:
+        title = "ActivityOutput"
+
+
+class ActivityOutputGuestList(BaseModel):
+    activities: list[ActivityOutputGuest]
+
+    class Config:
+        orm_mode = True
+
+
+class ActivityOutputAdminList(BaseModel):
+    activities: list[ActivityOutputAdmin]
+
+    class Config:
+        title = "ActivityOutputList"
+        orm_mode = True
 
 
 # PAYMENT
@@ -430,12 +489,12 @@ class PaymentOutList(BaseModel):
 # OUTPUT MODELS WITH LINKED ENTITIES
 class InitiativeOutputGuestWithLinkedEntities(InitiativeOutputGuest):
     initiative_owners: list[UserOutputGuest]
-    activities: list[ActivityOut]
+    activities: list[ActivityOutputGuest]
 
 
 class InitiativeOutputActivityOwnerWithLinkedEntities(InitiativeOutputActivityOwner):
     initiative_owners: list[UserOutputActivityOwner]
-    activities: list[ActivityOut]
+    activities: list[ActivityOutputActivityOwner]
 
     class Config:
         orm_mode = True
@@ -444,7 +503,7 @@ class InitiativeOutputActivityOwnerWithLinkedEntities(InitiativeOutputActivityOw
 
 class UserOutputUserWithLinkedEntities(UserOutputUser):
     initiatives: list[InitiativeOutputUser]
-    activities: list[ActivityOut]
+    activities: list[ActivityOutputUser]
 
     class Config:
         orm_mode = True
@@ -452,7 +511,7 @@ class UserOutputUserWithLinkedEntities(UserOutputUser):
 
 class UserOutputUserOwnerWithLinkedEntities(UserOutputUserOwner):
     initiatives: list[InitiativeOutputUserOwner]
-    activities: list[ActivityOut]
+    activities: list[ActivityOutputUserOwner]
 
     class Config:
         orm_mode = True
@@ -460,16 +519,16 @@ class UserOutputUserOwnerWithLinkedEntities(UserOutputUserOwner):
 
 class UserOutputAdminWithLinkedEntities(UserOutputAdmin):
     initiatives: list[InitiativeOutputAdmin]
-    activities: list[ActivityOut]
+    activities: list[ActivityOutputAdmin]
 
     class Config:
         orm_mode = True
         title = "UserOutputWithLinkedEntities"
 
 
-class ActivityOutWithLinkedEntities(ActivityOut):
-    activity_owners: list[UserOutputUserOwner]
-    initiative: InitiativeOutputActivityOwner
+class ActivityOutputGuestWithLinkedEntities(ActivityOutputGuest):
+    activity_owners: list[UserOutputGuest]
+    initiative: InitiativeOutputGuest
 
 
 # AUTHORIZATON
