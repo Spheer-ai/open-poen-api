@@ -2,7 +2,7 @@ from sqlmodel import Session, select, SQLModel
 from fastapi import Depends, HTTPException, status
 from .database import get_session
 from . import models as m
-from typing import Annotated, Type, TypeVar
+from typing import Annotated, Type, Sequence
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -155,11 +155,15 @@ def validate_input_data(
 
 
 def validate_output_data(
-    output_schema_instance: SQLModel,
+    output_schema_instance: SQLModel | Sequence[SQLModel],
     parse_schemas: list[tuple[AuthLevel, Type[BaseModel]]],
     auth_levels: list[AuthLevel],
+    seq_key: str | None = None,
 ):
     for level, schema in parse_schemas:
         if level in auth_levels:
-            return schema.from_orm(output_schema_instance)
+            if seq_key is None:
+                return schema.from_orm(output_schema_instance)
+            else:
+                return schema(**{seq_key: output_schema_instance})
     raise HTTPException(status_code=500)

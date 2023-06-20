@@ -24,7 +24,7 @@ class TimeStampMixin(BaseModel):
 
 
 class HiddenMixin(BaseModel):
-    hidden: bool = Field(nullable=False, default=False)
+    hidden: bool | None = Field(nullable=False, default=False)
 
 
 # LINK MODELS
@@ -128,12 +128,16 @@ class UserOutputAdmin(UserOutputUser, TimeStampMixin, HiddenMixin):
 class UserOutputUserList(BaseModel):
     users: list[UserOutputUser]
 
+    class Config:
+        orm_mode = True
+
 
 class UserOutputAdminList(BaseModel):
     users: list[UserOutputAdmin]
 
     class Config:
         title = "UserOutputList"
+        orm_mode = True
 
 
 # INITIATIVE

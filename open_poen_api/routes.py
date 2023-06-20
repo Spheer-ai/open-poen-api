@@ -337,7 +337,12 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Email address already registered")
 
 
-@router.patch("/user/{user_id}", response_model=m.UserOutputAdminWithLinkedEntities)
+@router.patch(
+    "/user/{user_id}",
+    response_model=m.UserOutputAdminWithLinkedEntities,
+    response_model_exclude_unset=True,
+)
+@router.patch("/user/{user_id}")
 async def update_user(
     user_id: int,
     user: m.UserUpdateAdmin,
@@ -399,12 +404,26 @@ async def delete_user(
     return Response(status_code=204)
 
 
-@router.get("/users", response_model=m.UserOutputUserList)
-def get_users(session: Session = Depends(get_session)):
+@router.get(
+    "/users", response_model=m.UserOutputAdminList, response_model_exclude_unset=True
+)
+def get_users(
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
+):
     # TODO: Enable searching by email.
     # TODO: pagination.
     users = session.exec(select(m.User)).all()
-    return {"users": users}
+    parsed_users = auth.validate_output_data(
+        users,
+        parse_schemas=[
+            (auth.AuthLevel.ADMIN, m.UserOutputAdminList),
+            (auth.AuthLevel.USER, m.UserOutputUserList),
+        ],
+        auth_levels=auth_levels,
+        seq_key="users",
+    )
+    return parsed_users
 
 
 # # FUNDER

@@ -177,8 +177,16 @@ def test_forbidden_update_by_user(client, session_2, user_authorization_header):
     assert existing_user.role == "admin"
 
 
-def test_get_users(client, session_2):
-    response = client.get("/users")
+def test_allowed_get_by_user(client, session_2, user_authorization_header):
+    header, _ = user_authorization_header
+    response = client.get("/users", headers=header)
+    assert response.status_code == 200
+    assert len(response.json()["users"]) == 3
+
+
+def test_allowed_get_by_admin(client, session_2, admin_authorization_header):
+    header, _ = admin_authorization_header
+    response = client.get("/users", headers=header)
     assert response.status_code == 200
     assert len(response.json()["users"]) == 3
 
