@@ -12,7 +12,7 @@ import pytest
         ("guest_authorization_header", 401, False),
     ],
 )
-def test_create_user(
+def test_post_user(
     client, session_2, authorization_header_name, status_code, email_in_db, request
 ):
     authorization_header, email = request.getfixturevalue(authorization_header_name)

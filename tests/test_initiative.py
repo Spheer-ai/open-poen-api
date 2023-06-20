@@ -13,7 +13,7 @@ import open_poen_api.models as m
         ("guest_authorization_header", 401, False),
     ],
 )
-def test_create_initiative(
+def test_post_initiative(
     client,
     session_2,
     authorization_header_name,
