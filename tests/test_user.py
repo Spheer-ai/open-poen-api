@@ -38,6 +38,17 @@ def test_duplicate_email(client, session_2, admin_authorization_header):
     assert response.json()["detail"] == "Email address already registered"
 
 
+def test_update_email_to_none(client, session_2, admin_authorization_header):
+    new_user_data = {"email": None, "first_name": "mark"}
+    header, _ = admin_authorization_header
+    response = client.patch(
+        f"/user/1",
+        json=new_user_data,
+        headers=header,
+    )
+    assert response.status_code == 422
+
+
 def test_delete_non_existing_user(client, session_2, admin_authorization_header):
     authorization_header, email = admin_authorization_header
     response = client.delete("/user/42", headers=authorization_header)

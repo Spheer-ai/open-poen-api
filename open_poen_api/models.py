@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Column, VARCHAR, Relationship, UniqueConstraint
 from datetime import datetime
-from pydantic import EmailStr, BaseModel, Extra
+from pydantic import EmailStr, BaseModel, Extra, validator
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
 from sqlalchemy import Column, Integer, ForeignKey, DateTime
@@ -25,6 +25,18 @@ class TimeStampMixin(BaseModel):
 
 class HiddenMixin(BaseModel):
     hidden: bool | None = Field(nullable=False, default=False)
+
+
+class NotNullValidatorMixin:
+    """This validator helps enforce the condition that certain fields cannot be set to `None`. This is useful
+    in situations where you want to distinguish between a field being omitted from a request (which is allowed)
+    and a field being explicitly set to `None` (which is not allowed)."""
+
+    @staticmethod
+    def not_null(value, field):
+        if value is None:
+            raise ValueError(f"{field.name} cannot be null")
+        return value
 
 
 # LINK MODELS
@@ -54,7 +66,7 @@ class Role(str, Enum):
 
 class UserInputBase(SQLModel, HiddenMixin):
     email: EmailStr = Field(
-        sa_column=Column("email", VARCHAR, unique=True, index=True), nullable=False
+        sa_column=Column("email", VARCHAR, unique=True, index=True, nullable=False)
     )
     first_name: str | None
     last_name: str | None
@@ -88,7 +100,7 @@ class UserCreateAdmin(UserInputBase):
         extra = Extra.forbid
 
 
-class UserUpdateUser(BaseModel):
+class UserUpdateUser(BaseModel, NotNullValidatorMixin):
     email: EmailStr | None
     first_name: str | None
     last_name: str | None
@@ -97,6 +109,10 @@ class UserUpdateUser(BaseModel):
     class Config:
         extra = Extra.forbid
         orm_mode = True
+
+    @validator("email")
+    def val_email(cls, value, field):
+        return cls.not_null(value, field)
 
 
 class UserUpdateAdmin(UserUpdateUser, HiddenMixin):
@@ -108,6 +124,10 @@ class UserUpdateAdmin(UserUpdateUser, HiddenMixin):
     class Config:
         title = "UserUpdate"
         extra = Extra.forbid
+
+    @validator("role", "active")
+    def val_role_active(cls, value, field):
+        return cls.not_null(value, field)
 
 
 class UserOutputUser(BaseModel):

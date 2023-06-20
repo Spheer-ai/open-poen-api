@@ -364,7 +364,7 @@ async def update_user(
     )
 
     # exclude_none=True because no User fields can be set to NULL after instantiation.
-    fields = get_fields_dict(user.dict(exclude_unset=True, exclude_none=True))
+    fields = get_fields_dict(user.dict(exclude_unset=True))
     for key, value in fields.items():
         setattr(user_db, key, value)
     if user.initiative_ids is not None:
