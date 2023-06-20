@@ -53,7 +53,9 @@ class Role(str, Enum):
 
 
 class UserInputBase(SQLModel, HiddenMixin):
-    email: EmailStr = Field(sa_column=Column("email", VARCHAR, unique=True, index=True))
+    email: EmailStr = Field(
+        sa_column=Column("email", VARCHAR, unique=True, index=True), nullable=False
+    )
     first_name: str | None
     last_name: str | None
     biography: str | None
@@ -117,7 +119,11 @@ class UserOutputUser(BaseModel):
     image: str | None
 
 
-class UserOutputAdmin(UserOutputUser, TimeStampMixin, HiddenMixin):
+class UserOutputUserOwner(UserOutputUser):
+    pass
+
+
+class UserOutputAdmin(UserOutputUserOwner, TimeStampMixin, HiddenMixin):
     email: EmailStr | None
     active: bool | None
 
@@ -127,6 +133,13 @@ class UserOutputAdmin(UserOutputUser, TimeStampMixin, HiddenMixin):
 
 class UserOutputUserList(BaseModel):
     users: list[UserOutputUser]
+
+    class Config:
+        orm_mode = True
+
+
+class UserOutputUserOwnerList(BaseModel):
+    users: list[UserOutputUserOwner]
 
     class Config:
         orm_mode = True
@@ -300,11 +313,19 @@ class PaymentOutList(BaseModel):
 
 # OUTPUT MODELS WITH LINKED ENTITIES
 class InitiativeOutWithLinkedEntities(InitiativeOut):
-    initiative_owners: list[UserOutputUser]
+    initiative_owners: list[UserOutputUserOwner]
     activities: list[ActivityOut]
 
 
 class UserOutputUserWithLinkedEntities(UserOutputUser):
+    initiatives: list[InitiativeOut]
+    activities: list[ActivityOut]
+
+    class Config:
+        orm_mode = True
+
+
+class UserOutputUserOwnerWithLinkedEntities(UserOutputUserOwner):
     initiatives: list[InitiativeOut]
     activities: list[ActivityOut]
 
@@ -322,7 +343,7 @@ class UserOutputAdminWithLinkedEntities(UserOutputAdmin):
 
 
 class ActivityOutWithLinkedEntities(ActivityOut):
-    activity_owners: list[UserOutputUser]
+    activity_owners: list[UserOutputUserOwner]
     initiative: InitiativeOut
 
 

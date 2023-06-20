@@ -354,7 +354,7 @@ async def update_user(
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
 
-    auth.validate_input_data(
+    auth.validate_input_schema(
         unified_input_schema=user,
         parse_schemas=[
             (auth.AuthLevel.ADMIN, m.UserUpdateAdmin),
@@ -363,7 +363,8 @@ async def update_user(
         auth_levels=auth_levels,
     )
 
-    fields = get_fields_dict(user.dict(exclude_unset=True))
+    # exclude_none=True because no User fields can be set to NULL after instantiation.
+    fields = get_fields_dict(user.dict(exclude_unset=True, exclude_none=True))
     for key, value in fields.items():
         setattr(user_db, key, value)
     if user.initiative_ids is not None:
@@ -376,11 +377,11 @@ async def update_user(
         session.add(user_db)
         session.commit()
         session.refresh(user_db)
-        return auth.validate_output_data(
+        return auth.validate_output_schema(
             user_db,
             parse_schemas=[
                 (auth.AuthLevel.ADMIN, m.UserOutputAdminWithLinkedEntities),
-                (auth.AuthLevel.USER_OWNER, m.UserOutputUserWithLinkedEntities),
+                (auth.AuthLevel.USER_OWNER, m.UserOutputUserOwnerWithLinkedEntities),
             ],
             auth_levels=auth_levels,
         )
@@ -414,7 +415,7 @@ def get_users(
     # TODO: Enable searching by email.
     # TODO: pagination.
     users = session.exec(select(m.User)).all()
-    parsed_users = auth.validate_output_data(
+    parsed_users = auth.validate_output_schema(
         users,
         parse_schemas=[
             (auth.AuthLevel.ADMIN, m.UserOutputAdminList),

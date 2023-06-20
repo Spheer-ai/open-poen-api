@@ -93,6 +93,9 @@ class AuthLevel(str, Enum):
     FINANCIAL = "financial"
     ADMIN = "admin"
 
+    def __str__(self):
+        return self.value
+
 
 def get_authorization_level(
     requester: Annotated[
@@ -132,7 +135,7 @@ def requires_login(logged_in_user: Annotated[m.User, Depends(get_logged_in_user)
     pass
 
 
-def validate_input_data(
+def validate_input_schema(
     unified_input_schema: BaseModel,
     parse_schemas: list[tuple[AuthLevel, Type[BaseModel]]],
     auth_levels: list[AuthLevel],
@@ -146,15 +149,15 @@ def validate_input_data(
             except ValidationError:
                 raise HTTPException(
                     status_code=403,
-                    detail=f"Unauthorized - Invalid data for level {level}",
+                    detail=f"Unauthorized - Invalid data for level {str(level)}",
                 )
     raise HTTPException(
         status_code=403,
-        detail=f"Unauthorized - Invalid authentication level(s) {auth_levels}",
+        detail=f"Unauthorized - Invalid authentication level(s) {[str(x) for x in auth_levels]}",
     )
 
 
-def validate_output_data(
+def validate_output_schema(
     output_schema_instance: SQLModel | Sequence[SQLModel],
     parse_schemas: list[tuple[AuthLevel, Type[BaseModel]]],
     auth_levels: list[AuthLevel],
