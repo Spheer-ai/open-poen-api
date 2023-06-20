@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from enum import Enum
+from enum import IntEnum
 from pydantic import BaseModel, ValidationError
 
 
@@ -72,7 +72,7 @@ def get_logged_in_user(requester: Annotated[m.User | None, Depends(get_requester
         return requester
 
 
-class AuthLevel(str, Enum):
+class AuthLevel(IntEnum):
     """
     Enum representing various authorization levels in the Open Poen application:
 
@@ -85,16 +85,16 @@ class AuthLevel(str, Enum):
     - ADMIN: A user with full rights.
     """
 
-    GUEST = "guest"
-    USER = "user"
-    USER_OWNER = "user_owner"
-    ACTIVITY_OWNER = "activity_owner"
-    INITIATIVE_OWNER = "initiative_owner"
-    FINANCIAL = "financial"
-    ADMIN = "admin"
+    GUEST = 1
+    USER = 2
+    USER_OWNER = 3
+    ACTIVITY_OWNER = 4
+    INITIATIVE_OWNER = 5
+    FINANCIAL = 6
+    ADMIN = 7
 
     def __str__(self):
-        return self.value
+        return self.name.lower()
 
 
 def get_authorization_level(
@@ -108,7 +108,9 @@ def get_authorization_level(
 ) -> list[AuthLevel]:
     if requester is None:
         return [AuthLevel.GUEST]
-    auth_levels = [AuthLevel.USER]
+    auth_levels = [AuthLevel.GUEST, AuthLevel.USER]
+    # TODO: USER_OWNER doesn't really belong here, it doesn't
+    # fit so well among the other levels ordinality wise.
     if user_id is not None and requester.id == user_id:
         auth_levels.append(AuthLevel.USER_OWNER)
     if initiative_id is not None and initiative_id in map(
@@ -142,7 +144,7 @@ def validate_input_schema(
 ):
     # TODO: Document this / make it more readable.
     for level, schema in parse_schemas:
-        if level in auth_levels:
+        if any([l >= level for l in auth_levels]):
             try:
                 schema(**unified_input_schema.dict(exclude_unset=True))
                 return
@@ -164,7 +166,7 @@ def validate_output_schema(
     seq_key: str | None = None,
 ):
     for level, schema in parse_schemas:
-        if level in auth_levels:
+        if any([l >= level for l in auth_levels]):
             if seq_key is None:
                 return schema.from_orm(output_schema_instance)
             else:
