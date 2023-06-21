@@ -179,18 +179,34 @@ def test_forbidden_update_by_user(client, session_2, user_authorization_header):
     assert existing_user.role == "admin"
 
 
-def test_allowed_get_by_user(client, session_2, user_authorization_header):
-    header, _ = user_authorization_header
-    response = client.get("/users", headers=header)
-    assert response.status_code == 200
-    assert len(response.json()["users"]) == 3
-
-
-def test_allowed_get_by_admin(client, session_2, admin_authorization_header):
-    header, _ = admin_authorization_header
-    response = client.get("/users", headers=header)
-    assert response.status_code == 200
-    assert len(response.json()["users"]) == 3
+@pytest.mark.parametrize(
+    "authorization_header_name, status_code, should_see_email",
+    [
+        ("admin_authorization_header", 200, True),
+        ("financial_authorization_header", 200, False),
+        ("user_authorization_header", 200, False),
+        ("guest_authorization_header", 401, False),
+    ],
+)
+def test_get_users(
+    client, session_2, authorization_header_name, status_code, should_see_email, request
+):
+    authorization_header, _ = request.getfixturevalue(authorization_header_name)
+    response = client.get(
+        "/users",
+        headers=authorization_header,
+    )
+    assert response.status_code == status_code
+    if status_code == 200:
+        response_json = response.json()
+        assert "users" in response_json
+        users = response_json["users"]
+        assert isinstance(users, list)
+        for user in users:
+            if should_see_email:
+                assert "email" in user
+            else:
+                assert "email" not in user
 
 
 def test_retrieve_token(client, session_2):

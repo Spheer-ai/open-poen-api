@@ -274,12 +274,11 @@ async def delete_initiative(
 
 @router.get(
     "/initiatives",
-    response_model=s.InitiativeOutputActivityOwnerList,
+    response_model=s.InitiativeOutputAdminList,
     response_model_exclude_unset=True,
 )
 async def get_initiatives(
     session: Session = Depends(get_session),
-    requires_login=Depends(auth.requires_login),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
 ):
     # TODO: Enable searching by name, ordering by creation date and
@@ -289,11 +288,13 @@ async def get_initiatives(
     parsed_initiatives = auth.validate_output_schema(
         initiatives,
         parse_schemas=[
-            (auth.AuthLevel.ACTIVITY_OWNER, s.InitiativeOutputActivityOwnerList),
+            (auth.AuthLevel.ADMIN, s.InitiativeOutputAdminList),
             (auth.AuthLevel.GUEST, s.InitiativeOutputGuestList),
         ],
         auth_levels=auth_levels,
+        seq_key="initiatives",
     )
+    return parsed_initiatives
 
 
 @router.get("/initiatives/aggregate-numbers")

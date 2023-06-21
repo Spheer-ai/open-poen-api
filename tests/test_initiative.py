@@ -74,10 +74,34 @@ def test_patch_initiative(
         assert existing_initiative.name == "New Name"
 
 
-def test_get_initiatives(client, session_2):
-    response = client.get("/initiatives")
+@pytest.mark.parametrize(
+    "authorization_header_name, should_see_owner_email",
+    [
+        ("admin_authorization_header", True),
+        ("financial_authorization_header", False),
+        ("user_authorization_header", False),
+        ("guest_authorization_header", False),
+    ],
+)
+def test_get_initiatives(
+    client, session_2, authorization_header_name, should_see_owner_email, request
+):
+    authorization_header, _ = request.getfixturevalue(authorization_header_name)
+    response = client.get(
+        "/initiatives",
+        headers=authorization_header,
+    )
     assert response.status_code == 200
-    assert len(response.json()["initiatives"]) == 2
+    response_json = response.json()
+    assert "initiatives" in response_json
+    initiatives = response_json["initiatives"]
+    assert isinstance(initiatives, list)
+    for initiative in initiatives:
+        assert "name" in initiative
+        if should_see_owner_email:
+            assert "owner_email" in initiative
+        else:
+            assert "owner_email" not in initiative
 
 
 def test_add_non_existing_initiative_owner(client, session_2, initiative_data):

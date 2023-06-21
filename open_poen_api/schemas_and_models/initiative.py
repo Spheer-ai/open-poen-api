@@ -77,10 +77,10 @@ class InitiativeOutputUserOwner(InitiativeOutputUser):
 
 
 class InitiativeOutputActivityOwner(InitiativeOutputUserOwner):
-    owner: str
-    owner_email: str
-    address_applicant: str
-    hidden_sponsors: bool
+    owner: str | None
+    owner_email: str | None
+    address_applicant: str | None
+    hidden_sponsors: bool | None
 
 
 class InitiativeOutputAdmin(InitiativeOutputActivityOwner, TimeStampMixin, HiddenMixin):
@@ -99,6 +99,13 @@ class InitiativeOutputGuestList(BaseModel):
 
 class InitiativeOutputActivityOwnerList(BaseModel):
     initiatives: list[InitiativeOutputActivityOwner]
+
+    class Config:
+        orm_mode = True
+
+
+class InitiativeOutputAdminList(BaseModel):
+    initiatives: list[InitiativeOutputAdmin]
 
     class Config:
         title = "InitiativeOutputList"
