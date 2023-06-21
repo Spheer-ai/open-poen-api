@@ -121,27 +121,39 @@ def generate_auth_header(username: str, client, session_2):
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
+UserID = int | None
+InitiativeID = int | None
+ActivityID = int | None
+AuthTestConfig = tuple[dict[str, str], UserID, InitiativeID, ActivityID]
+
+
 @pytest.fixture(scope="function")
-def admin_authorization_header(client, session_2):
+def admin_auth_2(client, session_2) -> AuthTestConfig:
     email = "user1@example.com"
-    return generate_auth_header(email, client, session_2), email
+    return generate_auth_header(email, client, session_2), 1, None, None
 
 
 @pytest.fixture(scope="function")
-def financial_authorization_header(client, session_2):
+def financial_auth_2(client, session_2) -> AuthTestConfig:
     email = "user2@example.com"
-    return generate_auth_header(email, client, session_2), email
+    return generate_auth_header(email, client, session_2), 1, None, None
 
 
 @pytest.fixture(scope="function")
-def user_authorization_header(client, session_2):
+def user_auth_2(client, session_2) -> AuthTestConfig:
     email = "user3@example.com"
-    return generate_auth_header(email, client, session_2), email
+    return generate_auth_header(email, client, session_2), 1, None, None
 
 
 @pytest.fixture(scope="function")
-def guest_authorization_header(client, session_2):
-    return {}, None
+def user_owner_auth_2(client, session_2) -> AuthTestConfig:
+    email = "user3@example.com"
+    return generate_auth_header(email, client, session_2), 3, None, None
+
+
+@pytest.fixture(scope="function")
+def guest_auth_2(client, session_2) -> AuthTestConfig:
+    return {}, 1, None, None
 
 
 @pytest.fixture

@@ -33,9 +33,9 @@ def test_post_initiative(
     assert name_exists == name_in_db
 
 
-def test_duplicate_name(client, session_2, admin_authorization_header, initiative_data):
+def test_duplicate_name(client, session_2, admin_auth_2, initiative_data):
     initiative_data["name"] = "Initiative 1"
-    authorization_header, _ = admin_authorization_header
+    authorization_header, _ = admin_auth_2
     response = client.post(
         "/initiative", json=initiative_data, headers=authorization_header
     )
