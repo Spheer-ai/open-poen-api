@@ -5,24 +5,24 @@ from open_poen_api.schemas_and_models.models import entities as e
 
 
 @pytest.mark.parametrize(
-    "authorization_header_name, status_code, name_in_db",
+    "auth, status_code, name_in_db",
     [
-        ("admin_authorization_header", 200, True),
-        ("financial_authorization_header", 403, False),
-        ("user_authorization_header", 403, False),
-        ("guest_authorization_header", 401, False),
+        ("admin_auth_2", 200, True),
+        ("financial_auth_2", 403, False),
+        ("user_auth_2", 403, False),
+        ("guest_auth_2", 401, False),
     ],
 )
 def test_post_initiative(
     client,
     session_2,
-    authorization_header_name,
+    auth,
     status_code,
     name_in_db,
     initiative_data,
     request,
 ):
-    authorization_header, _ = request.getfixturevalue(authorization_header_name)
+    authorization_header, _, _, _ = request.getfixturevalue(auth)
     response = client.post(
         "/initiative", json=initiative_data, headers=authorization_header
     )
@@ -35,7 +35,7 @@ def test_post_initiative(
 
 def test_duplicate_name(client, session_2, admin_auth_2, initiative_data):
     initiative_data["name"] = "Initiative 1"
-    authorization_header, _ = admin_auth_2
+    authorization_header, _, _, _ = admin_auth_2
     response = client.post(
         "/initiative", json=initiative_data, headers=authorization_header
     )
@@ -44,25 +44,21 @@ def test_duplicate_name(client, session_2, admin_auth_2, initiative_data):
 
 
 @pytest.mark.parametrize(
-    "authorization_header_name, status_code",
+    "auth, status_code",
     [
-        ("admin_authorization_header", 200),
-        ("financial_authorization_header", 403),
-        ("user_authorization_header", 403),
-        ("guest_authorization_header", 401),
+        ("admin_auth_2", 200),
+        ("financial_auth_2", 200),
+        ("initiative_owner_auth_2", 200),
+        ("guest_auth_2", 401),
     ],
 )
-def test_patch_initiative(
-    client, session_2, authorization_header_name, status_code, request
-):
-    existing_initiative = session_2.exec(
-        select(e.Initiative).where(e.Initiative.name == "Initiative 1")
-    ).one()
+def test_patch_initiative(client, session_2, auth, status_code, request):
+    authorization_header, user_id, initiative_id, _ = request.getfixturevalue(auth)
+    existing_initiative = session_2.get(e.Initiative, initiative_id)
     assert existing_initiative.name != "New Name"
     new_initiative_data = {
         "name": "New Name",
     }
-    authorization_header, _ = request.getfixturevalue(authorization_header_name)
     response = client.patch(
         f"/initiative/{existing_initiative.id}",
         json=new_initiative_data,
@@ -75,18 +71,16 @@ def test_patch_initiative(
 
 
 @pytest.mark.parametrize(
-    "authorization_header_name, should_see_owner_email",
+    "auth, should_see_owner_email",
     [
-        ("admin_authorization_header", True),
-        ("financial_authorization_header", False),
-        ("user_authorization_header", False),
-        ("guest_authorization_header", False),
+        ("admin_auth_2", True),
+        ("financial_auth_2", False),
+        ("user_auth_2", False),
+        ("guest_auth_2", False),
     ],
 )
-def test_get_initiatives(
-    client, session_2, authorization_header_name, should_see_owner_email, request
-):
-    authorization_header, _ = request.getfixturevalue(authorization_header_name)
+def test_get_initiatives(client, session_2, auth, should_see_owner_email, request):
+    authorization_header, _, _, _ = request.getfixturevalue(auth)
     response = client.get(
         "/initiatives",
         headers=authorization_header,
@@ -104,13 +98,18 @@ def test_get_initiatives(
             assert "owner_email" not in initiative
 
 
-def test_add_non_existing_initiative_owner(client, session_2, initiative_data):
+def test_add_non_existing_initiative_owner(
+    client, session_2, admin_auth_2, initiative_data
+):
+    authorization_header, _, _, _ = admin_auth_2
     initiative_data = {
         **initiative_data,
         "initiative_owner_ids": [42],
     }
 
-    response = client.post("/initiative", json=initiative_data)
+    response = client.post(
+        "/initiative", json=initiative_data, headers=authorization_header
+    )
     assert response.status_code == 404
     assert (
         response.json()["detail"]

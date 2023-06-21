@@ -285,7 +285,7 @@ async def update_initiative(
             parse_schemas=[
                 (auth.AuthLevel.ADMIN, le.InitiativeOutputAdminWithLinkedEntities),
                 (
-                    auth.AuthLevel.ACTIVITY_OWNER,
+                    auth.AuthLevel.ACTIVITY_OWNER,  # TODO: Make this InitiativeOutputInitiativeOwnerWithLinkedEntities?
                     le.InitiativeOutputActivityOwnerWithLinkedEntities,
                 ),
             ],

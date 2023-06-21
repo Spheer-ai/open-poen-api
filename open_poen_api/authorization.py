@@ -151,7 +151,6 @@ def validate_input_schema(
     parse_schemas: list[tuple[AuthLevel, Type[BaseModel]]],
     auth_levels: list[AuthLevel],
 ):
-    # TODO: Document this / make it more readable.
     for level, schema in parse_schemas:
         if any([l >= level for l in auth_levels]):
             try:

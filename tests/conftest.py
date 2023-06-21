@@ -50,11 +50,11 @@ def session_2(clean_session, pwd_context):
     )
     user3 = User(
         email="user3@example.com",
-        hidden=True,
         hashed_password=hashed_debug_password,
     )
     clean_session.add_all([user1, user2, user3])
     clean_session.commit()
+    clean_session.refresh(user3)
 
     initiative1 = Initiative(
         name="Initiative 1",
@@ -67,6 +67,7 @@ def session_2(clean_session, pwd_context):
         kvk_registration="Registration 1",
         location="Location 1",
         hidden=True,
+        initiative_owners=[user3, user2],
     )
 
     initiative2 = Initiative(
@@ -130,19 +131,25 @@ AuthTestConfig = tuple[dict[str, str], UserID, InitiativeID, ActivityID]
 @pytest.fixture(scope="function")
 def admin_auth_2(client, session_2) -> AuthTestConfig:
     email = "user1@example.com"
-    return generate_auth_header(email, client, session_2), 1, None, None
+    return generate_auth_header(email, client, session_2), 1, 1, None
 
 
 @pytest.fixture(scope="function")
 def financial_auth_2(client, session_2) -> AuthTestConfig:
     email = "user2@example.com"
-    return generate_auth_header(email, client, session_2), 1, None, None
+    return generate_auth_header(email, client, session_2), 1, 1, None
+
+
+@pytest.fixture(scope="function")
+def initiative_owner_auth_2(client, session_2) -> AuthTestConfig:
+    email = "user3@example.com"
+    return generate_auth_header(email, client, session_2), 3, 1, None
 
 
 @pytest.fixture(scope="function")
 def user_auth_2(client, session_2) -> AuthTestConfig:
     email = "user3@example.com"
-    return generate_auth_header(email, client, session_2), 1, None, None
+    return generate_auth_header(email, client, session_2), 1, 1, None
 
 
 @pytest.fixture(scope="function")
@@ -153,7 +160,7 @@ def user_owner_auth_2(client, session_2) -> AuthTestConfig:
 
 @pytest.fixture(scope="function")
 def guest_auth_2(client, session_2) -> AuthTestConfig:
-    return {}, 1, None, None
+    return {}, 1, 1, None
 
 
 @pytest.fixture

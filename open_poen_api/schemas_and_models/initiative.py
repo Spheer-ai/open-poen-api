@@ -14,19 +14,19 @@ class InitiativeCreateAdmin(InitiativeBase):
 
 
 class InitiativeUpdateInitiativeOwner(BaseModel, NotNullValidatorMixin):
+    name: str | None
     description: str | None
 
     class Config:
         extra = Extra.forbid
         orm_mode = True
 
-    @validator("description")
-    def val_description(cls, value, field):
+    @validator("description", "name")
+    def val_description_and_name(cls, value, field):
         return cls.not_null(value, field)
 
 
 class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
-    name: str | None
     purpose: str | None
     target_audience: str | None
     owner: str | None
@@ -44,7 +44,6 @@ class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
         extra = Extra.forbid
 
     @validator(
-        "name",
         "purpose",
         "target_audience",
         "owner",
