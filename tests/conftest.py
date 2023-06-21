@@ -3,7 +3,7 @@ from open_poen_api.database import engine
 from sqlmodel import Session, SQLModel
 from fastapi.testclient import TestClient
 from open_poen_api.app import app
-from open_poen_api.models import User, Initiative, Activity
+from open_poen_api.schemas_and_models.models.entities import User, Initiative, Activity
 from open_poen_api.utils import temp_password_generator
 from passlib.context import CryptContext
 import pytest

@@ -1,4 +1,4 @@
-import open_poen_api.models as m
+from open_poen_api.schemas_and_models.models import entities as e
 from sqlmodel import select
 import pytest
 
@@ -23,7 +23,7 @@ def test_post_user(
     response = client.post("/user", json=user_data, headers=authorization_header)
     assert response.status_code == status_code
     email_exists = "janedoe@gmail.com" in [
-        i.email for i in session_2.exec(select(m.User)).all()
+        i.email for i in session_2.exec(select(e.User)).all()
     ]
     assert email_exists == email_in_db
 
@@ -53,7 +53,7 @@ def test_forbidden_delete(client, session_2, user_authorization_header):
     authorization_header, email = user_authorization_header
     response = client.delete("/user/1", headers=authorization_header)
     assert response.status_code == 403
-    assert session_2.get(m.User, 1) is not None
+    assert session_2.get(e.User, 1) is not None
 
 
 @pytest.mark.parametrize(
@@ -67,7 +67,7 @@ def test_forbidden_delete(client, session_2, user_authorization_header):
 )
 def test_patch_user(client, session_2, authorization_header_name, status_code, request):
     existing_user = session_2.exec(
-        select(m.User).where(m.User.email == "user1@example.com")
+        select(e.User).where(e.User.email == "user1@example.com")
     ).one()
     assert existing_user.first_name != "John"
     assert existing_user.last_name != "Doe"
@@ -92,7 +92,7 @@ def test_patch_user(client, session_2, authorization_header_name, status_code, r
 
 def test_allowed_update_user_by_admin(client, session_2, admin_authorization_header):
     existing_user = session_2.exec(
-        select(m.User).where(m.User.email == "user3@example.com")
+        select(e.User).where(e.User.email == "user3@example.com")
     ).one()
     assert existing_user.first_name != "John"
     assert existing_user.last_name != "Doe"
@@ -122,7 +122,7 @@ def test_allowed_update_user_by_user_owner(
     client, session_2, user_authorization_header
 ):
     existing_user = session_2.exec(
-        select(m.User).where(m.User.email == "user3@example.com")
+        select(e.User).where(e.User.email == "user3@example.com")
     ).one()
     assert existing_user.first_name != "John"
     new_user_data = {"first_name": "John"}
@@ -140,7 +140,7 @@ def test_allowed_update_user_by_user_owner(
 
 def test_forbidden_update_by_user_owner(client, session_2, user_authorization_header):
     existing_user = session_2.exec(
-        select(m.User).where(m.User.email == "user3@example.com")
+        select(e.User).where(e.User.email == "user3@example.com")
     ).one()
     assert existing_user.role != "admin"
     assert existing_user.hidden
@@ -162,7 +162,7 @@ def test_forbidden_update_by_user_owner(client, session_2, user_authorization_he
 
 def test_forbidden_update_by_user(client, session_2, user_authorization_header):
     existing_user = session_2.exec(
-        select(m.User).where(m.User.email == "user1@example.com")
+        select(e.User).where(e.User.email == "user1@example.com")
     ).one()
     assert existing_user.role == "admin"
     new_user_data = {

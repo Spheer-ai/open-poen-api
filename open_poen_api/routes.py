@@ -1,7 +1,10 @@
 from sqlmodel import Session, select
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from .database import get_session
-from . import models as m
+from .schemas_and_models.models import entities as e
+from .schemas_and_models import linked_entities as le
+from .schemas_and_models.authorization import Token
+from . import schemas_and_models as s
 from . import authorization as auth
 from typing import Annotated
 from fastapi.security import OAuth2PasswordRequestForm
@@ -14,7 +17,7 @@ from pydantic import ValidationError
 router = APIRouter()
 
 
-@router.post("/token", response_model=m.Token)
+@router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: Session = Depends(get_session),
@@ -36,7 +39,7 @@ async def login_for_access_token(
 # ACTIVITY
 @router.post(
     "/initiative/{initiative_id}/activity",
-    response_model=m.ActivityOutputGuestWithLinkedEntities,
+    response_model=le.ActivityOutputGuestWithLinkedEntities,
     responses={
         404: {"description": "Initiative not found"},
         400: {"description": "Initiative already has an activity with this name"},
@@ -44,17 +47,17 @@ async def login_for_access_token(
 )
 async def create_activity(
     initiative_id: int,
-    activity: m.ActivityCreateAdmin,
+    activity: s.ActivityCreateAdmin,
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(m.Initiative, initiative_id)
+    initiative_db = session.get(e.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
     fields = get_fields_dict(activity)
-    new_activity = m.Activity(initiative_id=initiative_id, **fields)
+    new_activity = e.Activity(initiative_id=initiative_id, **fields)
     if activity.activity_owner_ids is not None:
         new_activity.activity_owners = get_entities_by_ids(
-            session, m.User, activity.activity_owner_ids
+            session, e.User, activity.activity_owner_ids
         )
     try:
         session.add(new_activity)
@@ -70,17 +73,17 @@ async def create_activity(
 
 @router.put(
     "/initiative/{initiative_id}/activity/{activity_id}",
-    response_model=m.ActivityOutputGuestWithLinkedEntities,
+    response_model=le.ActivityOutputGuestWithLinkedEntities,
 )
 async def update_activity(
     initiative_id: int,
     activity_id: int,
-    activity: m.ActivityCreateAdmin,
+    activity: s.ActivityCreateAdmin,
     session: Session = Depends(get_session),
 ):
     try:
-        initiative_db = session.get(m.Initiative, initiative_id)
-        activity_db = session.get(m.Activity, activity_id)
+        initiative_db = session.get(e.Initiative, initiative_id)
+        activity_db = session.get(e.Activity, activity_id)
 
         if (
             not initiative_db
@@ -97,7 +100,7 @@ async def update_activity(
 
         if activity.activity_owner_ids is not None:
             activity_db.activity_owners = get_entities_by_ids(
-                session, m.User, activity.activity_owner_ids
+                session, e.User, activity.activity_owner_ids
             )
 
         session.add(activity_db)
@@ -115,7 +118,7 @@ async def delete_activity(
     activity_id: int,
     session: Session = Depends(get_session),
 ):
-    activity = session.get(m.Activity, activity_id)
+    activity = session.get(e.Activity, activity_id)
     if not activity or activity.initiative_id != initiative_id:
         raise HTTPException(status_code=404, detail="Activity not found")
 
@@ -126,17 +129,17 @@ async def delete_activity(
 
 @router.get(
     "/initiative/{initiative_id}/activities",
-    response_model=m.ActivityOutputGuestList,
+    response_model=s.ActivityOutputGuestList,
 )
 async def get_activities_by_initiative(
     initiative_id: int, session: Session = Depends(get_session)
 ):
-    initiative = session.get(m.Initiative, initiative_id)
+    initiative = session.get(e.Initiative, initiative_id)
     if not initiative:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     activities = session.exec(
-        select(m.Activity).where(m.Activity.initiative_id == initiative_id)
+        select(e.Activity).where(e.Activity.initiative_id == initiative_id)
     ).all()
     return {"activities": activities}
 
@@ -167,30 +170,30 @@ async def get_activities_by_initiative(
 # INITIATIVE
 @router.post(
     "/initiative",
-    response_model=m.InitiativeOutputActivityOwnerWithLinkedEntities,
+    response_model=le.InitiativeOutputActivityOwnerWithLinkedEntities,
     responses={400: {"description": "Name already registered"}},
 )
 async def create_initiative(
-    initiative: m.InitiativeCreateAdmin,
+    initiative: s.InitiativeCreateAdmin,
     session: Session = Depends(get_session),
     requires_admin=Depends(auth.requires_admin),
 ):
     fields = get_fields_dict(initiative.dict())
-    new_initiative = m.Initiative(**fields)
+    new_initiative = e.Initiative(**fields)
     if initiative.initiative_owner_ids is not None:
         new_initiative.initiative_owners = get_entities_by_ids(
-            session, m.User, initiative.initiative_owner_ids
+            session, e.User, initiative.initiative_owner_ids
         )
     # TODO: Remove this.
     if initiative.activity_ids is not None:
         new_initiative.activities = get_entities_by_ids(
-            session, m.Activity, initiative.activity_ids
+            session, e.Activity, initiative.activity_ids
         )
     try:
         session.add(new_initiative)
         session.commit()
         session.refresh(new_initiative)
-        return m.InitiativeOutputActivityOwnerWithLinkedEntities.from_orm(
+        return le.InitiativeOutputActivityOwnerWithLinkedEntities.from_orm(
             new_initiative
         )
     except IntegrityError:
@@ -200,25 +203,25 @@ async def create_initiative(
 
 @router.patch(
     "/initiative/{initiative_id}",
-    response_model=m.InitiativeOutputActivityOwnerWithLinkedEntities,
+    response_model=le.InitiativeOutputActivityOwnerWithLinkedEntities,
     response_model_exclude_unset=True,
 )
 async def update_initiative(
     initiative_id: int,
-    initiative: m.InitiativeUpdateAdmin,
+    initiative: s.InitiativeUpdateAdmin,
     requires_login=Depends(auth.requires_login),
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
 ):
-    initiative_db = session.get(m.Initiative, initiative_id)
+    initiative_db = session.get(e.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     auth.validate_input_schema(
         unified_input_schema=initiative,
         parse_schemas=[
-            (auth.AuthLevel.ADMIN, m.InitiativeUpdateAdmin),
-            (auth.AuthLevel.INITIATIVE_OWNER, m.InitiativeUpdateInitiativeOwner),
+            (auth.AuthLevel.ADMIN, s.InitiativeUpdateAdmin),
+            (auth.AuthLevel.INITIATIVE_OWNER, s.InitiativeUpdateInitiativeOwner),
         ],
         auth_levels=auth_levels,
     )
@@ -228,11 +231,11 @@ async def update_initiative(
         setattr(initiative_db, key, value)
     if initiative.initiative_owner_ids is not None:
         initiative_db.initiative_owners = get_entities_by_ids(
-            session, m.User, initiative.initiative_owner_ids
+            session, e.User, initiative.initiative_owner_ids
         )
     if initiative.activity_ids is not None:
         initiative_db.activities = get_entities_by_ids(
-            session, m.Activity, initiative.activity_ids
+            session, e.Activity, initiative.activity_ids
         )
     try:
         session.add(initiative_db)
@@ -243,9 +246,9 @@ async def update_initiative(
             parse_schemas=[
                 (
                     auth.AuthLevel.ACTIVITY_OWNER,
-                    m.InitiativeOutputActivityOwnerWithLinkedEntities,
+                    le.InitiativeOutputActivityOwnerWithLinkedEntities,
                 ),
-                (auth.AuthLevel.GUEST, m.InitiativeOutputGuestWithLinkedEntities),
+                (auth.AuthLevel.GUEST, le.InitiativeOutputGuestWithLinkedEntities),
             ],
             auth_levels=auth_levels,
         )
@@ -260,7 +263,7 @@ async def delete_initiative(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    initiative = session.get(m.Initiative, initiative_id)
+    initiative = session.get(e.Initiative, initiative_id)
     if not initiative:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
@@ -271,7 +274,7 @@ async def delete_initiative(
 
 @router.get(
     "/initiatives",
-    response_model=m.InitiativeOutputActivityOwnerList,
+    response_model=s.InitiativeOutputActivityOwnerList,
     response_model_exclude_unset=True,
 )
 async def get_initiatives(
@@ -282,12 +285,12 @@ async def get_initiatives(
     # TODO: Enable searching by name, ordering by creation date and
     # initiative ownership.
     # TODO: pagination.
-    initiatives = session.exec(select(m.Initiative)).all()
+    initiatives = session.exec(select(e.Initiative)).all()
     parsed_initiatives = auth.validate_output_schema(
         initiatives,
         parse_schemas=[
-            (auth.AuthLevel.ACTIVITY_OWNER, m.InitiativeOutputActivityOwnerList),
-            (auth.AuthLevel.GUEST, m.InitiativeOutputGuestList),
+            (auth.AuthLevel.ACTIVITY_OWNER, s.InitiativeOutputActivityOwnerList),
+            (auth.AuthLevel.GUEST, s.InitiativeOutputGuestList),
         ],
         auth_levels=auth_levels,
     )
@@ -355,9 +358,9 @@ async def root():
 
 
 # USER
-@router.post("/user", response_model=m.UserOutputAdminWithLinkedEntities)
+@router.post("/user", response_model=le.UserOutputAdminWithLinkedEntities)
 async def create_user(
-    user: m.UserCreateAdmin,
+    user: s.UserCreateAdmin,
     session: Session = Depends(get_session),
     requires_admin=Depends(auth.requires_admin),
 ):
@@ -366,20 +369,20 @@ async def create_user(
     # TODO: Route for resetting the password.
     temp_password = temp_password_generator()
     fields = get_fields_dict(user.dict())
-    new_user = m.User(**fields, hashed_password=auth.PWD_CONTEXT.hash(temp_password))
+    new_user = e.User(**fields, hashed_password=auth.PWD_CONTEXT.hash(temp_password))
     if user.initiative_ids is not None:
         new_user.initiatives = get_entities_by_ids(
-            session, m.Initiative, user.initiative_ids
+            session, e.Initiative, user.initiative_ids
         )
     if user.activity_ids is not None:
         new_user.activities = get_entities_by_ids(
-            session, m.Activity, user.activity_ids
+            session, e.Activity, user.activity_ids
         )
     try:
         session.add(new_user)
         session.commit()
         session.refresh(new_user)
-        return m.UserOutputAdminWithLinkedEntities.from_orm(new_user)
+        return le.UserOutputAdminWithLinkedEntities.from_orm(new_user)
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Email address already registered")
@@ -387,26 +390,26 @@ async def create_user(
 
 @router.patch(
     "/user/{user_id}",
-    response_model=m.UserOutputAdminWithLinkedEntities,
+    response_model=le.UserOutputAdminWithLinkedEntities,
     response_model_exclude_unset=True,
 )
 @router.patch("/user/{user_id}")
 async def update_user(
     user_id: int,
-    user: m.UserUpdateAdmin,
+    user: s.UserUpdateAdmin,
     requires_login=Depends(auth.requires_login),
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
 ):
-    user_db = session.get(m.User, user_id)
+    user_db = session.get(e.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
 
     auth.validate_input_schema(
         unified_input_schema=user,
         parse_schemas=[
-            (auth.AuthLevel.ADMIN, m.UserUpdateAdmin),
-            (auth.AuthLevel.USER_OWNER, m.UserUpdateUserOwner),
+            (auth.AuthLevel.ADMIN, s.UserUpdateAdmin),
+            (auth.AuthLevel.USER_OWNER, s.UserUpdateUserOwner),
         ],
         auth_levels=auth_levels,
     )
@@ -416,10 +419,10 @@ async def update_user(
         setattr(user_db, key, value)
     if user.initiative_ids is not None:
         user_db.initiatives = get_entities_by_ids(
-            session, m.Initiative, user.initiative_ids
+            session, e.Initiative, user.initiative_ids
         )
     if user.activity_ids is not None:
-        user_db.activities = get_entities_by_ids(session, m.Activity, user.activity_ids)
+        user_db.activities = get_entities_by_ids(session, e.Activity, user.activity_ids)
     try:
         session.add(user_db)
         session.commit()
@@ -427,8 +430,8 @@ async def update_user(
         return auth.validate_output_schema(
             user_db,
             parse_schemas=[
-                (auth.AuthLevel.ADMIN, m.UserOutputAdminWithLinkedEntities),
-                (auth.AuthLevel.USER_OWNER, m.UserOutputUserOwnerWithLinkedEntities),
+                (auth.AuthLevel.ADMIN, le.UserOutputAdminWithLinkedEntities),
+                (auth.AuthLevel.USER_OWNER, le.UserOutputUserOwnerWithLinkedEntities),
             ],
             auth_levels=auth_levels,
         )
@@ -443,7 +446,7 @@ async def delete_user(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    user = session.get(m.User, user_id)
+    user = session.get(e.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -453,7 +456,7 @@ async def delete_user(
 
 
 @router.get(
-    "/users", response_model=m.UserOutputAdminList, response_model_exclude_unset=True
+    "/users", response_model=s.UserOutputAdminList, response_model_exclude_unset=True
 )
 def get_users(
     session: Session = Depends(get_session),
@@ -462,12 +465,12 @@ def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
-    users = session.exec(select(m.User)).all()
+    users = session.exec(select(e.User)).all()
     parsed_users = auth.validate_output_schema(
         users,
         parse_schemas=[
-            (auth.AuthLevel.ADMIN, m.UserOutputAdminList),
-            (auth.AuthLevel.USER, m.UserOutputUserList),
+            (auth.AuthLevel.ADMIN, s.UserOutputAdminList),
+            (auth.AuthLevel.USER, s.UserOutputUserList),
         ],
         auth_levels=auth_levels,
         seq_key="users",

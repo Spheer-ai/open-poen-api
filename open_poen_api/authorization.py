@@ -1,7 +1,7 @@
 from sqlmodel import Session, select, SQLModel
 from fastapi import Depends, HTTPException, status
 from .database import get_session
-from . import models as m
+from .schemas_and_models.models import entities as e
 from typing import Annotated, Type, Sequence
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -18,7 +18,7 @@ PWD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def authenticate_user(email: str, password: str, session: Session):
-    user = session.exec(select(m.User).where(m.User.email == email)).first()
+    user = session.exec(select(e.User).where(e.User.email == email)).first()
     if not user:
         return False
     if not PWD_CONTEXT.verify(password, user.hashed_password):
@@ -40,7 +40,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 def get_requester(
     token: Annotated[str | None, Depends(OAUTH2_SCHEME)],
     session: Session = Depends(get_session),
-) -> m.User | None:
+) -> e.User | None:
     """Gets the User instance of the requester, or returns None if the requester
     gives no credentials."""
     if token is None:
@@ -57,7 +57,7 @@ def get_requester(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    user = session.exec(select(m.User).where(m.User.email == email)).first()
+    user = session.exec(select(e.User).where(e.User.email == email)).first()
     if user is None:
         raise credentials_exception
     if not user.active:
@@ -65,7 +65,7 @@ def get_requester(
     return user
 
 
-def get_logged_in_user(requester: Annotated[m.User | None, Depends(get_requester)]):
+def get_logged_in_user(requester: Annotated[e.User | None, Depends(get_requester)]):
     if requester is None:
         raise HTTPException(status_code=401, detail="Requires login")
     else:
@@ -99,7 +99,7 @@ class AuthLevel(IntEnum):
 
 def get_authorization_level(
     requester: Annotated[
-        m.User | None,
+        e.User | None,
         Depends(get_requester),
     ],
     user_id: int | None = None,
@@ -117,23 +117,23 @@ def get_authorization_level(
         lambda x: x.id, requester.initiatives
     ):
         auth_levels.append(AuthLevel.INITIATIVE_OWNER)
-        if requester.role == m.Role.FINANCIAL:
+        if requester.role == e.Role.FINANCIAL:
             auth_levels.append(AuthLevel.FINANCIAL)
     if activity_id is not None and activity_id in map(
         lambda x: x.id, requester.activities
     ):
         auth_levels.append(AuthLevel.ACTIVITY_OWNER)
-    if requester.role == m.Role.ADMIN:
+    if requester.role == e.Role.ADMIN:
         auth_levels.append(AuthLevel.ADMIN)
     return auth_levels
 
 
-def requires_admin(logged_in_user: Annotated[m.User, Depends(get_logged_in_user)]):
-    if not logged_in_user.role == m.Role.ADMIN:
+def requires_admin(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
+    if not logged_in_user.role == e.Role.ADMIN:
         raise HTTPException(status_code=403, detail="Admin authorization required")
 
 
-def requires_login(logged_in_user: Annotated[m.User, Depends(get_logged_in_user)]):
+def requires_login(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
     pass
 
 
