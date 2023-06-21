@@ -157,3 +157,13 @@ def initiative_data():
         "kvk_registration": "12345678",
         "location": "Amsterdam",
     }
+
+
+@pytest.fixture
+def activity_data():
+    return {
+        "name": "Vlees- en Drinkwaren",
+        "description": "Eten voor de barbeque",
+        "purpose": "Ervoor zorgen dat er voldoende te eten en te drinken is",
+        "target_audience": "Alle bezoekers",
+    }

@@ -48,6 +48,7 @@ async def login_for_access_token(
 async def create_activity(
     initiative_id: int,
     activity: s.ActivityCreateInitiativeOwner,
+    requires_log_in=Depends(auth.requires_login),
     requires_initiative_owner=Depends(auth.requires_initiative_owner),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
     session: Session = Depends(get_session),
@@ -92,7 +93,8 @@ async def create_activity(
 async def update_activity(
     initiative_id: int,
     activity_id: int,
-    activity: s.ActivityCreateInitiativeOwner,
+    activity: s.ActivityUpdateInitiativeOwner,
+    requires_login=Depends(auth.requires_login),
     requires_initiative_owner=Depends(auth.requires_initiative_owner),
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
@@ -110,7 +112,7 @@ async def update_activity(
                 status_code=404, detail="Activity or Initiative not found"
             )
 
-        fields = get_fields_dict(activity.dict())
+        fields = get_fields_dict(activity.dict(exclude_unset=True))
         for key, value in fields.items():
             setattr(activity_db, key, value)
 

@@ -19,6 +19,7 @@ class ActivityUpdateInitiativeOwner(HiddenMixin, NotNullValidatorMixin):
     image: str | None
     # NOTE: Purposefully leaving out fields related to finishing.
     # I'll probably make a separate endpoint for this.
+    activity_owner_ids: list[int] | None
 
     class Config:
         title = "ActivityUpdate"
@@ -35,7 +36,7 @@ class ActivityOutputGuest(BaseModel):
     description: str
     purpose: str
     target_audience: str
-    image: str
+    image: str | None
     finished_description: str | None
     finished: bool
 
