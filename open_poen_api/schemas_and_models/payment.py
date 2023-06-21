@@ -21,6 +21,10 @@ class PaymentUpdateActivityOwner(BaseModel, NotNullValidatorMixin):
     def val_descriptions(cls, value, field):
         return cls.not_null(value, field)
 
+    class Config:
+        extra = Extra.forbid
+        orm_mode = True
+
 
 class PaymentUpdateInitiativeOwner(PaymentUpdateActivityOwner, HiddenMixin):
     route: Route | None
@@ -28,6 +32,10 @@ class PaymentUpdateInitiativeOwner(PaymentUpdateActivityOwner, HiddenMixin):
     @validator("route", "hidden")
     def val_route_and_hidden(cls, value, field):
         return cls.not_null(value, field)
+
+    class Config:
+        extra = Extra.forbid
+        orm_mode = True
 
 
 class PaymentUpdateFinancial(PaymentUpdateInitiativeOwner):
@@ -48,6 +56,11 @@ class PaymentUpdateFinancial(PaymentUpdateInitiativeOwner):
     )
     def val_fields(cls, value, field):
         return cls.not_null(value, field)
+
+    class Config:
+        title = "PaymentUpdate"
+        extra = Extra.forbid
+        orm_mode = True
 
 
 class PaymentOutputGuest(BaseModel):

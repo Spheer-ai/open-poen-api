@@ -36,6 +36,7 @@ class UserUpdateAdmin(UserUpdateUserOwner, HiddenMixin):
     class Config:
         title = "UserUpdate"
         extra = Extra.forbid
+        orm_mode = True
 
     @validator("role", "active")
     def val_role_active(cls, value, field):

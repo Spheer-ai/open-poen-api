@@ -17,13 +17,13 @@ class InitiativeUpdateInitiativeOwner(BaseModel, NotNullValidatorMixin):
     name: str | None
     description: str | None
 
-    class Config:
-        extra = Extra.forbid
-        orm_mode = True
-
     @validator("description", "name")
     def val_description_and_name(cls, value, field):
         return cls.not_null(value, field)
+
+    class Config:
+        extra = Extra.forbid
+        orm_mode = True
 
 
 class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
@@ -39,10 +39,6 @@ class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
     # TODO: Remove this.
     activity_ids: list[int] | None
 
-    class Config:
-        title = "InitiativeUpdate"
-        extra = Extra.forbid
-
     @validator(
         "purpose",
         "target_audience",
@@ -56,6 +52,11 @@ class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
     )
     def val_fields(cls, value, field):
         return cls.not_null(value, field)
+
+    class Config:
+        title = "InitiativeUpdate"
+        extra = Extra.forbid
+        orm_mode = True
 
 
 class InitiativeOutputGuest(BaseModel):
