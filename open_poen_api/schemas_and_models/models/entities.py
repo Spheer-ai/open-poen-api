@@ -132,7 +132,6 @@ class PaymentBase(SQLModel, HiddenMixin):
     route: Route = Field(
         sa_column=Column(ChoiceType(Route, impl=VARCHAR(length=32))),
         nullable=False,
-        default=get_default_route,
     )
     short_user_description: str | None
     long_user_description: str | None

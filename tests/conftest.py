@@ -7,6 +7,7 @@ from open_poen_api.schemas_and_models.models.entities import User, Initiative, A
 from open_poen_api.utils import temp_password_generator
 from passlib.context import CryptContext
 import pytest
+from datetime import datetime
 
 
 @pytest.fixture(scope="function")
@@ -185,4 +186,19 @@ def activity_data():
         "description": "Eten voor de barbeque",
         "purpose": "Ervoor zorgen dat er voldoende te eten en te drinken is",
         "target_audience": "Alle bezoekers",
+    }
+
+
+@pytest.fixture
+def payment_data():
+    return {
+        "booking_date": datetime.now().isoformat(),
+        "transaction_amount": 123.12,
+        "creditor_name": "Creditor Test",
+        "creditor_account": "CR123456789",
+        "debtor_name": "Debtor Test",
+        "debtor_account": "DB123456789",
+        "short_user_description": "Test short description",
+        "long_user_description": "Test long description",
+        "route": "income",
     }

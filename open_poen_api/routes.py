@@ -346,9 +346,32 @@ async def root():
 
 
 # # INITIATIVE - PAYMENT
-# @router.post("/initiative/{initiative_id}/payment")
-# async def root(initiative_id: int):
-#     return {"amount": 10.01, "debitor": "Mark de Wijk"}
+@router.post(
+    "/initiative/{initiative_id}/payment",
+    response_model=le.PaymentOutputFinancialWithLinkedEntities,
+    responses={404: {"description": "Initiative not found"}},
+)
+async def create_initiative_payment(
+    initiative_id: int,
+    payment: s.PaymentCreateFinancial,
+    requires_login=Depends(auth.requires_login),
+    requires_financial=Depends(auth.requires_financial),
+    session: Session = Depends(get_session),
+):
+    initiative_db = session.get(e.Initiative, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+
+    fields = get_fields_dict(payment.dict())
+    new_payment = e.Payment(initiative_id=initiative_id, **fields)
+    try:
+        session.add(new_payment)
+        session.commit()
+        session.refresh(new_payment)
+        return le.PaymentOutputFinancialWithLinkedEntities.from_orm(new_payment)
+    except Exception:
+        session.rollback()
+        raise Exception
 
 
 # @router.put("/initiative/{initiative_id}/payment/{payment_id}")

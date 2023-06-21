@@ -138,12 +138,20 @@ def requires_login(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)
 
 
 def requires_initiative_owner(
+    initiative_id: int,
     auth_levels: list[AuthLevel] = Depends(get_authorization_levels),
 ):
     if not any([l >= AuthLevel.INITIATIVE_OWNER for l in auth_levels]):
         raise HTTPException(
             status_code=403, detail="Initiative owner authorization required"
         )
+
+
+def requires_financial(
+    auth_levels: list[AuthLevel] = Depends(get_authorization_levels),
+):
+    if not any([l >= AuthLevel.FINANCIAL for l in auth_levels]):
+        raise HTTPException(status_code=403, detail="Financial authorization required")
 
 
 def validate_input_schema(

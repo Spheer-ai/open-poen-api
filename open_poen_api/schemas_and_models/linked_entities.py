@@ -1,6 +1,7 @@
 from . import initiative as i
 from . import activity as a
 from . import user as u
+from . import payment as p
 
 
 class InitiativeOutputGuestWithLinkedEntities(i.InitiativeOutputGuest):
@@ -76,3 +77,10 @@ class ActivityOutputAdminWithLinkedEntities(a.ActivityOutputAdmin):
     class Config:
         orm_mode = True
         title = "ActivityOutputWithLinkedEntities"
+
+
+class PaymentOutputFinancialWithLinkedEntities(p.PaymentOutputFinancial):
+    pass
+
+    class Config:
+        orm_mode = True

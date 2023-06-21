@@ -79,7 +79,11 @@ class PaymentOutputGuest(BaseModel):
     type: PaymentType
 
 
-class PaymentOutputAdmin(PaymentOutputGuest, TimeStampMixin, HiddenMixin):
+class PaymentOutputFinancial(PaymentOutputGuest, TimeStampMixin, HiddenMixin):
+    pass
+
+
+class PaymentOutputAdmin(PaymentOutputFinancial):
     pass
 
     class Config:
