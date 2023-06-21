@@ -3,7 +3,7 @@ from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
 from .models.entities import ActivityBase
 
 
-class ActivityCreateAdmin(ActivityBase):
+class ActivityCreateInitiativeOwner(ActivityBase):
     activity_owner_ids: list[int] | None
 
     class Config:
@@ -11,7 +11,7 @@ class ActivityCreateAdmin(ActivityBase):
         extra = Extra.forbid
 
 
-class ActivityUpdateActivtyOwner(BaseModel, NotNullValidatorMixin):
+class ActivityUpdateInitiativeOwner(HiddenMixin, NotNullValidatorMixin):
     name: str | None
     description: str | None
     purpose: str | None
@@ -24,7 +24,7 @@ class ActivityUpdateActivtyOwner(BaseModel, NotNullValidatorMixin):
         title = "ActivityUpdate"
         extra = Extra.forbid
 
-    @validator("name", "description", "purpose", "target_audience", "image")
+    @validator("name", "description", "purpose", "target_audience", "image", "hidden")
     def val_fields(cls, value, field):
         return cls.not_null(value, field)
 
@@ -52,7 +52,11 @@ class ActivityOutputActivityOwner(ActivityOutputUserOwner):
     pass
 
 
-class ActivityOutputAdmin(ActivityOutputActivityOwner, HiddenMixin, TimeStampMixin):
+class ActivityOutputInitiativeOwner(ActivityOutputActivityOwner, HiddenMixin):
+    pass
+
+
+class ActivityOutputAdmin(ActivityOutputInitiativeOwner, TimeStampMixin):
     pass
 
     class Config:
@@ -61,6 +65,13 @@ class ActivityOutputAdmin(ActivityOutputActivityOwner, HiddenMixin, TimeStampMix
 
 class ActivityOutputGuestList(BaseModel):
     activities: list[ActivityOutputGuest]
+
+    class Config:
+        orm_mode = True
+
+
+class ActivityOutputInitiativeOwnerList(BaseModel):
+    activities: list[ActivityOutputInitiativeOwner]
 
     class Config:
         orm_mode = True

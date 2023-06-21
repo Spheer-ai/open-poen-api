@@ -53,6 +53,7 @@ class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
         "kvk_registration",
         "location",
         "hidden_sponsors",
+        "hidden",
     )
     def val_fields(cls, value, field):
         return cls.not_null(value, field)
@@ -83,7 +84,13 @@ class InitiativeOutputActivityOwner(InitiativeOutputUserOwner):
     hidden_sponsors: bool | None
 
 
-class InitiativeOutputAdmin(InitiativeOutputActivityOwner, TimeStampMixin, HiddenMixin):
+class InitiativeOutputInitiativeOwner(InitiativeOutputActivityOwner):
+    pass
+
+
+class InitiativeOutputAdmin(
+    InitiativeOutputInitiativeOwner, TimeStampMixin, HiddenMixin
+):
     pass
 
     class Config:

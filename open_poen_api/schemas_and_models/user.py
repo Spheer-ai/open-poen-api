@@ -62,7 +62,11 @@ class UserOutputActivityOwner(UserOutputUserOwner):
     pass
 
 
-class UserOutputAdmin(UserOutputActivityOwner, TimeStampMixin, HiddenMixin):
+class UserOutputInitiativeOwner(UserOutputActivityOwner):
+    pass
+
+
+class UserOutputAdmin(UserOutputInitiativeOwner, TimeStampMixin, HiddenMixin):
     email: EmailStr | None
     active: bool | None
 

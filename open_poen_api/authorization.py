@@ -97,7 +97,7 @@ class AuthLevel(IntEnum):
         return self.name.lower()
 
 
-def get_authorization_level(
+def get_authorization_levels(
     requester: Annotated[
         e.User | None,
         Depends(get_requester),
@@ -135,6 +135,15 @@ def requires_admin(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)
 
 def requires_login(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
     pass
+
+
+def requires_initiative_owner(
+    auth_levels: list[AuthLevel] = Depends(get_authorization_levels),
+):
+    if not any([l >= AuthLevel.INITIATIVE_OWNER for l in auth_levels]):
+        raise HTTPException(
+            status_code=403, detail="Initiative owner authorization required"
+        )
 
 
 def validate_input_schema(

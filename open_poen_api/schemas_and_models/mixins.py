@@ -1,6 +1,6 @@
 from sqlmodel import Field, Column
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConstrainedDecimal
 from sqlalchemy import Column, DateTime
 
 
@@ -34,3 +34,10 @@ class NotNullValidatorMixin:
         if value is None:
             raise ValueError(f"{field.name} cannot be null")
         return value
+
+
+class Money(ConstrainedDecimal):
+    """This amount can be at the most one billion and can't have more than two decimal places."""
+
+    max_digits = 10
+    decimal_places = 2

@@ -1,10 +1,10 @@
 from sqlmodel import SQLModel, Field, Column, Relationship, UniqueConstraint, VARCHAR
-from pydantic import BaseModel, Extra, validator, EmailStr
+from pydantic import EmailStr
 from sqlalchemy import Column, Integer, ForeignKey, DateTime
 from datetime import datetime
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
-from ..mixins import TimeStampMixin, HiddenMixin
+from ..mixins import TimeStampMixin, HiddenMixin, Money
 from ..models.associations import ActivityToUser, InitiativeToUser
 
 
@@ -122,34 +122,35 @@ class PaymentType(str, Enum):
     MANUAL = "MANUAL"
 
 
-class PaymentBase(SQLModel, TimeStampMixin, HiddenMixin):
-    transaction_id: str | None
-    entry_reference: str | None
-    end_to_end_id: str | None
+class PaymentBase(SQLModel, HiddenMixin):
     booking_date: datetime = Field(sa_column=Column(DateTime(timezone=True)))
-    # transaction_amount (Add rule on amount != 0)
-    creditor_name: str | None
-    creditor_account: str | None
-    debtor_name: str | None
-    debtor_account: str | None
-    remittance_information_unstructured: str | None
-    remittance_information_structured: str | None
-    type: PaymentType = Field(
-        sa_column=Column(ChoiceType(PaymentType, impl=VARCHAR(length=32))),
-        nullable=False,
-    )
+    transaction_amount: Money
+    creditor_name: str
+    creditor_account: str
+    debtor_name: str
+    debtor_account: str
     route: Route = Field(
         sa_column=Column(ChoiceType(Route, impl=VARCHAR(length=32))),
         nullable=False,
         default=get_default_route,
     )
-    # debit_card_id: int | None
     short_user_description: str | None
     long_user_description: str | None
 
 
-class Payment(PaymentBase, table=True):
+class Payment(PaymentBase, TimeStampMixin, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    transaction_id: str | None
+    entry_reference: str | None
+    end_to_end_id: str | None
+    remittance_information_unstructured: str | None
+    remittance_information_structured: str | None
+    type: PaymentType = Field(
+        sa_column=Column(
+            ChoiceType(PaymentType, impl=VARCHAR(length=32)), default=PaymentType.MANUAL
+        ),
+        nullable=False,
+    )
     # TODO: How should these cascades work?
     initiative_id: int = Field(
         sa_column=Column(Integer, ForeignKey("initiative.id", ondelete="CASCADE"))
@@ -160,3 +161,5 @@ class Payment(PaymentBase, table=True):
         sa_column=Column(Integer, ForeignKey("activity.id", ondelete="CASCADE"))
     )
     activity: Activity = Relationship(back_populates="payments")
+    # debit_card_id: int | None
+    # debit_card: DebitCard = Relationship...

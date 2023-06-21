@@ -39,7 +39,7 @@ async def login_for_access_token(
 # ACTIVITY
 @router.post(
     "/initiative/{initiative_id}/activity",
-    response_model=le.ActivityOutputGuestWithLinkedEntities,
+    response_model=le.ActivityOutputAdminWithLinkedEntities,
     responses={
         404: {"description": "Initiative not found"},
         400: {"description": "Initiative already has an activity with this name"},
@@ -47,13 +47,16 @@ async def login_for_access_token(
 )
 async def create_activity(
     initiative_id: int,
-    activity: s.ActivityCreateAdmin,
+    activity: s.ActivityCreateInitiativeOwner,
+    requires_initiative_owner=Depends(auth.requires_initiative_owner),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
     session: Session = Depends(get_session),
 ):
     initiative_db = session.get(e.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
-    fields = get_fields_dict(activity)
+
+    fields = get_fields_dict(activity.dict())
     new_activity = e.Activity(initiative_id=initiative_id, **fields)
     if activity.activity_owner_ids is not None:
         new_activity.activity_owners = get_entities_by_ids(
@@ -63,7 +66,17 @@ async def create_activity(
         session.add(new_activity)
         session.commit()
         session.refresh(new_activity)
-        return new_activity
+        return auth.validate_output_schema(
+            new_activity,
+            parse_schemas=[
+                (auth.AuthLevel.ADMIN, le.ActivityOutputAdminWithLinkedEntities),
+                (
+                    auth.AuthLevel.INITIATIVE_OWNER,
+                    le.ActivityOutputInitiativeOwnerWithLinkedEntities,
+                ),
+            ],
+            auth_levels=auth_levels,
+        )
     except IntegrityError:
         session.rollback()
         raise HTTPException(
@@ -71,15 +84,18 @@ async def create_activity(
         )
 
 
-@router.put(
+@router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}",
-    response_model=le.ActivityOutputGuestWithLinkedEntities,
+    response_model=le.ActivityOutputAdminWithLinkedEntities,
+    response_model_exclude_unset=True,
 )
 async def update_activity(
     initiative_id: int,
     activity_id: int,
-    activity: s.ActivityCreateAdmin,
+    activity: s.ActivityCreateInitiativeOwner,
+    requires_initiative_owner=Depends(auth.requires_initiative_owner),
     session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
 ):
     try:
         initiative_db = session.get(e.Initiative, initiative_id)
@@ -94,7 +110,7 @@ async def update_activity(
                 status_code=404, detail="Activity or Initiative not found"
             )
 
-        fields = get_fields_dict(activity)
+        fields = get_fields_dict(activity.dict())
         for key, value in fields.items():
             setattr(activity_db, key, value)
 
@@ -106,7 +122,17 @@ async def update_activity(
         session.add(activity_db)
         session.commit()
         session.refresh(activity_db)
-        return activity_db
+        return auth.validate_output_schema(
+            activity_db,
+            parse_schemas=[
+                (auth.AuthLevel.ADMIN, le.ActivityOutputAdminWithLinkedEntities),
+                (
+                    auth.AuthLevel.INITIATIVE_OWNER,
+                    le.ActivityOutputInitiativeOwnerWithLinkedEntities,
+                ),
+            ],
+            auth_levels=auth_levels,
+        )
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Name already registered")
@@ -116,6 +142,7 @@ async def update_activity(
 async def delete_activity(
     initiative_id: int,
     activity_id: int,
+    requires_initiative_owner=Depends(auth.requires_initiative_owner),
     session: Session = Depends(get_session),
 ):
     activity = session.get(e.Activity, activity_id)
@@ -129,10 +156,12 @@ async def delete_activity(
 
 @router.get(
     "/initiative/{initiative_id}/activities",
-    response_model=s.ActivityOutputGuestList,
+    response_model=s.ActivityOutputAdminList,
 )
 async def get_activities_by_initiative(
-    initiative_id: int, session: Session = Depends(get_session)
+    initiative_id: int,
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
 ):
     initiative = session.get(e.Initiative, initiative_id)
     if not initiative:
@@ -141,7 +170,17 @@ async def get_activities_by_initiative(
     activities = session.exec(
         select(e.Activity).where(e.Activity.initiative_id == initiative_id)
     ).all()
-    return {"activities": activities}
+    parsed_activities = auth.validate_output_schema(
+        activities,
+        parse_schemas=[
+            (auth.AuthLevel.ADMIN, s.ActivityOutputAdminList),
+            (auth.AuthLevel.INITIATIVE_OWNER, s.ActivityOutputInitiativeOwnerList),
+            (auth.AuthLevel.GUEST, s.ActivityOutputGuestList),
+        ],
+        auth_levels=auth_levels,
+        seq_key="activities",
+    )
+    return parsed_activities
 
 
 # # ACTIVITY - PAYMENT
@@ -170,13 +209,13 @@ async def get_activities_by_initiative(
 # INITIATIVE
 @router.post(
     "/initiative",
-    response_model=le.InitiativeOutputActivityOwnerWithLinkedEntities,
+    response_model=le.InitiativeOutputAdminWithLinkedEntities,
     responses={400: {"description": "Name already registered"}},
 )
 async def create_initiative(
     initiative: s.InitiativeCreateAdmin,
-    session: Session = Depends(get_session),
     requires_admin=Depends(auth.requires_admin),
+    session: Session = Depends(get_session),
 ):
     fields = get_fields_dict(initiative.dict())
     new_initiative = e.Initiative(**fields)
@@ -193,9 +232,7 @@ async def create_initiative(
         session.add(new_initiative)
         session.commit()
         session.refresh(new_initiative)
-        return le.InitiativeOutputActivityOwnerWithLinkedEntities.from_orm(
-            new_initiative
-        )
+        return le.InitiativeOutputAdminWithLinkedEntities.from_orm(new_initiative)
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Name already registered")
@@ -203,7 +240,7 @@ async def create_initiative(
 
 @router.patch(
     "/initiative/{initiative_id}",
-    response_model=le.InitiativeOutputActivityOwnerWithLinkedEntities,
+    response_model=le.InitiativeOutputAdminWithLinkedEntities,
     response_model_exclude_unset=True,
 )
 async def update_initiative(
@@ -211,7 +248,7 @@ async def update_initiative(
     initiative: s.InitiativeUpdateAdmin,
     requires_login=Depends(auth.requires_login),
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
 ):
     initiative_db = session.get(e.Initiative, initiative_id)
     if not initiative_db:
@@ -244,11 +281,11 @@ async def update_initiative(
         return auth.validate_output_schema(
             initiative_db,
             parse_schemas=[
+                (auth.AuthLevel.ADMIN, le.InitiativeOutputAdminWithLinkedEntities),
                 (
                     auth.AuthLevel.ACTIVITY_OWNER,
                     le.InitiativeOutputActivityOwnerWithLinkedEntities,
                 ),
-                (auth.AuthLevel.GUEST, le.InitiativeOutputGuestWithLinkedEntities),
             ],
             auth_levels=auth_levels,
         )
@@ -279,7 +316,7 @@ async def delete_initiative(
 )
 async def get_initiatives(
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
 ):
     # TODO: Enable searching by name, ordering by creation date and
     # initiative ownership.
@@ -400,7 +437,7 @@ async def update_user(
     user: s.UserUpdateAdmin,
     requires_login=Depends(auth.requires_login),
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
 ):
     user_db = session.get(e.User, user_id)
     if not user_db:
@@ -462,7 +499,7 @@ async def delete_user(
 def get_users(
     session: Session = Depends(get_session),
     requires_login=Depends(auth.requires_login),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_level),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
