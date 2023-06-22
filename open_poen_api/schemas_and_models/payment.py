@@ -63,6 +63,16 @@ class PaymentUpdateFinancial(PaymentUpdateInitiativeOwner):
         orm_mode = True
 
 
+FORBIDDEN_NON_MANUAL_PAYMENT_FIELDS = [
+    "booking_date",
+    "transaction_amount",
+    "creditor_name",
+    "credtor_account",
+    "debtor_name",
+    "debtor_account",
+]
+
+
 class PaymentOutputGuest(BaseModel):
     id: int
     booking_date: datetime

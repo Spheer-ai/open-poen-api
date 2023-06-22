@@ -97,35 +97,57 @@ class AuthLevel(IntEnum):
         return self.name.lower()
 
 
-def get_authorization_levels(
-    requester: Annotated[
-        e.User | None,
-        Depends(get_requester),
-    ],
-    user_id: int | None = None,
-    initiative_id: int | None = None,
-    activity_id: int | None = None,
-) -> list[AuthLevel]:
-    if requester is None:
-        return [AuthLevel.GUEST]
-    auth_levels = [AuthLevel.GUEST, AuthLevel.USER]
-    # TODO: USER_OWNER doesn't really belong here, it doesn't
-    # fit so well among the other levels ordinality wise.
-    if user_id is not None and requester.id == user_id:
-        auth_levels.append(AuthLevel.USER_OWNER)
-    if initiative_id is not None and initiative_id in map(
-        lambda x: x.id, requester.initiatives
-    ):
-        auth_levels.append(AuthLevel.INITIATIVE_OWNER)
-        if requester.role == e.Role.FINANCIAL:
-            auth_levels.append(AuthLevel.FINANCIAL)
-    if activity_id is not None and activity_id in map(
-        lambda x: x.id, requester.activities
-    ):
-        auth_levels.append(AuthLevel.ACTIVITY_OWNER)
-    if requester.role == e.Role.ADMIN:
-        auth_levels.append(AuthLevel.ADMIN)
-    return auth_levels
+def get_initiative_auth_levels(requires_login: bool = False):
+    def _get_initiative_auth_levels(
+        requester: Annotated[
+            e.User | None,
+            Depends(get_requester),
+        ],
+        initiative_id: int | None = None,
+        activity_id: int | None = None,
+    ) -> list[AuthLevel]:
+        if requires_login and requester is None:
+            raise HTTPException(status_code=401, detail="Requires login")
+        if requester is None:
+            return [AuthLevel.GUEST]
+        auth_levels = [AuthLevel.GUEST, AuthLevel.USER]
+        if initiative_id is not None and initiative_id in map(
+            lambda x: x.id, requester.initiatives
+        ):
+            auth_levels.append(AuthLevel.INITIATIVE_OWNER)
+            if requester.role == e.Role.FINANCIAL:
+                auth_levels.append(AuthLevel.FINANCIAL)
+        if activity_id is not None and activity_id in map(
+            lambda x: x.id, requester.activities
+        ):
+            auth_levels.append(AuthLevel.ACTIVITY_OWNER)
+        if requester.role == e.Role.ADMIN:
+            auth_levels.append(AuthLevel.ADMIN)
+        return auth_levels
+
+    return _get_initiative_auth_levels
+
+
+def get_user_auth_levels(requires_login: bool = False):
+    def _get_user_auth_levels(
+        requester: Annotated[
+            e.User | None,
+            Depends(get_requester),
+        ],
+        user_id: int | None,
+    ) -> list[AuthLevel]:
+        if requires_login and requester is None:
+            raise HTTPException(status_code=401, detail="Requires login")
+        if requester is None:
+            return [AuthLevel.GUEST]
+        auth_levels = [AuthLevel.GUEST, AuthLevel.USER]
+        if user_id is not None and requester.id == user_id:
+            auth_levels.append(AuthLevel.USER_OWNER)
+        if requester.role == e.Role.ADMIN:
+            auth_levels.append(AuthLevel.ADMIN)
+        return auth_levels
+
+    return _get_user_auth_levels
 
 
 def requires_admin(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
@@ -139,7 +161,9 @@ def requires_login(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)
 
 def requires_initiative_owner(
     initiative_id: int,
-    auth_levels: list[AuthLevel] = Depends(get_authorization_levels),
+    auth_levels: list[AuthLevel] = Depends(
+        get_initiative_auth_levels(requires_login=True)
+    ),
 ):
     if not any([l >= AuthLevel.INITIATIVE_OWNER for l in auth_levels]):
         raise HTTPException(
@@ -148,7 +172,9 @@ def requires_initiative_owner(
 
 
 def requires_financial(
-    auth_levels: list[AuthLevel] = Depends(get_authorization_levels),
+    auth_levels: list[AuthLevel] = Depends(
+        get_initiative_auth_levels(requires_login=True)
+    ),
 ):
     if not any([l >= AuthLevel.FINANCIAL for l in auth_levels]):
         raise HTTPException(status_code=403, detail="Financial authorization required")

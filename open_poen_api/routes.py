@@ -50,7 +50,7 @@ async def create_activity(
     activity: s.ActivityCreateInitiativeOwner,
     requires_log_in=Depends(auth.requires_login),
     requires_initiative_owner=Depends(auth.requires_initiative_owner),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels),
     session: Session = Depends(get_session),
 ):
     initiative_db = session.get(e.Initiative, initiative_id)
@@ -97,7 +97,7 @@ async def update_activity(
     requires_login=Depends(auth.requires_login),
     requires_initiative_owner=Depends(auth.requires_initiative_owner),
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels),
 ):
     try:
         initiative_db = session.get(e.Initiative, initiative_id)
@@ -163,7 +163,7 @@ async def delete_activity(
 async def get_activities_by_initiative(
     initiative_id: int,
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels),
 ):
     initiative = session.get(e.Initiative, initiative_id)
     if not initiative:
@@ -248,9 +248,10 @@ async def create_initiative(
 async def update_initiative(
     initiative_id: int,
     initiative: s.InitiativeUpdateAdmin,
-    requires_login=Depends(auth.requires_login),
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(
+        auth.get_initiative_auth_levels(requires_login=True)
+    ),
 ):
     initiative_db = session.get(e.Initiative, initiative_id)
     if not initiative_db:
@@ -318,7 +319,7 @@ async def delete_initiative(
 )
 async def get_initiatives(
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels()),
 ):
     # TODO: Enable searching by name, ordering by creation date and
     # initiative ownership.
@@ -383,10 +384,10 @@ async def update_initiative_payment(
     initiative_id: int,
     payment_id: int,
     payment: s.PaymentUpdateFinancial,
-    requires_login=Depends(auth.requires_login),
-    requires_financial=Depends(auth.requires_financial),
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(
+        auth.get_initiative_auth_levels(requires_login=True)
+    ),
 ):
     initiative_db = session.get(e.Initiative, initiative_id)
     payment_db = session.get(e.Payment, payment_id)
@@ -403,10 +404,17 @@ async def update_initiative_payment(
         auth_levels=auth_levels,
     )
 
-    if payment_db.type != e.PaymentType.MANUAL:
-        print("check fields")
-
     fields = get_fields_dict(payment.dict(exclude_unset=True))
+    if payment_db.type != e.PaymentType.MANUAL:
+        forbidden_fields = [
+            f for f in s.FORBIDDEN_NON_MANUAL_PAYMENT_FIELDS if f in fields.keys()
+        ]
+        if len(forbidden_fields) > 0:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Payment type {payment_db.type.name} disallows changing fields {forbidden_fields}",
+            )
+
     for key, value in fields.items():
         setattr(payment_db, key, value)
 
@@ -497,9 +505,10 @@ async def create_user(
 async def update_user(
     user_id: int,
     user: s.UserUpdateAdmin,
-    requires_login=Depends(auth.requires_login),
     session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(
+        auth.get_user_auth_levels(requires_login=True)
+    ),
 ):
     user_db = session.get(e.User, user_id)
     if not user_db:
@@ -560,8 +569,9 @@ async def delete_user(
 )
 def get_users(
     session: Session = Depends(get_session),
-    requires_login=Depends(auth.requires_login),
-    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+    auth_levels: list[auth.AuthLevel] = Depends(
+        auth.get_initiative_auth_levels(requires_login=True)
+    ),
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.

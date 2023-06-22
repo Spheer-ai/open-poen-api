@@ -3,7 +3,12 @@ from open_poen_api.database import engine
 from sqlmodel import Session, SQLModel
 from fastapi.testclient import TestClient
 from open_poen_api.app import app
-from open_poen_api.schemas_and_models.models.entities import User, Initiative, Activity
+from open_poen_api.schemas_and_models.models.entities import (
+    User,
+    Initiative,
+    Activity,
+    Payment,
+)
 from open_poen_api.utils import temp_password_generator
 from passlib.context import CryptContext
 import pytest
@@ -55,6 +60,7 @@ def session_2(clean_session, pwd_context):
     )
     clean_session.add_all([user1, user2, user3])
     clean_session.commit()
+    clean_session.refresh(user2)
     clean_session.refresh(user3)
 
     initiative1 = Initiative(
@@ -90,28 +96,58 @@ def session_2(clean_session, pwd_context):
 
 
 @pytest.fixture(scope="function")
-def session_3(session_2):
+def session_3(session_2, pwd_context):
+    hashed_debug_password = pwd_context.hash(temp_password_generator())
+    user4 = User(
+        email="user4@example.com",
+        hashed_password=hashed_debug_password,
+    )
     activity1 = Activity(
         name="Activity 1",
         description="Description 1",
         purpose="Purpose 1",
         target_audience="Target Audience 1",
         initiative_id=1,
+        activity_owners=[user4],
     )
     activity2 = Activity(
         name="Activity 2",
         description="Description 2",
         purpose="Purpose 2",
         target_audience="Target Audience 2",
+        initiative_id=2,
+    )
+    payment1 = Payment(
+        booking_date=datetime.now().isoformat(),
+        transaction_amount=-33.33,
+        creditor_name="Some Name",
+        creditor_account="NL3400992211",
+        debtor_name="Another Name",
+        debtor_account="DE94772012",
+        short_user_description="Test short description",
+        long_user_description="Test long description",
+        route="expenses",
         initiative_id=1,
     )
-    session_2.add_all([activity1, activity2])
+    payment2 = Payment(
+        booking_date=datetime.now().isoformat(),
+        transaction_amount=-33.33,
+        creditor_name="Some Name",
+        creditor_account="NL3400992211",
+        debtor_name="Another Name",
+        debtor_account="DE94772012",
+        short_user_description="Test short description",
+        long_user_description="Test long description",
+        route="expenses",
+        initiative_id=2,
+    )
+    session_2.add_all([activity1, activity2, payment1, payment2])
     session_2.commit()
 
     yield session_2
 
 
-def generate_auth_header(username: str, client, session_2):
+def generate_auth_header(username: str, client, session):
     data = {"username": username, "password": "DEBUG_PASSWORD"}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
@@ -123,45 +159,88 @@ def generate_auth_header(username: str, client, session_2):
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-UserID = int | None
-InitiativeID = int | None
-ActivityID = int | None
-AuthTestConfig = tuple[dict[str, str], UserID, InitiativeID, ActivityID]
+UserID = int
+InitiativeID = int
+ActivityID = int
+AuthTestUserConfig = tuple[dict[str, str], UserID]
+AuthTestInitiativeConfig = tuple[dict[str, str], InitiativeID, ActivityID]
 
 
+# TESTING USER PERMISSIONS
 @pytest.fixture(scope="function")
-def admin_auth_2(client, session_2) -> AuthTestConfig:
+def user_admin_2(client, session_2) -> AuthTestUserConfig:
+    # Admin edits/queries another user.
     email = "user1@example.com"
-    return generate_auth_header(email, client, session_2), 1, 1, None
+    return generate_auth_header(email, client, session_2), 2
 
 
 @pytest.fixture(scope="function")
-def financial_auth_2(client, session_2) -> AuthTestConfig:
+def user_financial_2(client, session_2) -> AuthTestUserConfig:
+    # Financial edits/queries another user.
     email = "user2@example.com"
-    return generate_auth_header(email, client, session_2), 1, 1, None
+    return generate_auth_header(email, client, session_2), 1
 
 
 @pytest.fixture(scope="function")
-def initiative_owner_auth_2(client, session_2) -> AuthTestConfig:
+def user_user_owner_2(client, session_2) -> AuthTestUserConfig:
+    # User Owner edits/queries himself.
     email = "user3@example.com"
-    return generate_auth_header(email, client, session_2), 3, 1, None
+    return generate_auth_header(email, client, session_2), 3
 
 
 @pytest.fixture(scope="function")
-def user_auth_2(client, session_2) -> AuthTestConfig:
+def user_user_2(client, session_2) -> AuthTestUserConfig:
+    # A user edits/queries another user.
     email = "user3@example.com"
-    return generate_auth_header(email, client, session_2), 1, 1, None
+    return generate_auth_header(email, client, session_2), 1
 
 
 @pytest.fixture(scope="function")
-def user_owner_auth_2(client, session_2) -> AuthTestConfig:
+def user_guest_2(client, session_2) -> AuthTestUserConfig:
+    # A guest edits/queries a user.
+    return {}, 1
+
+
+# TESTING INITIATIVE PERMISSIONS
+@pytest.fixture(scope="function")
+def init_admin_3(client, session_3) -> AuthTestInitiativeConfig:
+    # Admin edits/queries an initiative/activity without being initiative owner
+    email = "user1@example.com"
+    return generate_auth_header(email, client, session_3), 1, 1
+
+
+@pytest.fixture(scope="function")
+def init_financial_3(client, session_3) -> AuthTestInitiativeConfig:
+    # Financial edits/queries an initiative/activity that he is linked to
+    email = "user2@example.com"
+    return generate_auth_header(email, client, session_3), 1, 1
+
+
+@pytest.fixture(scope="function")
+def init_initiative_owner_3(client, session_3) -> AuthTestInitiativeConfig:
+    # Initiative Owner edits/queries an initiative/activity the he is linked to.
     email = "user3@example.com"
-    return generate_auth_header(email, client, session_2), 3, None, None
+    return generate_auth_header(email, client, session_3), 1, 1
 
 
 @pytest.fixture(scope="function")
-def guest_auth_2(client, session_2) -> AuthTestConfig:
-    return {}, 1, 1, None
+def init_activity_owner_3(client, session_3) -> AuthTestInitiativeConfig:
+    # Activity Owner edits/queries an initiative/activity that he is linked to.
+    email = "user4@example.com"
+    return generate_auth_header(email, client, session_3), 1, 1
+
+
+@pytest.fixture(scope="function")
+def init_user_3(client, session_3) -> AuthTestInitiativeConfig:
+    # A user that edits/queries an initiative/activity for which he has no rights.
+    email = "user3@example.com"
+    return generate_auth_header(email, client, session_3), 2, 1
+
+
+@pytest.fixture(scope="function")
+def init_guest_3(client, session_3) -> AuthTestInitiativeConfig:
+    # A guest edits/queries an initiative/activity.
+    return {}, 1, 1
 
 
 @pytest.fixture

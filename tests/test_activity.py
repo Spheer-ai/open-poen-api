@@ -35,9 +35,9 @@ def test_post_activity(
     assert name_exists == name_in_db
 
 
-def test_duplicate_name(client, session_3, admin_auth_2, activity_data):
+def test_duplicate_name(client, session_3, user_admin_2, activity_data):
     activity_data["name"] = "Activity 1"
-    authorization_header, _ = admin_auth_2
+    authorization_header, _ = user_admin_2
     response = client.post(
         "/initiative/1/activity", json=activity_data, headers=authorization_header
     )
