@@ -111,11 +111,6 @@ class Route(str, Enum):
     EXPENSES = "expenses"
 
 
-def get_default_route(context):
-    ta = context.get_current_parameters()["transaction_amount"]
-    return Route.INCOME if ta > 0 else Route.EXPENSES
-
-
 class PaymentType(str, Enum):
     BNG = "BNG"
     NORDIGEN = "NORDIGEN"

@@ -345,7 +345,7 @@ async def root():
     return {"total_spent": 100, "total_earned": 100, "initiative_count": 22}
 
 
-# # INITIATIVE - PAYMENT
+# INITIATIVE - PAYMENT
 @router.post(
     "/initiative/{initiative_id}/payment",
     response_model=le.PaymentOutputFinancialWithLinkedEntities,
@@ -374,9 +374,46 @@ async def create_initiative_payment(
         raise Exception
 
 
-# @router.put("/initiative/{initiative_id}/payment/{payment_id}")
-# async def root(initiative_id: int, payment_id: int):
-#     return {"amount": 10.01, "debitor": "Mark de Wijk"}
+@router.patch(
+    "/initiative/{initiative_id}/payment/{payment_id}",
+    response_model=le.PaymentOutputFinancialWithLinkedEntities,
+    responses={404: {"description": "Initiative or Payment not found"}},
+)
+async def update_initiative_payment(
+    initiative_id: int,
+    payment_id: int,
+    payment: s.PaymentUpdateFinancial,
+    requires_login=Depends(auth.requires_login),
+    requires_financial=Depends(auth.requires_financial),
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_authorization_levels),
+):
+    initiative_db = session.get(e.Initiative, initiative_id)
+    payment_db = session.get(e.Payment, payment_id)
+
+    if not initiative_db or not payment_db or payment_db not in initiative_db.payments:
+        raise HTTPException(status_code=404, detail="Initiative or Payment not found")
+
+    auth.validate_input_schema(
+        unified_input_schema=payment,
+        parse_schemas=[
+            (auth.AuthLevel.FINANCIAL, s.PaymentUpdateFinancial),
+            (auth.AuthLevel.INITIATIVE_OWNER, s.PaymentUpdateInitiativeOwner),
+        ],
+        auth_levels=auth_levels,
+    )
+
+    if payment_db.type != e.PaymentType.MANUAL:
+        print("check fields")
+
+    fields = get_fields_dict(payment.dict(exclude_unset=True))
+    for key, value in fields.items():
+        setattr(payment_db, key, value)
+
+    session.add(payment_db)
+    session.commit()
+    session.refresh(payment_db)
+    return payment_db
 
 
 # @router.delete("/initiative/{initiative_id}/payment/{payment_id}")

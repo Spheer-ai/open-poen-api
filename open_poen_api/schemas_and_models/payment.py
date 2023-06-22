@@ -79,7 +79,11 @@ class PaymentOutputGuest(BaseModel):
     type: PaymentType
 
 
-class PaymentOutputFinancial(PaymentOutputGuest, TimeStampMixin, HiddenMixin):
+class PaymentOutputInitiativeOwner(PaymentOutputGuest, TimeStampMixin, HiddenMixin):
+    pass
+
+
+class PaymentOutputFinancial(PaymentOutputInitiativeOwner):
     pass
 
 

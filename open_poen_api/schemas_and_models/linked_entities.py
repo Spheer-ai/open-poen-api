@@ -79,6 +79,13 @@ class ActivityOutputAdminWithLinkedEntities(a.ActivityOutputAdmin):
         title = "ActivityOutputWithLinkedEntities"
 
 
+class PaymentOutputInitiativeOwnerWithLinkedEntities(p.PaymentOutputInitiativeOwner):
+    pass
+
+    class Config:
+        orm_mode = True
+
+
 class PaymentOutputFinancialWithLinkedEntities(p.PaymentOutputFinancial):
     pass
 
