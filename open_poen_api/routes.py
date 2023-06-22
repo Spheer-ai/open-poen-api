@@ -187,9 +187,36 @@ async def get_activities_by_initiative(
 
 
 # # ACTIVITY - PAYMENT
-# @router.post("/initiative/{initiative_id}/activity/{activity_id}/payment")
-# async def root(initiative_id: int, activity_id: int):
-#     return {"amount": 10.01, "debitor": "Mark de Wijk"}
+@router.post(
+    "/initiative/{initiative_id}/activity/{activity_id}/payment",
+    response_model=le.PaymentOutputFinancialWithLinkedEntities,
+    responses={404, {"description": "Initiative or Activity not found"}},
+)
+async def root(
+    initiative_id: int,
+    activity_id: int,
+    payment: s.PaymentCreateFinancial,
+    requires_financial=Depends(auth.requires_financial),
+    session: Session = Depends(get_session),
+):
+    initiative_db = session.get(e.Initiative, initiative_id)
+    activity_db = session.get(e.Activity, activity_id)
+
+    if (
+        not initiative_db
+        or not activity_db
+        or activity_db not in initiative_db.activities
+    ):
+        raise HTTPException(status_code=404, detail="Initiative or Activity not found")
+
+    fields = get_fields_dict(payment.dict())
+    new_payment = e.Payment(
+        initiative_id=initiative_id, activity_id=activity_id, **fields
+    )
+    session.add(new_payment)
+    session.commit()
+    session.refresh(new_payment)
+    return le.PaymentOutputFinancialWithLinkedEntities.from_orm(new_payment)
 
 
 # @router.put("/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}")
@@ -356,7 +383,6 @@ async def root():
 async def create_initiative_payment(
     initiative_id: int,
     payment: s.PaymentCreateFinancial,
-    requires_login=Depends(auth.requires_login),
     requires_financial=Depends(auth.requires_financial),
     session: Session = Depends(get_session),
 ):
@@ -366,14 +392,10 @@ async def create_initiative_payment(
 
     fields = get_fields_dict(payment.dict())
     new_payment = e.Payment(initiative_id=initiative_id, **fields)
-    try:
-        session.add(new_payment)
-        session.commit()
-        session.refresh(new_payment)
-        return le.PaymentOutputFinancialWithLinkedEntities.from_orm(new_payment)
-    except Exception:
-        session.rollback()
-        raise Exception
+    session.add(new_payment)
+    session.commit()
+    session.refresh(new_payment)
+    return le.PaymentOutputFinancialWithLinkedEntities.from_orm(new_payment)
 
 
 @router.patch(
