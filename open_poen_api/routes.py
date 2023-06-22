@@ -159,6 +159,7 @@ async def delete_activity(
 @router.get(
     "/initiative/{initiative_id}/activities",
     response_model=s.ActivityOutputAdminList,
+    response_model_exclude_unset=True,
 )
 async def get_activities_by_initiative(
     initiative_id: int,
@@ -424,17 +425,51 @@ async def update_initiative_payment(
     return payment_db
 
 
-# @router.delete("/initiative/{initiative_id}/payment/{payment_id}")
-# async def root(initiative_id: int, payment_id: int):
-#     return {"status_code": 204, "content": "Succesfully deleted."}
+@router.delete("/initiative/{initiative_id}/payment/{payment_id}")
+async def delete_initiative_payment(
+    initiative_id: int,
+    payment_id: int,
+    requires_financial=Depends(auth.requires_financial),
+    session: Session = Depends(get_session),
+):
+    initiative_db = session.get(e.Initiative, initiative_id)
+    payment_db = session.get(e.Payment, payment_id)
+
+    if not initiative_db or not payment_db or payment_db not in initiative_db.payments:
+        raise HTTPException(status_code=404, detail="Initiative or Payment not found")
+
+    session.delete(payment_db)
+    session.commit()
+    return Response(status_code=204)
 
 
-# @router.get("/initiative/{initiative_id}/payments")
-# async def root(initiative_id: int):
-#     return [
-#         {"amount": 10.01, "debitor": "Mark de Wijk"},
-#         {"amount": 9.01, "debitor": "Jamal Vleij"},
-#     ]
+@router.get(
+    "/initiative/{initiative_id}/payments",
+    response_model=s.PaymentOutputFinancialList,
+    response_model_exclude_unset=True,
+)
+async def get_initiative_payments(
+    initiative_id: int,
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels()),
+):
+    # TODO: Enable ordering by created_at or booking date or something.
+    # TODO: Enable pagination.
+    # TODO: Add linking logic for BNG, NORDIGEN
+    payments = session.exec(
+        select(e.Payment).where(e.Payment.initiative_id == initiative_id)
+    ).all()
+    parsed_payments = auth.validate_output_schema(
+        payments,
+        parse_schemas=[
+            (auth.AuthLevel.FINANCIAL, s.PaymentOutputFinancialList),
+            (auth.AuthLevel.INITIATIVE_OWNER, s.PaymentOutputInitiatitveOwnerList),
+            (auth.AuthLevel.GUEST, s.PaymentOutputGuestList),
+        ],
+        auth_levels=auth_levels,
+        seq_key="payments",
+    )
+    return parsed_payments
 
 
 # # INITIATIVE - DEBIT CARD

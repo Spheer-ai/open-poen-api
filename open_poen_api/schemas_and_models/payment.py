@@ -96,10 +96,6 @@ class PaymentOutputInitiativeOwner(PaymentOutputGuest, TimeStampMixin, HiddenMix
 class PaymentOutputFinancial(PaymentOutputInitiativeOwner):
     pass
 
-
-class PaymentOutputAdmin(PaymentOutputFinancial):
-    pass
-
     class Config:
         title = "PaymentOutput"
 
@@ -111,8 +107,15 @@ class PaymentOutputGuestList(BaseModel):
         orm_mode = True
 
 
-class PaymentOutputAdminList(BaseModel):
-    payments: list[PaymentOutputAdmin]
+class PaymentOutputInitiatitveOwnerList(BaseModel):
+    payments: list[PaymentOutputInitiativeOwner]
+
+    class Config:
+        orm_mode = True
+
+
+class PaymentOutputFinancialList(BaseModel):
+    payments: list[PaymentOutputFinancial]
 
     class Config:
         orm_mode = True
