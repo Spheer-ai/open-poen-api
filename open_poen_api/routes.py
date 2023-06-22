@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, and_
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from .database import get_session
 from .schemas_and_models.models import entities as e
@@ -10,8 +10,12 @@ from typing import Annotated
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
-from .utils import get_entities_by_ids, temp_password_generator, get_fields_dict
-from pydantic import ValidationError
+from .utils import (
+    get_entities_by_ids,
+    temp_password_generator,
+    get_fields_dict,
+)
+from .payment import check_for_forbidden_fields
 
 
 router = APIRouter()
@@ -219,21 +223,119 @@ async def root(
     return le.PaymentOutputFinancialWithLinkedEntities.from_orm(new_payment)
 
 
-# @router.put("/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}")
-# async def root(initiative_id: int, activity_id: int, payment_id: int):
-#     return {"amount": 10.01, "debitor": "Mark de Wijk"}
+@router.patch(
+    "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}",
+    response_model=le.PaymentOutputFinancialWithLinkedEntities,
+    responses={404: {"description": "Initiative, Activity or Payment not found"}},
+)
+async def update_activity_payment(
+    initiative_id: int,
+    activity_id: int,
+    payment_id: int,
+    payment: s.PaymentUpdateFinancial,
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(
+        auth.get_initiative_auth_levels(requires_login=True)
+    ),
+):
+    initiative_db = session.get(e.Initiative, initiative_id)
+    activity_db = session.get(e.Activity, activity_id)
+    payment_db = session.get(e.Payment, payment_id)
+    if (
+        not initiative_db
+        or not activity_db
+        or not payment_db
+        or payment_db not in activity_db.payments
+        or activity_db not in initiative_db.activities
+    ):
+        raise HTTPException(
+            status_code=404, detail="Initiative, Activity or Payment not found"
+        )
+
+    auth.validate_input_schema(
+        unified_input_schema=payment,
+        parse_schemas=[
+            (auth.AuthLevel.FINANCIAL, s.PaymentUpdateFinancial),
+            (auth.AuthLevel.INITIATIVE_OWNER, s.PaymentUpdateInitiativeOwner),
+            (auth.AuthLevel.ACTIVITY_OWNER, s.PaymentUpdateActivityOwner),
+        ],
+        auth_levels=auth_levels,
+    )
+
+    fields = get_fields_dict(payment.dict(exclude_unset=True))
+    check_for_forbidden_fields(payment_db, fields)
+
+    for key, value in fields.items():
+        setattr(payment_db, key, value)
+
+    session.add(payment_db)
+    session.commit()
+    session.refresh(payment_db)
+    return payment_db
 
 
-# @router.delete(
-#     "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}"
-# )
-# async def root(initiative_id: int, activity_id: int, payment_id: int):
-#     return {"status_code": 204, "content": "Succesfully deleted."}
+@router.delete(
+    "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}"
+)
+async def delete_activity_payment(
+    initiative_id: int,
+    activity_id: int,
+    payment_id: int,
+    requires_financial=Depends(auth.requires_financial),
+    session: Session = Depends(get_session),
+):
+    initiative_db = session.get(e.Initiative, initiative_id)
+    activity_db = session.get(e.Activity, activity_id)
+    payment_db = session.get(e.Payment, payment_id)
+    if (
+        not initiative_db
+        or not activity_db
+        or not payment_db
+        or payment_db not in activity_db.payments
+        or activity_db not in initiative_db.activities
+    ):
+        raise HTTPException(
+            status_code=404, detail="Initiative, Activity or Payment not found"
+        )
+
+    session.delete(payment_db)
+    session.commit()
+    return Response(status_code=204)
 
 
-# @router.get("/initiative/{initiative_id}/activity/{activity_id}/payments")
-# async def root(initiative_id: int, activity_id: int):
-#     return {"status_code": 200, "content": "to implement"}
+@router.get(
+    "/initiative/{initiative_id}/activity/{activity_id}/payments",
+    response_model=s.PaymentOutputFinancialList,
+    response_model_exclude_unset=True,
+)
+async def get_activity_payments(
+    initiative_id: int,
+    activity_id: int,
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels()),
+):
+    # TODO: Enable ordering by created_at or booking date or something.
+    # TODO: Enable pagination.
+    # TODO: Add linking logic for BNG, NORDIGEN
+    payments = session.exec(
+        select(e.Payment).where(
+            and_(
+                e.Payment.initiative_id == initiative_id,
+                e.Payment.activity_id == activity_id,
+            )
+        )
+    ).all()
+    parsed_payments = auth.validate_output_schema(
+        payments,
+        parse_schemas=[
+            (auth.AuthLevel.FINANCIAL, s.PaymentOutputFinancialList),
+            (auth.AuthLevel.INITIATIVE_OWNER, s.PaymentOutputInitiatitveOwnerList),
+            (auth.AuthLevel.GUEST, s.PaymentOutputGuestList),
+        ],
+        auth_levels=auth_levels,
+        seq_key="payments",
+    )
+    return parsed_payments
 
 
 # INITIATIVE
@@ -365,13 +467,13 @@ async def get_initiatives(
     return parsed_initiatives
 
 
-@router.get("/initiatives/aggregate-numbers")
-async def root():
-    # TODO: Merge into /initiatives?
-    # NOTE: Can't merge, because /initiatives will be paginated.
-    # TODO: Implement caching to prevent calculating this with every
-    # front page view?
-    return {"total_spent": 100, "total_earned": 100, "initiative_count": 22}
+# @router.get("/initiatives/aggregate-numbers")
+# async def root():
+# TODO: Merge into /initiatives?
+# NOTE: Can't merge, because /initiatives will be paginated.
+# TODO: Implement caching to prevent calculating this with every
+# front page view?
+# return {"total_spent": 100, "total_earned": 100, "initiative_count": 22}
 
 
 # INITIATIVE - PAYMENT
@@ -401,7 +503,12 @@ async def create_initiative_payment(
 @router.patch(
     "/initiative/{initiative_id}/payment/{payment_id}",
     response_model=le.PaymentOutputFinancialWithLinkedEntities,
-    responses={404: {"description": "Initiative or Payment not found"}},
+    responses={
+        404: {"description": "Initiative or Payment not found"},
+        403: {
+            "description": "Returned if you change forbidden fields on non manual payments."
+        },
+    },
 )
 async def update_initiative_payment(
     initiative_id: int,
@@ -428,15 +535,7 @@ async def update_initiative_payment(
     )
 
     fields = get_fields_dict(payment.dict(exclude_unset=True))
-    if payment_db.type != e.PaymentType.MANUAL:
-        forbidden_fields = [
-            f for f in s.FORBIDDEN_NON_MANUAL_PAYMENT_FIELDS if f in fields.keys()
-        ]
-        if len(forbidden_fields) > 0:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Payment type {payment_db.type.name} disallows changing fields {forbidden_fields}",
-            )
+    check_for_forbidden_fields(payment_db, fields)
 
     for key, value in fields.items():
         setattr(payment_db, key, value)
