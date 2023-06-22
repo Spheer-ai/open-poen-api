@@ -1,4 +1,4 @@
-from . import models
+from .schemas_and_models.models import entities
 from sqlmodel import create_engine, SQLModel, Session
 
 # TODO: Configure this with environment variables.

@@ -1,10 +1,12 @@
 from sqlmodel import Session, SQLModel, select, col
-from typing import Type, TypeVar
+from typing import Type, TypeVar, Any
 from fastapi import HTTPException
 import os
 from dotenv import load_dotenv
 import string
 import random
+from .schemas_and_models.models import entities as e
+from . import schemas_and_models as s
 
 load_dotenv()
 
@@ -42,11 +44,11 @@ def temp_password_generator(
         return "DEBUG_PASSWORD"
 
 
-def get_fields_dict(model: SQLModel) -> dict:
+def get_fields_dict(d: dict) -> dict:
     """An input schema can have ids of entities for which we want to establish
     a relationship. Those we process separately, so we filter those out here."""
     fields_dict = {}
-    for key, value in model.dict().items():
+    for key, value in d.items():
         if not key.endswith("_ids"):
             fields_dict[key] = value
     return fields_dict
