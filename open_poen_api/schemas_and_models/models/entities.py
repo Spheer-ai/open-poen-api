@@ -71,6 +71,7 @@ class Initiative(InitiativeBase, TimeStampMixin, table=True):
         sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
     )
     payments: list["Payment"] = Relationship(back_populates="initiative")
+    debit_cards: list["DebitCard"] = Relationship(back_populates="initiative")
 
 
 class ActivityBase(SQLModel, HiddenMixin):
@@ -155,5 +156,20 @@ class Payment(PaymentBase, TimeStampMixin, table=True):
         sa_column=Column(Integer, ForeignKey("activity.id", ondelete="CASCADE"))
     )
     activity: Activity = Relationship(back_populates="payments")
-    # debit_card_id: int | None
-    # debit_card: DebitCard = Relationship...
+    debit_card_id: int | None = Field(
+        sa_column=Column(Integer, ForeignKey("debitcard.id"), nullable=True)
+    )
+    debit_card: "DebitCard" = Relationship(back_populates="payments")
+
+
+class DebitCardBase(SQLModel):
+    card_number: str = Field(unique=True, nullable=False)
+
+
+class DebitCard(DebitCardBase, TimeStampMixin, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    initiative_id: int | None = Field(
+        sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
+    )
+    initiative: Initiative = Relationship(back_populates="debit_cards")
+    payments: list[Payment] = Relationship(back_populates="debit_card")
