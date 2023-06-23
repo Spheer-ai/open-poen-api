@@ -4,7 +4,7 @@ from .mixins import TimeStampMixin
 
 
 class DebitCardCreateAdmin(DebitCardBase):
-    pass
+    initiative_id: int
 
     class Config:
         title = "DebitCardCreate"
@@ -12,11 +12,11 @@ class DebitCardCreateAdmin(DebitCardBase):
 
 
 class DebitCardUpdateAdmin(BaseModel):
-    id: int
     initiative_id: int
 
 
 class DebitCardOutputActivityOwner(TimeStampMixin):
+    id: int
     card_number: str
 
     class Config:

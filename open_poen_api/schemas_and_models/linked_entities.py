@@ -21,6 +21,13 @@ class InitiativeOutputActivityOwnerWithLinkedEntities(i.InitiativeOutputActivity
         orm_mode = True
 
 
+class InitiativeOutputInitiativeOwnerWithLinkedEntities(
+    i.InitiativeOutputInitiativeOwner
+):
+    initiative_owners: list[u.UserOutputInitiativeOwner]
+    activies: list[a.ActivityOutputInitiativeOwner]
+
+
 class InitiativeOutputAdminWithLinkedEntities(i.InitiativeOutputAdmin):
     initiative_owners: list[u.UserOutputAdmin]
     activities: list[a.ActivityOutputAdmin]

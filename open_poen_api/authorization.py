@@ -104,7 +104,6 @@ def get_initiative_auth_levels(requires_login: bool = False):
             Depends(get_requester),
         ],
         initiative_id: int | None = None,
-        activity_id: int | None = None,
     ) -> list[AuthLevel]:
         if requires_login and requester is None:
             raise HTTPException(status_code=401, detail="Requires login")
@@ -117,8 +116,8 @@ def get_initiative_auth_levels(requires_login: bool = False):
             auth_levels.append(AuthLevel.INITIATIVE_OWNER)
             if requester.role == e.Role.FINANCIAL:
                 auth_levels.append(AuthLevel.FINANCIAL)
-        if activity_id is not None and activity_id in map(
-            lambda x: x.id, requester.activities
+        if initiative_id is not None and initiative_id in map(
+            lambda x: x.initiative_id, requester.activities
         ):
             auth_levels.append(AuthLevel.ACTIVITY_OWNER)
         if requester.role == e.Role.ADMIN:
@@ -150,13 +149,19 @@ def get_user_auth_levels(requires_login: bool = False):
     return _get_user_auth_levels
 
 
-def requires_admin(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
-    if not logged_in_user.role == e.Role.ADMIN:
-        raise HTTPException(status_code=403, detail="Admin authorization required")
-
-
 def requires_login(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
     pass
+
+
+def requires_activity_owner(
+    auth_levels: list[AuthLevel] = Depends(
+        get_initiative_auth_levels(requires_login=True)
+    ),
+):
+    if not any([l >= AuthLevel.ACTIVITY_OWNER for l in auth_levels]):
+        raise HTTPException(
+            status_code=403, detail="Activity owner authorization required"
+        )
 
 
 def requires_initiative_owner(
@@ -178,6 +183,11 @@ def requires_financial(
 ):
     if not any([l >= AuthLevel.FINANCIAL for l in auth_levels]):
         raise HTTPException(status_code=403, detail="Financial authorization required")
+
+
+def requires_admin(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
+    if not logged_in_user.role == e.Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Admin authorization required")
 
 
 def validate_input_schema(

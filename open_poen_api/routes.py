@@ -414,8 +414,8 @@ async def update_initiative(
             parse_schemas=[
                 (auth.AuthLevel.ADMIN, le.InitiativeOutputAdminWithLinkedEntities),
                 (
-                    auth.AuthLevel.ACTIVITY_OWNER,  # TODO: Make this InitiativeOutputInitiativeOwnerWithLinkedEntities?
-                    le.InitiativeOutputActivityOwnerWithLinkedEntities,
+                    auth.AuthLevel.INITIATIVE_OWNER,
+                    le.InitiativeOutputInitiativeOwnerWithLinkedEntities,
                 ),
             ],
             auth_levels=auth_levels,
@@ -591,9 +591,9 @@ async def get_initiative_payments(
     return parsed_payments
 
 
-# INITIATIVE - DEBIT CARD
+# DEBIT CARD
 @router.post(
-    "/initiative/{initiative_id}/debit-card",
+    "/debit-card",
     response_model=le.DebitCardOutputActivityOwnerWithLinkedEntities,
     responses={
         404: {"description": "Initiative not found"},
@@ -601,17 +601,16 @@ async def get_initiative_payments(
     },
 )
 async def create_debit_card(
-    initiative_id: int,
     debit_card: s.DebitCardCreateAdmin,
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
+    initiative_db = session.get(e.Initiative, debit_card.initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     fields = get_fields_dict(debit_card.dict())
-    new_debit_card = e.DebitCard(initiative_id=initiative_id, **fields)
+    new_debit_card = e.DebitCard(initiative_id=debit_card.initiative_id, **fields)
     try:
         session.add(new_debit_card)
         session.commit()
@@ -626,17 +625,16 @@ async def create_debit_card(
 
 
 @router.patch(
-    "/initiative/{initiative_id}/debit-card/{debit_card_id}",
+    "/debit-card/{debit_card_id}",
     response_model=le.DebitCardOutputActivityOwnerWithLinkedEntities,
 )
 async def update_initiative_debit_card(
-    initiative_id: int,
     debit_card_id: int,
     debit_card: s.DebitCardUpdateAdmin,
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
+    initiative_db = session.get(e.Initiative, debit_card.initiative_id)
     debit_card_db = session.get(e.Activity, debit_card_id)
 
     if (
@@ -652,16 +650,10 @@ async def update_initiative_debit_card(
     for key, value in fields.items():
         setattr(debit_card_db, key, value)
 
-    try:
-        session.add(debit_card_db)
-        session.commit()
-        session.refresh(debit_card_db)
-        return debit_card_db
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            404, detail="The Debit Card's new Initiative does not exist"
-        )
+    session.add(debit_card_db)
+    session.commit()
+    session.refresh(debit_card_db)
+    return debit_card_db
 
 
 @router.get(
@@ -670,11 +662,9 @@ async def update_initiative_debit_card(
 )
 async def get_initiative_debit_cards(
     initiative_id: int,
+    requires_activity_owner=Depends(auth.requires_activity_owner),
     session: Session = Depends(get_session),
 ):
-    # TODO: Fix permissions in such a way that we can recognize activity
-    # owners as well on the initiative (this) level. Activity Owners should
-    # be allowed to get debit cards.
     initiative = session.get(e.Initiative, initiative_id)
     if not initiative:
         raise HTTPException(status_code=404, detail="Initiative not found")
@@ -683,10 +673,6 @@ async def get_initiative_debit_cards(
         select(e.DebitCard).where(e.DebitCard.initiative_id == initiative_id)
     ).all()
     return {"debit_cards": debit_cards}
-
-
-@router.patch("/debit-cards/{debit_card_id}", response_model=s.DebitCardOutputActivityOwner)
-async def 
 
 
 # @router.get("/initiative/{initiative_id}/debit-cards/aggregate-numbers")
@@ -802,7 +788,7 @@ async def delete_user(
 def get_users(
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(
-        auth.get_initiative_auth_levels(requires_login=True)
+        auth.get_user_auth_levels(requires_login=True)
     ),
 ):
     # TODO: Enable searching by email.

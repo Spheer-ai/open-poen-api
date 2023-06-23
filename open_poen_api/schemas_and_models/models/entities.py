@@ -157,7 +157,7 @@ class Payment(PaymentBase, TimeStampMixin, table=True):
     )
     activity: Activity = Relationship(back_populates="payments")
     debit_card_id: int | None = Field(
-        sa_column=Column(Integer, ForeignKey("debit_card.id"), nullable=True)
+        sa_column=Column(Integer, ForeignKey("debitcard.id"), nullable=True)
     )
     debit_card: "DebitCard" = Relationship(back_populates="payments")
 
@@ -169,7 +169,7 @@ class DebitCardBase(SQLModel):
 class DebitCard(DebitCardBase, TimeStampMixin, table=True):
     id: int | None = Field(default=None, primary_key=True)
     initiative_id: int | None = Field(
-        sa_column=Column(Integer, ForeignKey("initiative_id"), nullable=True)
+        sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
     )
     initiative: Initiative = Relationship(back_populates="debit_cards")
     payments: list[Payment] = Relationship(back_populates="debit_card")
