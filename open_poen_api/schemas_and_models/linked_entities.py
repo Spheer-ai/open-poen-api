@@ -2,6 +2,7 @@ from . import initiative as i
 from . import activity as a
 from . import user as u
 from . import payment as p
+from . import debit_card as d
 
 
 class InitiativeOutputGuestWithLinkedEntities(i.InitiativeOutputGuest):
@@ -91,3 +92,12 @@ class PaymentOutputFinancialWithLinkedEntities(p.PaymentOutputFinancial):
 
     class Config:
         orm_mode = True
+        title = "PaymentOutputWithLinkedEntities"
+
+
+class DebitCardOutputActivityOwnerWithLinkedEntities(d.DebitCardOutputActivityOwner):
+    pass
+
+    class Config:
+        orm_mode = True
+        title = "DebitCardOutputWithLinkedEntities"

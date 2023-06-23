@@ -160,7 +160,7 @@ def requires_login(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)
 
 
 def requires_initiative_owner(
-    initiative_id: int,
+    # initiative_id: int,
     auth_levels: list[AuthLevel] = Depends(
         get_initiative_auth_levels(requires_login=True)
     ),
