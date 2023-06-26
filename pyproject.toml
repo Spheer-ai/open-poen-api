@@ -19,6 +19,7 @@ passlib = "^1.7.4"
 python-multipart = "^0.0.6"
 pydantic = {extras = ["email"], version = "^1.10.9"}
 sqlalchemy-utils = "^0.41.1"
+pytz = "^2023.3"
 
 
 [tool.poetry.group.dev.dependencies]

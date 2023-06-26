@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import select, and_
-from open_poen_api.schemas_and_models.models import entities as e
+from open_poen_api.schemas_and_models.models import entities as ent
 
 
 @pytest.mark.parametrize(
@@ -30,7 +30,7 @@ def test_post_activity(
     )
     assert response.status_code == status_code
     name_exists = activity_data["name"] in [
-        activity.name for activity in session_3.exec(select(e.Activity)).all()
+        activity.name for activity in session_3.exec(select(ent.Activity)).all()
     ]
     assert name_exists == name_in_db
 
@@ -60,7 +60,7 @@ def test_patch_activity(
     client, session_3, authorization_header_name, status_code, request
 ):
     existing_activity = session_3.exec(
-        select(e.Activity).where(e.Activity.name == "Activity 1")
+        select(ent.Activity).where(ent.Activity.name == "Activity 1")
     ).one()
     assert existing_activity.description != "Updated description"
     assert existing_activity.purpose != "Updated purpose"

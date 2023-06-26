@@ -1,7 +1,7 @@
 from sqlmodel import Session, select, SQLModel
 from fastapi import Depends, HTTPException, status
 from .database import get_session
-from .schemas_and_models.models import entities as e
+from .schemas_and_models.models import entities as ent
 from typing import Annotated, Type, Sequence
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -18,7 +18,7 @@ PWD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def authenticate_user(email: str, password: str, session: Session):
-    user = session.exec(select(e.User).where(e.User.email == email)).first()
+    user = session.exec(select(ent.User).where(ent.User.email == email)).first()
     if not user:
         return False
     if not PWD_CONTEXT.verify(password, user.hashed_password):
@@ -40,7 +40,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 def get_requester(
     token: Annotated[str | None, Depends(OAUTH2_SCHEME)],
     session: Session = Depends(get_session),
-) -> e.User | None:
+) -> ent.User | None:
     """Gets the User instance of the requester, or returns None if the requester
     gives no credentials."""
     if token is None:
@@ -55,9 +55,10 @@ def get_requester(
         email: str | None = payload.get("sub")
         if email is None:
             raise credentials_exception
+    # TODO: Add separate detail for expired token.
     except JWTError:
         raise credentials_exception
-    user = session.exec(select(e.User).where(e.User.email == email)).first()
+    user = session.exec(select(ent.User).where(ent.User.email == email)).first()
     if user is None:
         raise credentials_exception
     if not user.active:
@@ -65,7 +66,7 @@ def get_requester(
     return user
 
 
-def get_logged_in_user(requester: Annotated[e.User | None, Depends(get_requester)]):
+def get_logged_in_user(requester: Annotated[ent.User | None, Depends(get_requester)]):
     if requester is None:
         raise HTTPException(status_code=401, detail="Requires login")
     else:
@@ -100,7 +101,7 @@ class AuthLevel(IntEnum):
 def get_initiative_auth_levels(requires_login: bool = False):
     def _get_initiative_auth_levels(
         requester: Annotated[
-            e.User | None,
+            ent.User | None,
             Depends(get_requester),
         ],
         initiative_id: int | None = None,
@@ -114,13 +115,13 @@ def get_initiative_auth_levels(requires_login: bool = False):
             lambda x: x.id, requester.initiatives
         ):
             auth_levels.append(AuthLevel.INITIATIVE_OWNER)
-            if requester.role == e.Role.FINANCIAL:
+            if requester.role == ent.Role.FINANCIAL:
                 auth_levels.append(AuthLevel.FINANCIAL)
         if initiative_id is not None and initiative_id in map(
             lambda x: x.initiative_id, requester.activities
         ):
             auth_levels.append(AuthLevel.ACTIVITY_OWNER)
-        if requester.role == e.Role.ADMIN:
+        if requester.role == ent.Role.ADMIN:
             auth_levels.append(AuthLevel.ADMIN)
         return auth_levels
 
@@ -130,7 +131,7 @@ def get_initiative_auth_levels(requires_login: bool = False):
 def get_user_auth_levels(requires_login: bool = False):
     def _get_user_auth_levels(
         requester: Annotated[
-            e.User | None,
+            ent.User | None,
             Depends(get_requester),
         ],
         user_id: int | None,
@@ -142,15 +143,22 @@ def get_user_auth_levels(requires_login: bool = False):
         auth_levels = [AuthLevel.GUEST, AuthLevel.USER]
         if user_id is not None and requester.id == user_id:
             auth_levels.append(AuthLevel.USER_OWNER)
-        if requester.role == e.Role.ADMIN:
+        if requester.role == ent.Role.ADMIN:
             auth_levels.append(AuthLevel.ADMIN)
         return auth_levels
 
     return _get_user_auth_levels
 
 
-def requires_login(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
+def requires_login(logged_in_user: Annotated[ent.User, Depends(get_logged_in_user)]):
     pass
+
+
+def requires_user_owner(
+    user_id: int, logged_in_user: Annotated[ent.User, Depends(get_logged_in_user)]
+):
+    if not logged_in_user.id == user_id:
+        raise HTTPException(status_code=403, detail="User Owner authorization required")
 
 
 def requires_activity_owner(
@@ -185,8 +193,8 @@ def requires_financial(
         raise HTTPException(status_code=403, detail="Financial authorization required")
 
 
-def requires_admin(logged_in_user: Annotated[e.User, Depends(get_logged_in_user)]):
-    if not logged_in_user.role == e.Role.ADMIN:
+def requires_admin(logged_in_user: Annotated[ent.User, Depends(get_logged_in_user)]):
+    if not logged_in_user.role == ent.Role.ADMIN:
         raise HTTPException(status_code=403, detail="Admin authorization required")
 
 

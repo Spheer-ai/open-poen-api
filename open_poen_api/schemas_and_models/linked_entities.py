@@ -3,6 +3,7 @@ from . import activity as a
 from . import user as u
 from . import payment as p
 from . import debit_card as d
+from . import bng as bng
 
 
 class InitiativeOutputGuestWithLinkedEntities(i.InitiativeOutputGuest):
@@ -56,6 +57,7 @@ class UserOutputUserOwnerWithLinkedEntities(u.UserOutputUserOwner):
 class UserOutputAdminWithLinkedEntities(u.UserOutputAdmin):
     initiatives: list[i.InitiativeOutputAdmin]
     activities: list[a.ActivityOutputAdmin]
+    bng: bng.BNGOutputAdmin
 
     class Config:
         orm_mode = True
@@ -108,3 +110,11 @@ class DebitCardOutputActivityOwnerWithLinkedEntities(d.DebitCardOutputActivityOw
     class Config:
         orm_mode = True
         title = "DebitCardOutputWithLinkedEntities"
+
+
+class BNGOutputAdminWithLinkedEntities(bng.BNGOutputAdmin):
+    user: u.UserOutputAdmin
+
+    class Config:
+        orm_mode = True
+        title = "BNGOutputWithLinkedEntities"

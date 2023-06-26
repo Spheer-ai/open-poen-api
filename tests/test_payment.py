@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import select
-from open_poen_api.schemas_and_models.models import entities as e
+from open_poen_api.schemas_and_models.models import entities as ent
 
 
 @pytest.mark.parametrize(

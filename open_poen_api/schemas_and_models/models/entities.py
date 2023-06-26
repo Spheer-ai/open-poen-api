@@ -17,7 +17,7 @@ class Role(str, Enum):
     USER = "user"
 
 
-class UserInputBase(SQLModel, HiddenMixin):
+class UserBase(SQLModel, HiddenMixin):
     email: EmailStr = Field(
         sa_column=Column("email", VARCHAR, unique=True, index=True, nullable=False)
     )
@@ -33,7 +33,7 @@ class UserInputBase(SQLModel, HiddenMixin):
     image: str | None
 
 
-class User(UserInputBase, TimeStampMixin, table=True):
+class User(UserBase, TimeStampMixin, table=True):
     id: int | None = Field(default=None, primary_key=True)
     hashed_password: str
     initiatives: list["Initiative"] = Relationship(
@@ -41,6 +41,9 @@ class User(UserInputBase, TimeStampMixin, table=True):
     )
     activities: list["Activity"] = Relationship(
         back_populates="activity_owners", link_model=ActivityToUser
+    )
+    bng: "BNG" | None = Relationship(
+        sa_relationship_kwargs={"uselist": False}, back_populates="user"
     )
 
 
@@ -173,3 +176,19 @@ class DebitCard(DebitCardBase, TimeStampMixin, table=True):
     )
     initiative: Initiative = Relationship(back_populates="debit_cards")
     payments: list[Payment] = Relationship(back_populates="debit_card")
+
+
+class BNGBase(SQLModel):
+    iban: str = Field(unique=True, nullable=False)
+    expires_on: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+
+
+class BNG(BNGBase, TimeStampMixin):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(
+        sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
+    )
+    user: User = Relationship(back_populates="bng")
+    consent_id: str
+    access_token: str
+    last_import_on: datetime | None

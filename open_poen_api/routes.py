@@ -1,14 +1,23 @@
 from sqlmodel import Session, select, and_
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Response,
+    Query,
+    BackgroundTasks,
+)
+from fastapi.responses import RedirectResponse
 from .database import get_session
-from .schemas_and_models.models import entities as e
+from .schemas_and_models.models import entities as ent
 from .schemas_and_models import linked_entities as le
 from .schemas_and_models.authorization import Token
 from . import schemas_and_models as s
 from . import authorization as auth
 from typing import Annotated
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import timedelta
+from datetime import timedelta, datetime
 from sqlalchemy.exc import IntegrityError
 from .utils import (
     get_entities_by_ids,
@@ -16,6 +25,9 @@ from .utils import (
     get_fields_dict,
 )
 from .payment import check_for_forbidden_fields
+from jose import jwt, JWTError, ExpiredSignatureError
+from time import time
+import pytz
 
 
 router = APIRouter()
@@ -56,15 +68,15 @@ async def create_activity(
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels()),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     fields = get_fields_dict(activity.dict())
-    new_activity = e.Activity(initiative_id=initiative_id, **fields)
+    new_activity = ent.Activity(initiative_id=initiative_id, **fields)
     if activity.activity_owner_ids is not None:
         new_activity.activity_owners = get_entities_by_ids(
-            session, e.User, activity.activity_owner_ids
+            session, ent.User, activity.activity_owner_ids
         )
     try:
         session.add(new_activity)
@@ -102,8 +114,8 @@ async def update_activity(
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels()),
 ):
     try:
-        initiative_db = session.get(e.Initiative, initiative_id)
-        activity_db = session.get(e.Activity, activity_id)
+        initiative_db = session.get(ent.Initiative, initiative_id)
+        activity_db = session.get(ent.Activity, activity_id)
 
         if (
             not initiative_db
@@ -120,7 +132,7 @@ async def update_activity(
 
         if activity.activity_owner_ids is not None:
             activity_db.activity_owners = get_entities_by_ids(
-                session, e.User, activity.activity_owner_ids
+                session, ent.User, activity.activity_owner_ids
             )
 
         session.add(activity_db)
@@ -149,7 +161,7 @@ async def delete_activity(
     requires_initiative_owner=Depends(auth.requires_initiative_owner),
     session: Session = Depends(get_session),
 ):
-    activity = session.get(e.Activity, activity_id)
+    activity = session.get(ent.Activity, activity_id)
     if not activity or activity.initiative_id != initiative_id:
         raise HTTPException(status_code=404, detail="Activity not found")
 
@@ -168,12 +180,12 @@ async def get_activities_by_initiative(
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(auth.get_initiative_auth_levels()),
 ):
-    initiative = session.get(e.Initiative, initiative_id)
+    initiative = session.get(ent.Initiative, initiative_id)
     if not initiative:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     activities = session.exec(
-        select(e.Activity).where(e.Activity.initiative_id == initiative_id)
+        select(ent.Activity).where(ent.Activity.initiative_id == initiative_id)
     ).all()
     parsed_activities = auth.validate_output_schema(
         activities,
@@ -201,8 +213,8 @@ async def root(
     requires_financial=Depends(auth.requires_financial),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
-    activity_db = session.get(e.Activity, activity_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
+    activity_db = session.get(ent.Activity, activity_id)
 
     if (
         not initiative_db
@@ -212,7 +224,7 @@ async def root(
         raise HTTPException(status_code=404, detail="Initiative or Activity not found")
 
     fields = get_fields_dict(payment.dict())
-    new_payment = e.Payment(
+    new_payment = ent.Payment(
         initiative_id=initiative_id, activity_id=activity_id, **fields
     )
     session.add(new_payment)
@@ -236,9 +248,9 @@ async def update_activity_payment(
         auth.get_initiative_auth_levels(requires_login=True)
     ),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
-    activity_db = session.get(e.Activity, activity_id)
-    payment_db = session.get(e.Payment, payment_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
+    activity_db = session.get(ent.Activity, activity_id)
+    payment_db = session.get(ent.Payment, payment_id)
     if (
         not initiative_db
         or not activity_db
@@ -282,9 +294,9 @@ async def delete_activity_payment(
     requires_financial=Depends(auth.requires_financial),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
-    activity_db = session.get(e.Activity, activity_id)
-    payment_db = session.get(e.Payment, payment_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
+    activity_db = session.get(ent.Activity, activity_id)
+    payment_db = session.get(ent.Payment, payment_id)
     if (
         not initiative_db
         or not activity_db
@@ -316,10 +328,10 @@ async def get_activity_payments(
     # TODO: Enable pagination.
     # TODO: Add linking logic for BNG, NORDIGEN
     payments = session.exec(
-        select(e.Payment).where(
+        select(ent.Payment).where(
             and_(
-                e.Payment.initiative_id == initiative_id,
-                e.Payment.activity_id == activity_id,
+                ent.Payment.initiative_id == initiative_id,
+                ent.Payment.activity_id == activity_id,
             )
         )
     ).all()
@@ -348,15 +360,15 @@ async def create_initiative(
     session: Session = Depends(get_session),
 ):
     fields = get_fields_dict(initiative.dict())
-    new_initiative = e.Initiative(**fields)
+    new_initiative = ent.Initiative(**fields)
     if initiative.initiative_owner_ids is not None:
         new_initiative.initiative_owners = get_entities_by_ids(
-            session, e.User, initiative.initiative_owner_ids
+            session, ent.User, initiative.initiative_owner_ids
         )
     # TODO: Remove this.
     if initiative.activity_ids is not None:
         new_initiative.activities = get_entities_by_ids(
-            session, e.Activity, initiative.activity_ids
+            session, ent.Activity, initiative.activity_ids
         )
     try:
         session.add(new_initiative)
@@ -381,7 +393,7 @@ async def update_initiative(
         auth.get_initiative_auth_levels(requires_login=True)
     ),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
@@ -399,11 +411,11 @@ async def update_initiative(
         setattr(initiative_db, key, value)
     if initiative.initiative_owner_ids is not None:
         initiative_db.initiative_owners = get_entities_by_ids(
-            session, e.User, initiative.initiative_owner_ids
+            session, ent.User, initiative.initiative_owner_ids
         )
     if initiative.activity_ids is not None:
         initiative_db.activities = get_entities_by_ids(
-            session, e.Activity, initiative.activity_ids
+            session, ent.Activity, initiative.activity_ids
         )
     try:
         session.add(initiative_db)
@@ -431,7 +443,7 @@ async def delete_initiative(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    initiative = session.get(e.Initiative, initiative_id)
+    initiative = session.get(ent.Initiative, initiative_id)
     if not initiative:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
@@ -452,7 +464,7 @@ async def get_initiatives(
     # TODO: Enable searching by name, ordering by creation date and
     # initiative ownership.
     # TODO: pagination.
-    initiatives = session.exec(select(e.Initiative)).all()
+    initiatives = session.exec(select(ent.Initiative)).all()
     parsed_initiatives = auth.validate_output_schema(
         initiatives,
         parse_schemas=[
@@ -486,12 +498,12 @@ async def create_initiative_payment(
     requires_financial=Depends(auth.requires_financial),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     fields = get_fields_dict(payment.dict())
-    new_payment = e.Payment(initiative_id=initiative_id, **fields)
+    new_payment = ent.Payment(initiative_id=initiative_id, **fields)
     session.add(new_payment)
     session.commit()
     session.refresh(new_payment)
@@ -517,8 +529,8 @@ async def update_initiative_payment(
         auth.get_initiative_auth_levels(requires_login=True)
     ),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
-    payment_db = session.get(e.Payment, payment_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
+    payment_db = session.get(ent.Payment, payment_id)
 
     if not initiative_db or not payment_db or payment_db not in initiative_db.payments:
         raise HTTPException(status_code=404, detail="Initiative or Payment not found")
@@ -551,8 +563,8 @@ async def delete_initiative_payment(
     requires_financial=Depends(auth.requires_financial),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, initiative_id)
-    payment_db = session.get(e.Payment, payment_id)
+    initiative_db = session.get(ent.Initiative, initiative_id)
+    payment_db = session.get(ent.Payment, payment_id)
 
     if not initiative_db or not payment_db or payment_db not in initiative_db.payments:
         raise HTTPException(status_code=404, detail="Initiative or Payment not found")
@@ -576,7 +588,7 @@ async def get_initiative_payments(
     # TODO: Enable pagination.
     # TODO: Add linking logic for BNG, NORDIGEN
     payments = session.exec(
-        select(e.Payment).where(e.Payment.initiative_id == initiative_id)
+        select(ent.Payment).where(ent.Payment.initiative_id == initiative_id)
     ).all()
     parsed_payments = auth.validate_output_schema(
         payments,
@@ -605,12 +617,12 @@ async def create_debit_card(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, debit_card.initiative_id)
+    initiative_db = session.get(ent.Initiative, debit_card.initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     fields = get_fields_dict(debit_card.dict())
-    new_debit_card = e.DebitCard(initiative_id=debit_card.initiative_id, **fields)
+    new_debit_card = ent.DebitCard(initiative_id=debit_card.initiative_id, **fields)
     try:
         session.add(new_debit_card)
         session.commit()
@@ -634,8 +646,8 @@ async def update_initiative_debit_card(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    initiative_db = session.get(e.Initiative, debit_card.initiative_id)
-    debit_card_db = session.get(e.Activity, debit_card_id)
+    initiative_db = session.get(ent.Initiative, debit_card.initiative_id)
+    debit_card_db = session.get(ent.Activity, debit_card_id)
 
     if (
         not initiative_db
@@ -665,12 +677,12 @@ async def get_initiative_debit_cards(
     requires_activity_owner=Depends(auth.requires_activity_owner),
     session: Session = Depends(get_session),
 ):
-    initiative = session.get(e.Initiative, initiative_id)
+    initiative = session.get(ent.Initiative, initiative_id)
     if not initiative:
         raise HTTPException(status_code=404, detail="Initiative not found")
 
     debit_cards = session.exec(
-        select(e.DebitCard).where(e.DebitCard.initiative_id == initiative_id)
+        select(ent.DebitCard).where(ent.DebitCard.initiative_id == initiative_id)
     ).all()
     return {"debit_cards": debit_cards}
 
@@ -695,14 +707,14 @@ async def create_user(
     # TODO: Route for resetting the password.
     temp_password = temp_password_generator()
     fields = get_fields_dict(user.dict())
-    new_user = e.User(**fields, hashed_password=auth.PWD_CONTEXT.hash(temp_password))
+    new_user = ent.User(**fields, hashed_password=auth.PWD_CONTEXT.hash(temp_password))
     if user.initiative_ids is not None:
         new_user.initiatives = get_entities_by_ids(
-            session, e.Initiative, user.initiative_ids
+            session, ent.Initiative, user.initiative_ids
         )
     if user.activity_ids is not None:
         new_user.activities = get_entities_by_ids(
-            session, e.Activity, user.activity_ids
+            session, ent.Activity, user.activity_ids
         )
     try:
         session.add(new_user)
@@ -728,7 +740,7 @@ async def update_user(
         auth.get_user_auth_levels(requires_login=True)
     ),
 ):
-    user_db = session.get(e.User, user_id)
+    user_db = session.get(ent.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -746,10 +758,12 @@ async def update_user(
         setattr(user_db, key, value)
     if user.initiative_ids is not None:
         user_db.initiatives = get_entities_by_ids(
-            session, e.Initiative, user.initiative_ids
+            session, ent.Initiative, user.initiative_ids
         )
     if user.activity_ids is not None:
-        user_db.activities = get_entities_by_ids(session, e.Activity, user.activity_ids)
+        user_db.activities = get_entities_by_ids(
+            session, ent.Activity, user.activity_ids
+        )
     try:
         session.add(user_db)
         session.commit()
@@ -773,7 +787,7 @@ async def delete_user(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
-    user = session.get(e.User, user_id)
+    user = session.get(ent.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -793,7 +807,7 @@ def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
-    users = session.exec(select(e.User)).all()
+    users = session.exec(select(ent.User)).all()
     parsed_users = auth.validate_output_schema(
         users,
         parse_schemas=[
@@ -804,6 +818,138 @@ def get_users(
         seq_key="users",
     )
     return parsed_users
+
+
+# BNG
+@router.get(
+    "/users/{user_id}/bng-initiate",
+    response_class=RedirectResponse,
+)
+async def bng_initiate(
+    user_id: int,
+    bng: s.BNGCreateAdmin,
+    requires_user_owner=Depends(auth.requires_user_owner),
+    requires_admin=Depends(auth.requires_admin),
+    session: Session = Depends(get_session),
+):
+    user = session.get(ent.User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    existing_bng = session.exec(select(ent.BNG)).first()
+    if existing_bng:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
+        )
+    try:
+        consent_id, oauth_url = bng_api.create_consent(
+            iban=bng.iban,
+            valid_until=bng.expires_on,
+            # TODO: Configure domain automatically
+            redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
+        )
+    except ConnectionError as e:
+        raise HTTPException(
+            status_code=500, detail="Error in request for consent to BNG."
+        )
+    token = jwt.encode(
+        {
+            "user_id": user_id,
+            "iban": bng.iban,
+            "bank_name": "BNG",
+            "exp": time() + 1800,
+            "consent_id": consent_id,
+        },
+        auth.SECRET_KEY,
+        auth.ALGORITHM,
+    ).decode("utf-8")
+    url_to_return = oauth_url.format(token)
+    return RedirectResponse(url=url_to_return)
+
+
+@router.post("/users/{user_id}/bng-callback", response_model=s.BNGOutputAdmin)
+async def bng_callback(
+    user_id: int,
+    background_tasks: BackgroundTasks,
+    code: str = Query(),
+    state: str = Query(),
+    session: Session = Depends(get_session),
+):
+    try:
+        payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="JWT token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate JWT token")
+
+    try:
+        response = bng_api.retrieve_access_token(code)
+    except ConnectionError as e:
+        raise HTTPException(
+            status_code=500, detail="Error in retrieval of access token to BNG."
+        )
+
+    access_token, expires_in = response["access_token"], response["expires_in"]
+    expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
+        seconds=int(expires_in)
+    )
+    new_bng_account = ent.BNG(
+        iban=payload["iban"],
+        expires_on=expires_on,
+        user_id=payload["user_id"],
+        consent_id=payload["consent_id"],
+        access_token=access_token,
+        last_import_on=None,
+    )
+    session.add(new_bng_account)
+    session.commit()
+    session.refresh(new_bng_account)
+    background_tasks.add_task(bng_api.get_bng_payments)
+    return new_bng_account
+
+
+@router.delete("/users/{user_id}/bng-connection")
+async def delete_bng_connection(
+    user_id: int,
+    requires_user_owner=Depends(auth.requires_user_owner),
+    requires_admin=Depends(auth.requires_admin),
+    session: Session = Depends(get_session),
+):
+    existing_bng = session.exec(select(ent.BNG)).first()
+    if not existing_bng:
+        raise HTTPException(status_code=404, detail="No BNG Account exists")
+    if existing_bng.user_id != user_id:
+        raise HTTPException(
+            status_code=403, detail="A BNG Account can only be deleted by the creator"
+        )
+
+    # TODO: Delete consent through API as well.
+    session.delete(existing_bng)
+    session.commit()
+    return Response(status_code=204)
+
+
+@router.get("/bng-connection")
+async def get_bng_connection(
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(
+        auth.get_user_auth_levels(requires_login=True)
+    ),
+):
+    existing_bng = session.exec(select(ent.BNG)).first()
+    if not existing_bng:
+        raise HTTPException(status_code=404, detail="No BNG Account exists")
+
+    parsed_bng = auth.validate_output_schema(
+        existing_bng,
+        parse_schemas=[
+            (auth.AuthLevel.ADMIN, s.BNGOutputAdmin),
+            (auth.AuthLevel.USER, s.BNGOutputUser),
+        ],
+        auth_levels=auth_levels,
+    )
+    return parsed_bng
 
 
 # # FUNDER
@@ -830,31 +976,3 @@ def get_users(
 #         {"name": "Gemeente Amsterdam", "created_at": "2022-4-1"},
 #         {"name": "Stichting Leergeld", "created_at": "2022-1-1"},
 #     ]
-
-
-# # BNG
-# @router.post("/bng-connection")
-# async def root():
-#     # Should accept IBAN and only available to admins.
-#     return {"IBAN": "NL32INGB00039845938"}
-
-
-# @router.delete("/bng-connection")
-# async def root():
-#     return {"status_code": 204, "content": "Succesfully deleted."}
-
-
-# @router.get("/bng-connection")
-# async def root():
-#     # Only available to admins.
-#     return {"IBAN": "NL32INGB00039845938"}
-
-
-# @router.get("/bng-connection/status")
-# async def root():
-#     return {
-#         "present": True,
-#         "online": True,
-#         "days_left": 33,
-#         "last_sync": "2022-12-1, 17:53",
-#     }

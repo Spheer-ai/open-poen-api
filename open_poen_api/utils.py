@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 import string
 import random
-from .schemas_and_models.models import entities as e
+from .schemas_and_models.models import entities as ent
 from . import schemas_and_models as s
 
 load_dotenv()

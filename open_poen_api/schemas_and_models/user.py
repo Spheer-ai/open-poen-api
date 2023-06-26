@@ -1,9 +1,9 @@
 from pydantic import EmailStr, BaseModel, Extra, validator
 from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
-from .models.entities import UserInputBase, Role
+from .models.entities import UserBase, Role
 
 
-class UserCreateAdmin(UserInputBase):
+class UserCreateAdmin(UserBase):
     initiative_ids: list[int] | None
     activity_ids: list[int] | None
 

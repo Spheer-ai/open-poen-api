@@ -1,4 +1,4 @@
-from open_poen_api.schemas_and_models.models import entities as e
+from open_poen_api.schemas_and_models.models import entities as ent
 from sqlmodel import select
 import pytest
 
@@ -21,7 +21,7 @@ def test_post_user(client, session_2, auth, status_code, email_in_db, request):
     response = client.post("/user", json=user_data, headers=authorization_header)
     assert response.status_code == status_code
     email_exists = "janedoe@gmail.com" in [
-        i.email for i in session_2.exec(select(e.User)).all()
+        i.email for i in session_2.exec(select(ent.User)).all()
     ]
     assert email_exists == email_in_db
 
@@ -69,7 +69,7 @@ user_data_set = [
 @pytest.mark.parametrize("user_data", user_data_set)
 def test_patch_user(client, session_2, auth, user_data, request):
     authorization_header, user_id = request.getfixturevalue(auth)
-    existing_user = session_2.get(e.User, user_id)
+    existing_user = session_2.get(ent.User, user_id)
 
     # Validate initial state
     for field, new_value in user_data.items():
