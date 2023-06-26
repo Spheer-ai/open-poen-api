@@ -11,7 +11,7 @@ from Crypto.Signature import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 from urllib.parse import urlparse
 from urllib.parse import urlencode
-from app import app
+
 
 REDIRECT_URL = app.config["REDIRECT_URL"]
 API_URL_PREFIX = "https://api.xs2a{}.bngbank.nl/api/v1/"

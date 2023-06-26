@@ -6,6 +6,7 @@ from enum import Enum
 from sqlalchemy_utils import ChoiceType
 from ..mixins import TimeStampMixin, HiddenMixin, Money
 from ..models.associations import ActivityToUser, InitiativeToUser
+from typing import Optional
 
 
 class Role(str, Enum):
@@ -42,7 +43,7 @@ class User(UserBase, TimeStampMixin, table=True):
     activities: list["Activity"] = Relationship(
         back_populates="activity_owners", link_model=ActivityToUser
     )
-    bng: "BNG" | None = Relationship(
+    bng: Optional["BNG"] = Relationship(
         sa_relationship_kwargs={"uselist": False}, back_populates="user"
     )
 

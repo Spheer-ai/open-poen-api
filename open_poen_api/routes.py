@@ -909,7 +909,7 @@ async def bng_callback(
     session.add(new_bng_account)
     session.commit()
     session.refresh(new_bng_account)
-    background_tasks.add_task(get_bng_payments)
+    background_tasks.add_task(get_bng_payments, session)
     return new_bng_account
 
 

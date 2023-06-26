@@ -1,7 +1,7 @@
 from .models.entities import BNGBase
 from pydantic import BaseModel
 from datetime import datetime
-from mixins import TimeStampMixin
+from .mixins import TimeStampMixin
 
 
 class BNGCreateAdmin(BNGBase):
