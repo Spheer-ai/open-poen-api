@@ -23,11 +23,13 @@ from .utils import (
     get_entities_by_ids,
     temp_password_generator,
     get_fields_dict,
+    get_requester_ip,
 )
 from .payment import check_for_forbidden_fields
 from jose import jwt, JWTError, ExpiredSignatureError
 from time import time
 import pytz
+from .bng import get_bng_payments, retrieve_access_token, create_consent
 
 
 router = APIRouter()
@@ -831,6 +833,7 @@ async def bng_initiate(
     requires_user_owner=Depends(auth.requires_user_owner),
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
+    requester_ip: str = Depends(get_requester_ip),
 ):
     user = session.get(ent.User, user_id)
     if not user:
@@ -843,11 +846,12 @@ async def bng_initiate(
             detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
         )
     try:
-        consent_id, oauth_url = bng_api.create_consent(
+        consent_id, oauth_url = create_consent(
             iban=bng.iban,
             valid_until=bng.expires_on,
             # TODO: Configure domain automatically
             redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
+            requester_ip=requester_ip,
         )
     except ConnectionError as e:
         raise HTTPException(
@@ -884,7 +888,7 @@ async def bng_callback(
         raise HTTPException(status_code=401, detail="Could not validate JWT token")
 
     try:
-        response = bng_api.retrieve_access_token(code)
+        response = retrieve_access_token(code)
     except ConnectionError as e:
         raise HTTPException(
             status_code=500, detail="Error in retrieval of access token to BNG."
@@ -905,7 +909,7 @@ async def bng_callback(
     session.add(new_bng_account)
     session.commit()
     session.refresh(new_bng_account)
-    background_tasks.add_task(bng_api.get_bng_payments)
+    background_tasks.add_task(get_bng_payments)
     return new_bng_account
 
 
@@ -930,7 +934,7 @@ async def delete_bng_connection(
     return Response(status_code=204)
 
 
-@router.get("/bng-connection")
+@router.get("/bng-connection", response_model=s.BNGOutputAdmin)
 async def get_bng_connection(
     session: Session = Depends(get_session),
     auth_levels: list[auth.AuthLevel] = Depends(
