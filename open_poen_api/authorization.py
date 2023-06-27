@@ -6,7 +6,7 @@ from typing import Annotated, Type, Sequence
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+from jose import JWTError, jwt, ExpiredSignatureError
 from enum import IntEnum
 from pydantic import BaseModel, ValidationError
 
@@ -55,7 +55,8 @@ def get_requester(
         email: str | None = payload.get("sub")
         if email is None:
             raise credentials_exception
-    # TODO: Add separate detail for expired token.
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="JWT token expired")
     except JWTError:
         raise credentials_exception
     user = session.exec(select(ent.User).where(ent.User.email == email)).first()

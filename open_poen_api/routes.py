@@ -30,6 +30,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from time import time
 import pytz
 from .bng import get_bng_payments, retrieve_access_token, create_consent
+from requests.exceptions import RequestException
 
 
 router = APIRouter()
@@ -853,8 +854,7 @@ async def bng_initiate(
             redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
             requester_ip=requester_ip,
         )
-        # TODO: Right exception here.
-    except ConnectionError as e:
+    except RequestException as e:
         raise HTTPException(
             status_code=500, detail="Error in request for consent to BNG."
         )
@@ -890,10 +890,9 @@ async def bng_callback(
 
     try:
         response = retrieve_access_token(code)
-        # TODO: right exception here
-    except ConnectionError as e:
+    except RequestException as e:
         raise HTTPException(
-            status_code=500, detail="Error in retrieval of access token to BNG."
+            status_code=500, detail="Error in retrieval of access token from BNG"
         )
 
     access_token, expires_in = response["access_token"], response["expires_in"]
