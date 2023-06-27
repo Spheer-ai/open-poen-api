@@ -112,15 +112,15 @@ def get_initiative_auth_levels(requires_login: bool = False):
             return [AuthLevel.GUEST]
         auth_levels = [AuthLevel.GUEST, AuthLevel.USER]
         if initiative_id is not None and initiative_id in map(
+            lambda x: x.initiative_id, requester.activities
+        ):
+            auth_levels.append(AuthLevel.ACTIVITY_OWNER)
+        if initiative_id is not None and initiative_id in map(
             lambda x: x.id, requester.initiatives
         ):
             auth_levels.append(AuthLevel.INITIATIVE_OWNER)
             if requester.role == ent.Role.FINANCIAL:
                 auth_levels.append(AuthLevel.FINANCIAL)
-        if initiative_id is not None and initiative_id in map(
-            lambda x: x.initiative_id, requester.activities
-        ):
-            auth_levels.append(AuthLevel.ACTIVITY_OWNER)
         if requester.role == ent.Role.ADMIN:
             auth_levels.append(AuthLevel.ADMIN)
         return auth_levels

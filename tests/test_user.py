@@ -47,31 +47,65 @@ def test_update_email_to_none(client, user_admin_2):
     assert response.status_code == 422
 
 
-auth_data = {
-    "user_admin_2": {"user": 200, "admin": 200},
-    "user_financial_2": {"user": 403, "admin": 403},
-    "user_user_2": {"user": 403, "admin": 403},
-    "user_user_owner_2": {"user": 200, "admin": 403},
-    "user_guest_2": {"user": 401, "admin": 401},
-}
-
-user_data_set = [
-    {
-        "first_name": "New First Name",
-        "last_name": "New Last Name",
-        "email": "different@address.com",
-    },
-    {"hidden": True},
-]
-
-
-@pytest.mark.parametrize("auth", auth_data.keys())
-@pytest.mark.parametrize("user_data", user_data_set)
-def test_patch_user(client, session_2, auth, user_data, request):
+@pytest.mark.parametrize(
+    "auth, user_data, expected_status_code",
+    [
+        (
+            "user_admin_2",
+            {
+                "first_name": "New First Name",
+                "last_name": "New Last Name",
+                "email": "different@address.com",
+            },
+            200,
+        ),
+        ("user_admin_2", {"hidden": True}, 200),
+        (
+            "user_financial_2",
+            {
+                "first_name": "New First Name",
+                "last_name": "New Last Name",
+                "email": "different@address.com",
+            },
+            403,
+        ),
+        ("user_financial_2", {"hidden": True}, 403),
+        (
+            "user_user_2",
+            {
+                "first_name": "New First Name",
+                "last_name": "New Last Name",
+                "email": "different@address.com",
+            },
+            403,
+        ),
+        ("user_user_2", {"hidden": True}, 403),
+        (
+            "user_user_owner_2",
+            {
+                "first_name": "New First Name",
+                "last_name": "New Last Name",
+                "email": "different@address.com",
+            },
+            200,
+        ),
+        ("user_user_owner_2", {"hidden": True}, 403),
+        (
+            "user_guest_2",
+            {
+                "first_name": "New First Name",
+                "last_name": "New Last Name",
+                "email": "different@address.com",
+            },
+            401,
+        ),
+        ("user_guest_2", {"hidden": True}, 401),
+    ],
+)
+def test_patch_user(client, session_2, auth, user_data, expected_status_code, request):
     authorization_header, user_id = request.getfixturevalue(auth)
     existing_user = session_2.get(ent.User, user_id)
 
-    # Validate initial state
     for field, new_value in user_data.items():
         assert getattr(existing_user, field) != new_value
 
@@ -81,14 +115,9 @@ def test_patch_user(client, session_2, auth, user_data, request):
         headers=authorization_header,
     )
 
-    status_code = (
-        auth_data[auth].get("user")
-        if "first_name" in user_data
-        else auth_data[auth].get("admin")
-    )
-    assert response.status_code == status_code
+    assert response.status_code == expected_status_code
 
-    if status_code == 200:
+    if expected_status_code == 200:
         session_2.refresh(existing_user)
         for field, new_value in user_data.items():
             assert getattr(existing_user, field) == new_value

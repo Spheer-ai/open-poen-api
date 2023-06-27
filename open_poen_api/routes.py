@@ -853,6 +853,7 @@ async def bng_initiate(
             redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
             requester_ip=requester_ip,
         )
+        # TODO: Right exception here.
     except ConnectionError as e:
         raise HTTPException(
             status_code=500, detail="Error in request for consent to BNG."
@@ -889,6 +890,7 @@ async def bng_callback(
 
     try:
         response = retrieve_access_token(code)
+        # TODO: right exception here
     except ConnectionError as e:
         raise HTTPException(
             status_code=500, detail="Error in retrieval of access token to BNG."
