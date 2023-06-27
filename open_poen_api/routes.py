@@ -30,7 +30,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from time import time
 import pytz
 
-from .bng import get_bng_payments, retrieve_access_token, create_consent
+# from .bng import get_bng_payments, retrieve_access_token, create_consent
 from requests.exceptions import RequestException
 
 
@@ -825,137 +825,137 @@ def get_users(
 
 
 # # BNG
-@router.get(
-    "/users/{user_id}/bng-initiate",
-    response_class=RedirectResponse,
-)
-async def bng_initiate(
-    user_id: int,
-    bng: s.BNGCreateAdmin,
-    requires_user_owner=Depends(auth.requires_user_owner),
-    requires_admin=Depends(auth.requires_admin),
-    session: Session = Depends(get_session),
-    requester_ip: str = Depends(get_requester_ip),
-):
-    user = session.get(ent.User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+# @router.get(
+#     "/users/{user_id}/bng-initiate",
+#     response_class=RedirectResponse,
+# )
+# async def bng_initiate(
+#     user_id: int,
+#     bng: s.BNGCreateAdmin,
+#     requires_user_owner=Depends(auth.requires_user_owner),
+#     requires_admin=Depends(auth.requires_admin),
+#     session: Session = Depends(get_session),
+#     requester_ip: str = Depends(get_requester_ip),
+# ):
+#     user = session.get(ent.User, user_id)
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
 
-    existing_bng = session.exec(select(ent.BNG)).first()
-    if existing_bng:
-        raise HTTPException(
-            status_code=400,
-            detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
-        )
-    try:
-        consent_id, oauth_url = create_consent(
-            iban=bng.iban,
-            valid_until=bng.expires_on,
-            # TODO: Configure domain automatically
-            redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
-            requester_ip=requester_ip,
-        )
-    except RequestException as e:
-        raise HTTPException(
-            status_code=500, detail="Error in request for consent to BNG."
-        )
-    token = jwt.encode(
-        {
-            "user_id": user_id,
-            "iban": bng.iban,
-            "bank_name": "BNG",
-            "exp": time() + 1800,
-            "consent_id": consent_id,
-        },
-        auth.SECRET_KEY,
-        auth.ALGORITHM,
-    ).decode("utf-8")
-    url_to_return = oauth_url.format(token)
-    return RedirectResponse(url=url_to_return)
-
-
-@router.post("/users/{user_id}/bng-callback", response_model=s.BNGOutputAdmin)
-async def bng_callback(
-    user_id: int,
-    background_tasks: BackgroundTasks,
-    code: str = Query(),
-    state: str = Query(),
-    session: Session = Depends(get_session),
-):
-    try:
-        payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
-    except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="JWT token expired")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate JWT token")
-
-    try:
-        response = retrieve_access_token(code)
-    except RequestException as e:
-        raise HTTPException(
-            status_code=500, detail="Error in retrieval of access token from BNG"
-        )
-
-    access_token, expires_in = response["access_token"], response["expires_in"]
-    expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
-        seconds=int(expires_in)
-    )
-    new_bng_account = ent.BNG(
-        iban=payload["iban"],
-        expires_on=expires_on,
-        user_id=payload["user_id"],
-        consent_id=payload["consent_id"],
-        access_token=access_token,
-        last_import_on=None,
-    )
-    session.add(new_bng_account)
-    session.commit()
-    session.refresh(new_bng_account)
-    background_tasks.add_task(get_bng_payments, session)
-    return new_bng_account
+#     existing_bng = session.exec(select(ent.BNG)).first()
+#     if existing_bng:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
+#         )
+#     try:
+#         consent_id, oauth_url = create_consent(
+#             iban=bng.iban,
+#             valid_until=bng.expires_on,
+#             # TODO: Configure domain automatically
+#             redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
+#             requester_ip=requester_ip,
+#         )
+#     except RequestException as e:
+#         raise HTTPException(
+#             status_code=500, detail="Error in request for consent to BNG."
+#         )
+#     token = jwt.encode(
+#         {
+#             "user_id": user_id,
+#             "iban": bng.iban,
+#             "bank_name": "BNG",
+#             "exp": time() + 1800,
+#             "consent_id": consent_id,
+#         },
+#         auth.SECRET_KEY,
+#         auth.ALGORITHM,
+#     ).decode("utf-8")
+#     url_to_return = oauth_url.format(token)
+#     return RedirectResponse(url=url_to_return)
 
 
-@router.delete("/users/{user_id}/bng-connection")
-async def delete_bng_connection(
-    user_id: int,
-    requires_user_owner=Depends(auth.requires_user_owner),
-    requires_admin=Depends(auth.requires_admin),
-    session: Session = Depends(get_session),
-):
-    existing_bng = session.exec(select(ent.BNG)).first()
-    if not existing_bng:
-        raise HTTPException(status_code=404, detail="No BNG Account exists")
-    if existing_bng.user_id != user_id:
-        raise HTTPException(
-            status_code=403, detail="A BNG Account can only be deleted by the creator"
-        )
+# @router.post("/users/{user_id}/bng-callback", response_model=s.BNGOutputAdmin)
+# async def bng_callback(
+#     user_id: int,
+#     background_tasks: BackgroundTasks,
+#     code: str = Query(),
+#     state: str = Query(),
+#     session: Session = Depends(get_session),
+# ):
+#     try:
+#         payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+#     except ExpiredSignatureError:
+#         raise HTTPException(status_code=401, detail="JWT token expired")
+#     except JWTError:
+#         raise HTTPException(status_code=401, detail="Could not validate JWT token")
 
-    # TODO: Delete consent through API as well.
-    session.delete(existing_bng)
-    session.commit()
-    return Response(status_code=204)
+#     try:
+#         response = retrieve_access_token(code)
+#     except RequestException as e:
+#         raise HTTPException(
+#             status_code=500, detail="Error in retrieval of access token from BNG"
+#         )
+
+#     access_token, expires_in = response["access_token"], response["expires_in"]
+#     expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
+#         seconds=int(expires_in)
+#     )
+#     new_bng_account = ent.BNG(
+#         iban=payload["iban"],
+#         expires_on=expires_on,
+#         user_id=payload["user_id"],
+#         consent_id=payload["consent_id"],
+#         access_token=access_token,
+#         last_import_on=None,
+#     )
+#     session.add(new_bng_account)
+#     session.commit()
+#     session.refresh(new_bng_account)
+#     background_tasks.add_task(get_bng_payments, session)
+#     return new_bng_account
 
 
-@router.get("/bng-connection", response_model=s.BNGOutputAdmin)
-async def get_bng_connection(
-    session: Session = Depends(get_session),
-    auth_levels: list[auth.AuthLevel] = Depends(
-        auth.get_user_auth_levels(requires_login=True)
-    ),
-):
-    existing_bng = session.exec(select(ent.BNG)).first()
-    if not existing_bng:
-        raise HTTPException(status_code=404, detail="No BNG Account exists")
+# @router.delete("/users/{user_id}/bng-connection")
+# async def delete_bng_connection(
+#     user_id: int,
+#     requires_user_owner=Depends(auth.requires_user_owner),
+#     requires_admin=Depends(auth.requires_admin),
+#     session: Session = Depends(get_session),
+# ):
+#     existing_bng = session.exec(select(ent.BNG)).first()
+#     if not existing_bng:
+#         raise HTTPException(status_code=404, detail="No BNG Account exists")
+#     if existing_bng.user_id != user_id:
+#         raise HTTPException(
+#             status_code=403, detail="A BNG Account can only be deleted by the creator"
+#         )
 
-    parsed_bng = auth.validate_output_schema(
-        existing_bng,
-        parse_schemas=[
-            (auth.AuthLevel.ADMIN, s.BNGOutputAdmin),
-            (auth.AuthLevel.USER, s.BNGOutputUser),
-        ],
-        auth_levels=auth_levels,
-    )
-    return parsed_bng
+#     # TODO: Delete consent through API as well.
+#     session.delete(existing_bng)
+#     session.commit()
+#     return Response(status_code=204)
+
+
+# @router.get("/bng-connection", response_model=s.BNGOutputAdmin)
+# async def get_bng_connection(
+#     session: Session = Depends(get_session),
+#     auth_levels: list[auth.AuthLevel] = Depends(
+#         auth.get_user_auth_levels(requires_login=True)
+#     ),
+# ):
+#     existing_bng = session.exec(select(ent.BNG)).first()
+#     if not existing_bng:
+#         raise HTTPException(status_code=404, detail="No BNG Account exists")
+
+#     parsed_bng = auth.validate_output_schema(
+#         existing_bng,
+#         parse_schemas=[
+#             (auth.AuthLevel.ADMIN, s.BNGOutputAdmin),
+#             (auth.AuthLevel.USER, s.BNGOutputUser),
+#         ],
+#         auth_levels=auth_levels,
+#     )
+#     return parsed_bng
 
 
 # # FUNDER
