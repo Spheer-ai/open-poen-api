@@ -43,9 +43,7 @@ class User(UserBase, TimeStampMixin, table=True):
     activities: list["Activity"] = Relationship(
         back_populates="activity_owners", link_model=ActivityToUser
     )
-    bng: Optional["BNG"] = Relationship(
-        sa_relationship_kwargs={"uselist": False}, back_populates="user"
-    )
+    bng: Optional["BNG"] = Relationship(back_populates="user")
 
 
 class InitiativeBase(SQLModel, HiddenMixin):
@@ -184,7 +182,7 @@ class BNGBase(SQLModel):
     expires_on: datetime = Field(sa_column=Column(DateTime(timezone=True)))
 
 
-class BNG(BNGBase, TimeStampMixin):
+class BNG(BNGBase, TimeStampMixin, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)

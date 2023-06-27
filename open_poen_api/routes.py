@@ -29,6 +29,7 @@ from .payment import check_for_forbidden_fields
 from jose import jwt, JWTError, ExpiredSignatureError
 from time import time
 import pytz
+
 from .bng import get_bng_payments, retrieve_access_token, create_consent
 from requests.exceptions import RequestException
 
@@ -823,7 +824,7 @@ def get_users(
     return parsed_users
 
 
-# BNG
+# # BNG
 @router.get(
     "/users/{user_id}/bng-initiate",
     response_class=RedirectResponse,
