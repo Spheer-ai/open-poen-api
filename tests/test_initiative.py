@@ -1,7 +1,7 @@
 # from .fixtures import client, created_user
 import pytest
 from sqlmodel import select
-from open_poen_api.schemas_and_models.models import entities as e
+from open_poen_api.schemas_and_models.models import entities as ent
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ def test_post_initiative(
     )
     assert response.status_code == status_code
     name_exists = initiative_data["name"] in [
-        initiative.name for initiative in session_2.exec(select(e.Initiative)).all()
+        initiative.name for initiative in session_2.exec(select(ent.Initiative)).all()
     ]
     assert name_exists == name_in_db
 
@@ -54,7 +54,7 @@ def test_duplicate_name(client, session_2, user_admin_2, initiative_data):
 )
 def test_patch_initiative(client, session_2, auth, status_code, request):
     authorization_header, user_id, initiative_id, _ = request.getfixturevalue(auth)
-    existing_initiative = session_2.get(e.Initiative, initiative_id)
+    existing_initiative = session_2.get(ent.Initiative, initiative_id)
     assert existing_initiative.name != "New Name"
     new_initiative_data = {
         "name": "New Name",

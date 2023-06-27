@@ -1,16 +1,23 @@
 from sqlmodel import Session, SQLModel, select, col
 from typing import Type, TypeVar, Any
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 import os
 from dotenv import load_dotenv
 import string
 import random
-from .schemas_and_models.models import entities as e
+from .schemas_and_models.models import entities as ent
 from . import schemas_and_models as s
 
 load_dotenv()
 
 DEBUG = os.getenv("DEBUG") == "true"
+
+
+def get_requester_ip(request: Request):
+    if request.client is not None:
+        return request.client.host
+    else:
+        return "123.456.789.101"
 
 
 T = TypeVar("T", bound=SQLModel)
