@@ -162,7 +162,7 @@ pycparser = "*"
 name = "charset-normalizer"
 version = "3.1.0"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7.0"
 files = [
@@ -677,6 +677,21 @@ files = [
 ]
 
 [[package]]
+name = "nordigen"
+version = "1.3.1"
+description = "Python client for Nordigen API"
+category = "main"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "nordigen-1.3.1-py3-none-any.whl", hash = "sha256:ef3b7da95bfae22a9070f75f67a3680ca2392cd1fd4fec0b1748928ca573cb75"},
+    {file = "nordigen-1.3.1.tar.gz", hash = "sha256:89a6128ccc997448adaa84f720925094b01dcf1725eb04e3e9c54981b0a761a2"},
+]
+
+[package.dependencies]
+requests = ">=2.26.0,<3.0.0"
+
+[[package]]
 name = "packaging"
 version = "23.1"
 description = "Core utilities for Python packages"
@@ -1067,7 +1082,7 @@ files = [
 name = "requests"
 version = "2.31.0"
 description = "Python HTTP for Humans."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -1345,7 +1360,7 @@ files = [
 name = "urllib3"
 version = "2.0.2"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -1548,4 +1563,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "705112ed34e8fac8ee862229d5d8bd8c50dc0553547c5b114294afbadb3b57d1"
+content-hash = "6f2dc6765b26851cf64191da6a62c3f0dfa83e24c6e3ccd50b6e911873925808"

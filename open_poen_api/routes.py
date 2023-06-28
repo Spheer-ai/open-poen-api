@@ -31,10 +31,14 @@ from time import time
 import pytz
 
 # from .bng import get_bng_payments, retrieve_access_token, create_consent
+from .gocardless import refresh_tokens, client
 from requests.exceptions import RequestException
+import asyncio
 
 
 router = APIRouter()
+
+lock = asyncio.Lock()
 
 
 @router.post("/token", response_model=Token)
@@ -824,95 +828,95 @@ def get_users(
     return parsed_users
 
 
-# BNG
-@router.get(
-    "/users/{user_id}/bng-initiate",
-    response_class=RedirectResponse,
-)
-async def bng_initiate(
-    user_id: int,
-    bng: s.BNGCreateAdmin,
-    requires_user_owner=Depends(auth.requires_user_owner),
-    requires_admin=Depends(auth.requires_admin),
-    session: Session = Depends(get_session),
-    requester_ip: str = Depends(get_requester_ip),
-):
-    user = session.get(ent.User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+# # BNG
+# @router.get(
+#     "/users/{user_id}/bng-initiate",
+#     response_class=RedirectResponse,
+# )
+# async def bng_initiate(
+#     user_id: int,
+#     bng: s.BNGCreateAdmin,
+#     requires_user_owner=Depends(auth.requires_user_owner),
+#     requires_admin=Depends(auth.requires_admin),
+#     session: Session = Depends(get_session),
+#     requester_ip: str = Depends(get_requester_ip),
+# ):
+#     user = session.get(ent.User, user_id)
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
 
-    existing_bng = session.exec(select(ent.BNG)).first()
-    if existing_bng:
-        raise HTTPException(
-            status_code=400,
-            detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
-        )
-    try:
-        consent_id, oauth_url = create_consent(
-            iban=bng.iban,
-            valid_until=bng.expires_on,
-            # TODO: Configure domain automatically
-            redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
-            requester_ip=requester_ip,
-        )
-    except RequestException as e:
-        raise HTTPException(
-            status_code=500, detail="Error in request for consent to BNG."
-        )
-    token = jwt.encode(
-        {
-            "user_id": user_id,
-            "iban": bng.iban,
-            "bank_name": "BNG",
-            "exp": time() + 1800,
-            "consent_id": consent_id,
-        },
-        auth.SECRET_KEY,
-        auth.ALGORITHM,
-    ).decode("utf-8")
-    url_to_return = oauth_url.format(token)
-    return RedirectResponse(url=url_to_return)
+#     existing_bng = session.exec(select(ent.BNG)).first()
+#     if existing_bng:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
+#         )
+#     try:
+#         consent_id, oauth_url = create_consent(
+#             iban=bng.iban,
+#             valid_until=bng.expires_on,
+#             # TODO: Configure domain automatically
+#             redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
+#             requester_ip=requester_ip,
+#         )
+#     except RequestException as e:
+#         raise HTTPException(
+#             status_code=500, detail="Error in request for consent to BNG."
+#         )
+#     token = jwt.encode(
+#         {
+#             "user_id": user_id,
+#             "iban": bng.iban,
+#             "bank_name": "BNG",
+#             "exp": time() + 1800,
+#             "consent_id": consent_id,
+#         },
+#         auth.SECRET_KEY,
+#         auth.ALGORITHM,
+#     ).decode("utf-8")
+#     url_to_return = oauth_url.format(token)
+#     return RedirectResponse(url=url_to_return)
 
 
-@router.post("/users/{user_id}/bng-callback", response_model=s.BNGOutputAdmin)
-async def bng_callback(
-    user_id: int,
-    background_tasks: BackgroundTasks,
-    code: str = Query(),
-    state: str = Query(),
-    session: Session = Depends(get_session),
-):
-    try:
-        payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
-    except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="JWT token expired")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate JWT token")
+# @router.post("/users/{user_id}/bng-callback", response_model=s.BNGOutputAdmin)
+# async def bng_callback(
+#     user_id: int,
+#     background_tasks: BackgroundTasks,
+#     code: str = Query(),
+#     state: str = Query(),
+#     session: Session = Depends(get_session),
+# ):
+#     try:
+#         payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+#     except ExpiredSignatureError:
+#         raise HTTPException(status_code=401, detail="JWT token expired")
+#     except JWTError:
+#         raise HTTPException(status_code=401, detail="Could not validate JWT token")
 
-    try:
-        response = retrieve_access_token(code)
-    except RequestException as e:
-        raise HTTPException(
-            status_code=500, detail="Error in retrieval of access token from BNG"
-        )
+#     try:
+#         response = retrieve_access_token(code)
+#     except RequestException as e:
+#         raise HTTPException(
+#             status_code=500, detail="Error in retrieval of access token from BNG"
+#         )
 
-    access_token, expires_in = response["access_token"], response["expires_in"]
-    expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
-        seconds=int(expires_in)
-    )
-    new_bng_account = ent.BNG(
-        iban=payload["iban"],
-        expires_on=expires_on,
-        user_id=payload["user_id"],
-        consent_id=payload["consent_id"],
-        access_token=access_token,
-        last_import_on=None,
-    )
-    session.add(new_bng_account)
-    session.commit()
-    session.refresh(new_bng_account)
-    background_tasks.add_task(get_bng_payments, session)
-    return new_bng_account
+#     access_token, expires_in = response["access_token"], response["expires_in"]
+#     expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
+#         seconds=int(expires_in)
+#     )
+#     new_bng_account = ent.BNG(
+#         iban=payload["iban"],
+#         expires_on=expires_on,
+#         user_id=payload["user_id"],
+#         consent_id=payload["consent_id"],
+#         access_token=access_token,
+#         last_import_on=None,
+#     )
+#     session.add(new_bng_account)
+#     session.commit()
+#     session.refresh(new_bng_account)
+#     background_tasks.add_task(get_bng_payments, session)
+#     return new_bng_account
 
 
 # @router.delete("/users/{user_id}/bng-connection")
@@ -956,6 +960,41 @@ async def bng_callback(
 #         auth_levels=auth_levels,
 #     )
 #     return parsed_bng
+
+
+# GOCARDLESS
+@router.get(
+    "/initiatives/{initiative_id}/gocardless-initiate", response_class=RedirectResponse
+)
+async def gocardless_initiatite(
+    initiative_id: int,
+    # gocardless: s.GoCardlessCreateActivityOwnerCreate,
+    logged_in_user=Depends(auth.get_logged_in_user),
+    requires_activity_owner=Depends(auth.requires_activity_owner),
+    session: Session = Depends(get_session),
+):
+    # TODO: Who is able to do this? Discuss.
+    initiative = session.get(ent.Initiative, initiative_id)
+    if not initiative:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+
+    # A user should only be able to couple one bank account per initiative.
+    # TODO
+
+    async with lock:
+        refresh_tokens()
+
+    init = client.initialize_session(
+        # TODO: Configure domain automatically
+        redirect_uri="https://openpoen.nl/todo",
+        # TODO: Parse dynamically
+        institution_id="ING",
+        # TODO: generate
+        reference_id="bla",
+        max_historical_days=720,
+    )
+
+    print("stop")
 
 
 # # FUNDER
