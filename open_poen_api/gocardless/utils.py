@@ -1,6 +1,12 @@
 from datetime import datetime, timedelta
 from nordigen import NordigenClient
 import os
+import asyncio
+from dotenv import load_dotenv
+
+load_dotenv()
+
+lock = asyncio.Lock()
 
 access_token: str | None = None
 refresh_token: str | None = None
@@ -23,21 +29,22 @@ async def refresh_tokens():
     global refresh_token
     global access_expires_at
     global refresh_expires_at
-    if not access_token or token_is_expired(access_expires_at):
-        if refresh_token and not token_is_expired(refresh_expires_at):
-            token_data = client.exchange_token(refresh_token)
-            access_token = token_data["access"]
-            access_expires_at = datetime.now() + timedelta(
-                seconds=token_data["access_expires"]
-            )
-        else:
-            token_data = client.generate_token()
-            access_token = token_data["access"]
-            access_expires_at = datetime.now() + timedelta(
-                seconds=token_data["access_expires"]
-            )
-            refresh_token = token_data["refresh"]
-            refresh_expires_at = datetime.now() + timedelta(
-                seconds=token_data["refresh_expires"]
-            )
-    client.token = access_token
+    async with lock:
+        if not access_token or token_is_expired(access_expires_at):
+            if refresh_token and not token_is_expired(refresh_expires_at):
+                token_data = client.exchange_token(refresh_token)
+                access_token = token_data["access"]
+                access_expires_at = datetime.now() + timedelta(
+                    seconds=token_data["access_expires"]
+                )
+            else:
+                token_data = client.generate_token()
+                access_token = token_data["access"]
+                access_expires_at = datetime.now() + timedelta(
+                    seconds=token_data["access_expires"]
+                )
+                refresh_token = token_data["refresh"]
+                refresh_expires_at = datetime.now() + timedelta(
+                    seconds=token_data["refresh_expires"]
+                )
+        client.token = access_token

@@ -23,6 +23,7 @@ pytz = "^2023.3"
 python-dateutil = "^2.8.2"
 pycryptodome = "^3.18.0"
 nordigen = "^1.3.1"
+typer = {extras = ["all"], version = "^0.9.0"}
 
 
 [tool.poetry.group.dev.dependencies]
@@ -44,3 +45,6 @@ build-backend = "poetry.core.masonry.api"
 testpaths = [
     "tests"
 ]
+
+[tool.poetry.scripts]
+open-poen = "open_poen_api.cli:app"

@@ -33,12 +33,9 @@ import pytz
 # from .bng import get_bng_payments, retrieve_access_token, create_consent
 from .gocardless import refresh_tokens, client
 from requests.exceptions import RequestException
-import asyncio
 
 
 router = APIRouter()
-
-lock = asyncio.Lock()
 
 
 @router.post("/token", response_model=Token)
@@ -981,8 +978,7 @@ async def gocardless_initiatite(
     # A user should only be able to couple one bank account per initiative.
     # TODO
 
-    async with lock:
-        refresh_tokens()
+    refresh_tokens()
 
     init = client.initialize_session(
         # TODO: Configure domain automatically
