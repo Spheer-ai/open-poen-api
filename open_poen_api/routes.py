@@ -792,6 +792,7 @@ async def delete_user(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
+    # TODO: Make soft delete.
     user = session.get(ent.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -872,6 +873,7 @@ def get_users(
 #         auth.ALGORITHM,
 #     ).decode("utf-8")
 #     url_to_return = oauth_url.format(token)
+#     # TODO: Don't return a redirect, but some json with the link.
 #     return RedirectResponse(url=url_to_return)
 
 
@@ -913,6 +915,7 @@ def get_users(
 #     session.commit()
 #     session.refresh(new_bng_account)
 #     background_tasks.add_task(get_bng_payments, session)
+#     # Here we should redirect the user back to a route in the SPA.
 #     return new_bng_account
 
 
@@ -960,37 +963,42 @@ def get_users(
 
 
 # GOCARDLESS
-@router.get(
-    "/initiatives/{initiative_id}/gocardless-initiate", response_class=RedirectResponse
-)
+@router.get("/users/{user_id}/gocardless-initiate", response_class=RedirectResponse)
 async def gocardless_initiatite(
-    initiative_id: int,
+    user_id: int,
     # gocardless: s.GoCardlessCreateActivityOwnerCreate,
     logged_in_user=Depends(auth.get_logged_in_user),
-    requires_activity_owner=Depends(auth.requires_activity_owner),
+    requires_user_owner=Depends(auth.requires_user_owner),
     session: Session = Depends(get_session),
 ):
-    # TODO: Who is able to do this? Discuss.
-    initiative = session.get(ent.Initiative, initiative_id)
-    if not initiative:
-        raise HTTPException(status_code=404, detail="Initiative not found")
+    user = session.get(ent.User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # A user should only be able to couple one bank account per initiative.
+    # A user can only have one requisition per bank (institution_id).
     # TODO
 
-    refresh_tokens()
+    await refresh_tokens()
 
     init = client.initialize_session(
         # TODO: Configure domain automatically
-        redirect_uri="https://openpoen.nl/todo",
+        redirect_uri=f"https://openpoen.nl/users/{user_id}/gocardless-callback",
         # TODO: Parse dynamically
-        institution_id="ING",
-        # TODO: generate
+        institution_id="ING_INGBNL2A",
+        # TODO: generate with email and id to record in db?
         reference_id="bla",
         max_historical_days=720,
     )
 
-    print("stop")
+    new_requisition = ent.Requisition(
+        user_id=user_id,
+        api_institution_id="ING_INGBNL2A",
+        api_institution_id=init.requisition_id,
+    )
+    session.add(new_requisition)
+    session.commit()
+    # TODO: Don´t return a redirect, but some json with the link.
+    return RedirectResponse(url=init.link)
 
 
 # # FUNDER

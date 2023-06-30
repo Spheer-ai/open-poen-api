@@ -44,6 +44,7 @@ class User(UserBase, TimeStampMixin, table=True):
         back_populates="activity_owners", link_model=ActivityToUser
     )
     bng: Optional["BNG"] = Relationship(back_populates="user")
+    requisitions: list["Requisition"] = Relationship(back_populates="user")
 
 
 class InitiativeBase(SQLModel, HiddenMixin):
@@ -191,3 +192,32 @@ class BNG(BNGBase, TimeStampMixin, table=True):
     consent_id: str
     access_token: str
     last_import_on: datetime | None
+
+
+class Requisition(SQLModel, TimeStampMixin, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(
+        sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
+    )
+    user: User = Relationship(back_populates="requisitions")
+    api_institution_id: str
+    api_requisition_id: str
+
+    __table_args__ = (
+        UniqueConstraint("api_institution_id", "user_id", name="single_bank_per_user"),
+    )
+
+
+class Account(SQLModel, TimeStampMixin, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    api_account_id: str
+
+    requisition_id: int | None = Field(
+        sa_column=Column(Integer, ForeignKey("requisition.id"), nullable=True)
+    )
+    requisition: Requisition = Relationship(back_populates="accounts")
+
+    initiative_id: int | None = Field(
+        sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
+    )
+    initiative: Initiative = Relationship(back_populates="accounts")
