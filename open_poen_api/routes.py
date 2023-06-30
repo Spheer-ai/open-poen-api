@@ -19,11 +19,12 @@ from typing import Annotated
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta, datetime
 from sqlalchemy.exc import IntegrityError
-from .utils import (
+from .utils.utils import (
     get_entities_by_ids,
     temp_password_generator,
     get_fields_dict,
     get_requester_ip,
+    format_user_timestamp,
 )
 from .payment import check_for_forbidden_fields
 from jose import jwt, JWTError, ExpiredSignatureError
@@ -921,47 +922,47 @@ async def bng_callback(
     return new_bng_account
 
 
-# @router.delete("/users/{user_id}/bng-connection")
-# async def delete_bng_connection(
-#     user_id: int,
-#     requires_user_owner=Depends(auth.requires_user_owner),
-#     requires_admin=Depends(auth.requires_admin),
-#     session: Session = Depends(get_session),
-# ):
-#     existing_bng = session.exec(select(ent.BNG)).first()
-#     if not existing_bng:
-#         raise HTTPException(status_code=404, detail="No BNG Account exists")
-#     if existing_bng.user_id != user_id:
-#         raise HTTPException(
-#             status_code=403, detail="A BNG Account can only be deleted by the creator"
-#         )
+@router.delete("/users/{user_id}/bng-connection")
+async def delete_bng_connection(
+    user_id: int,
+    requires_user_owner=Depends(auth.requires_user_owner),
+    requires_admin=Depends(auth.requires_admin),
+    session: Session = Depends(get_session),
+):
+    existing_bng = session.exec(select(ent.BNG)).first()
+    if not existing_bng:
+        raise HTTPException(status_code=404, detail="No BNG Account exists")
+    if existing_bng.user_id != user_id:
+        raise HTTPException(
+            status_code=403, detail="A BNG Account can only be deleted by the creator"
+        )
 
-#     # TODO: Delete consent through API as well.
-#     session.delete(existing_bng)
-#     session.commit()
-#     return Response(status_code=204)
+    # TODO: Delete consent through API as well.
+    session.delete(existing_bng)
+    session.commit()
+    return Response(status_code=204)
 
 
-# @router.get("/bng-connection", response_model=s.BNGOutputAdmin)
-# async def get_bng_connection(
-#     session: Session = Depends(get_session),
-#     auth_levels: list[auth.AuthLevel] = Depends(
-#         auth.get_user_auth_levels(requires_login=True)
-#     ),
-# ):
-#     existing_bng = session.exec(select(ent.BNG)).first()
-#     if not existing_bng:
-#         raise HTTPException(status_code=404, detail="No BNG Account exists")
+@router.get("/bng-connection", response_model=s.BNGOutputAdmin)
+async def get_bng_connection(
+    session: Session = Depends(get_session),
+    auth_levels: list[auth.AuthLevel] = Depends(
+        auth.get_user_auth_levels(requires_login=True)
+    ),
+):
+    existing_bng = session.exec(select(ent.BNG)).first()
+    if not existing_bng:
+        raise HTTPException(status_code=404, detail="No BNG Account exists")
 
-#     parsed_bng = auth.validate_output_schema(
-#         existing_bng,
-#         parse_schemas=[
-#             (auth.AuthLevel.ADMIN, s.BNGOutputAdmin),
-#             (auth.AuthLevel.USER, s.BNGOutputUser),
-#         ],
-#         auth_levels=auth_levels,
-#     )
-#     return parsed_bng
+    parsed_bng = auth.validate_output_schema(
+        existing_bng,
+        parse_schemas=[
+            (auth.AuthLevel.ADMIN, s.BNGOutputAdmin),
+            (auth.AuthLevel.USER, s.BNGOutputUser),
+        ],
+        auth_levels=auth_levels,
+    )
+    return parsed_bng
 
 
 # GOCARDLESS
@@ -984,11 +985,10 @@ async def gocardless_initiatite(
 
     init = client.initialize_session(
         # TODO: This has to redirect to the SPA.
-        redirect_uri=f"https://openpoen.nl/users/{user_id}/gocardless-callback",
+        redirect_uri=f"https://{DOMAIN_NAME}/users/{user_id}/gocardless-callback",
         # TODO: Parse dynamically
         institution_id="ING_INGBNL2A",
-        # TODO: generate with email and id to record in db?
-        reference_id="bla",
+        reference_id=format_user_timestamp(user.id),
         max_historical_days=720,
     )
 

@@ -22,9 +22,11 @@ TLS_CERTS = (
 )
 SIGNING_CERTS = (os.environ.get("BNG_SIGN_CER"), os.environ.get("BNG_SIGN_KEY"))
 
-API_URL_PREFIX = "https://api.xs2a{}.bngbank.nl/api/v1/"
-OAUTH_URL_PREFIX = "https://api.xs2a{}.bngbank.nl/authorise?response_type=code&"
-ACCESS_TOKEN_URL = "https://api.xs2a{}.bngbank.nl/token"
+API_URL_PREFIX = f"https://api.xs2a{URI_FORMAT}.bngbank.nl/api/v1/"
+OAUTH_URL_PREFIX = (
+    f"https://api.xs2a{URI_FORMAT}.bngbank.nl/authorise?response_type=code&"
+)
+ACCESS_TOKEN_URL = f"https://api.xs2a{URI_FORMAT}.bngbank.nl/token"
 
 
 def get_current_rfc_1123_date():

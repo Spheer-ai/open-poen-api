@@ -7,6 +7,7 @@ import random
 from ..schemas_and_models.models import entities as ent
 from .. import schemas_and_models as s
 from load_env import load_env
+import datetime
 
 load_env()
 
@@ -18,6 +19,12 @@ def get_requester_ip(request: Request):
         return request.client.host
     else:
         return "123.456.789.101"
+
+
+def format_user_timestamp(user_id: int | None) -> str:
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+    formatted_string = f"{user_id}-{timestamp}"
+    return formatted_string
 
 
 T = TypeVar("T", bound=SQLModel)
