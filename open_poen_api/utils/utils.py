@@ -2,15 +2,15 @@ from sqlmodel import Session, SQLModel, select, col
 from typing import Type, TypeVar, Any
 from fastapi import HTTPException, Request
 import os
-from dotenv import load_dotenv
 import string
 import random
-from .schemas_and_models.models import entities as ent
-from . import schemas_and_models as s
+from ..schemas_and_models.models import entities as ent
+from .. import schemas_and_models as s
+from load_env import load_env
 
-load_dotenv()
+load_env()
 
-DEBUG = os.getenv("DEBUG") == "true"
+DEBUG = os.environ.get("ENVIRONMENT") == "debug"
 
 
 def get_requester_ip(request: Request):
