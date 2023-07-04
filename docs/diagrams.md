@@ -9,32 +9,34 @@ erDiagram
     ACTIVITY }o--o{ USER : owned_by
     %% We import payments from BNG without necessarily assigning them to an initiative.
     ACTIVITY |o--o{ PAYMENT : linked_to
-    %% It's not required to set a funder for an activity yet.
-    FUNDER }o--o{ ACTIVITY : funds
-    PAYMENT_ATTACHMENT }o--|| PAYMENT : attached_to
+    ATTACHMENT }o--|| PAYMENT : attached_to
     BNG_ACCOUNT |o--|| USER : created_by
     DEBIT_CARD |o--o{ PAYMENT : linked_to
     DEBIT_CARD }o--o| INITIATIVE : linked_to
     CATEGORY |o--o{ PAYMENT : linked_to
-    %% Should categories be linked to activities? Why?
-    %% Related to this: why do we have initiatives -> activities again? What's the reasoning?
     CATEGORY }o--|| ACTIVITY : linked_to
-    NORDIGEN_BANK_ACCOUNT }o--|| USER : created_by
-    NORDIGEN_BANK_ACCOUNT }o--|| INITIATIVE : linked_to
-    NORDIGEN_REQUISITION }|--|| NORDIGEN_BANK_ACCOUNT : linked_to
+    REQUISITION }o--|| USER : created_by
+    BANK_ACCOUNT }o--|| REQUISITION : linked_to
+    PAYMENT }o--o| BANK_ACCOUNT : linked_to
+    FUNDER ||--o{ REGULATION : issues
+    REGULATION ||--o{ GRANT : part_of
 
-    INITIATIVE {
-        str image_url
-    }
-    ACTIVITY {
-        str image_url
-    }
-    USER {
-        str image_url
-    }
-    PAYMENT_ATTACHMENT {
-        str url
-        str mimetype
+    GRANT_ROLES }o--o{ USER : has
+    GRANT }o--o{ GRANT_ROLES : gives_access_to
+    %% What type of relationship should this be?
+    GRANT }|--o{ INITIATIVE : part_of
+    INITIATIVE ||--o{ ATTACHMENT : attached_to
+    ACTIVITY ||--o{ ATTACHMENT : attached_to
+    ACCOUNTABILITY_REPORT |o--|| GRANT : reports_on
+    PAYMENT_IMPORT |o--|{ PAYMENT : part_of
+    USER ||--o{ PAYMENT_IMPORT : done_by
+
+    
+    GRANT_ROLES {
+        int user_id
+        int grant_id
+        %% subsidy_officer, policy_officer or overseer
+        str role
     }
 
     MUTATION_LOGS {
@@ -42,4 +44,3 @@ erDiagram
         str who
         str when
     }
-```
