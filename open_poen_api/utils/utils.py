@@ -6,10 +6,11 @@ import string
 import random
 from ..schemas_and_models.models import entities as ent
 from .. import schemas_and_models as s
-from load_env import load_env
+
+from .load_env import load_env_vars
 import datetime
 
-load_env()
+load_env_vars()
 
 DEBUG = os.environ.get("ENVIRONMENT") == "debug"
 

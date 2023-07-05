@@ -2,9 +2,9 @@ from datetime import datetime, timedelta
 from nordigen import NordigenClient
 import os
 import asyncio
-from ..utils.load_env import load_env
+from ..utils.load_env import load_env_vars
 
-load_env()
+load_env_vars()
 
 lock = asyncio.Lock()
 

@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 
-def load_env():
+def load_env_vars():
     load_dotenv()
     if os.getenv("ENVIRONMENT") == "debug":
         load_dotenv(".env.debug")

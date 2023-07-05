@@ -995,7 +995,7 @@ async def gocardless_initiatite(
     new_requisition = ent.Requisition(
         user_id=user_id,
         api_institution_id="ING_INGBNL2A",
-        api_institution_id=init.requisition_id,
+        api_requisition_id=init.requisition_id,
     )
     session.add(new_requisition)
     session.commit()
