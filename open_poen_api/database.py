@@ -2,6 +2,7 @@ from .schemas_and_models.models.entities import User, Base
 from typing import AsyncGenerator
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi import Depends
+import contextlib
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -25,3 +26,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     yield SQLAlchemyUserDatabase(session, User)
+
+
+get_async_session_context = contextlib.asynccontextmanager(get_async_session)
+get_user_db_context = contextlib.asynccontextmanager(get_user_db)

@@ -11,6 +11,7 @@ from fastapi_users.authentication import (
     JWTStrategy,
     AuthenticationBackend,
 )
+import contextlib
 
 load_env_vars()
 
@@ -56,3 +57,5 @@ auth_backend = AuthenticationBackend(
 fastapi_users = FastAPIUsers[User, int](get_user_manager, [auth_backend])
 
 current_active_user = fastapi_users.current_user(active=True)
+
+get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)

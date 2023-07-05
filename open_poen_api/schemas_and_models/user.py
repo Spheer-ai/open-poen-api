@@ -1,9 +1,10 @@
-from pydantic import EmailStr, BaseModel, Extra, validator
+from pydantic import EmailStr, BaseModel, Extra, validator, Field
 
 # from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
 
 # from .models.entities import UserBase, Role
 from fastapi_users import schemas
+from .models.entities import Role
 
 
 class UserRead(schemas.BaseUser[int]):
@@ -11,7 +12,7 @@ class UserRead(schemas.BaseUser[int]):
 
 
 class UserCreate(schemas.BaseUserCreate):
-    pass
+    role: Role = Field(default=Role.USER)
 
 
 class UserUpdate(schemas.BaseUserUpdate):
