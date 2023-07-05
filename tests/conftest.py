@@ -9,7 +9,7 @@ from open_poen_api.schemas_and_models.models.entities import (
     Activity,
     Payment,
 )
-from open_poen_api.utils import temp_password_generator
+from open_poen_api.utils.utils import temp_password_generator
 from passlib.context import CryptContext
 import pytest
 from datetime import datetime

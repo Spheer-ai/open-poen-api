@@ -19,18 +19,24 @@ from typing import Annotated
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta, datetime
 from sqlalchemy.exc import IntegrityError
-from .utils import (
+from .utils.utils import (
     get_entities_by_ids,
     temp_password_generator,
     get_fields_dict,
     get_requester_ip,
+    format_user_timestamp,
 )
 from .payment import check_for_forbidden_fields
 from jose import jwt, JWTError, ExpiredSignatureError
 from time import time
 import pytz
+import os
+
 from .bng import get_bng_payments, retrieve_access_token, create_consent
+from .gocardless import refresh_tokens, client
 from requests.exceptions import RequestException
+
+DOMAIN_NAME = os.environ.get("DOMAIN_NAME")
 
 
 router = APIRouter()
@@ -790,6 +796,7 @@ async def delete_user(
     requires_admin=Depends(auth.requires_admin),
     session: Session = Depends(get_session),
 ):
+    # TODO: Make soft delete.
     user = session.get(ent.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -823,7 +830,7 @@ def get_users(
     return parsed_users
 
 
-# BNG
+# # BNG
 @router.get(
     "/users/{user_id}/bng-initiate",
     response_class=RedirectResponse,
@@ -850,8 +857,7 @@ async def bng_initiate(
         consent_id, oauth_url = create_consent(
             iban=bng.iban,
             valid_until=bng.expires_on,
-            # TODO: Configure domain automatically
-            redirect_url=f"https://openpoen.nl/users/{user_id}/bng-callback",
+            redirect_url=f"https://{DOMAIN_NAME}/users/{user_id}/bng-callback",
             requester_ip=requester_ip,
         )
     except RequestException as e:
@@ -870,6 +876,7 @@ async def bng_initiate(
         auth.ALGORITHM,
     ).decode("utf-8")
     url_to_return = oauth_url.format(token)
+    # TODO: Don't return a redirect, but some json with the link.
     return RedirectResponse(url=url_to_return)
 
 
@@ -889,7 +896,7 @@ async def bng_callback(
         raise HTTPException(status_code=401, detail="Could not validate JWT token")
 
     try:
-        response = retrieve_access_token(code)
+        response = retrieve_access_token(code, redirect_url="")
     except RequestException as e:
         raise HTTPException(
             status_code=500, detail="Error in retrieval of access token from BNG"
@@ -911,6 +918,7 @@ async def bng_callback(
     session.commit()
     session.refresh(new_bng_account)
     background_tasks.add_task(get_bng_payments, session)
+    # Here we should redirect the user back to a route in the SPA.
     return new_bng_account
 
 
@@ -955,6 +963,44 @@ async def get_bng_connection(
         auth_levels=auth_levels,
     )
     return parsed_bng
+
+
+# GOCARDLESS
+@router.get("/users/{user_id}/gocardless-initiate", response_class=RedirectResponse)
+async def gocardless_initiatite(
+    user_id: int,
+    # gocardless: s.GoCardlessCreateActivityOwnerCreate,
+    logged_in_user=Depends(auth.get_logged_in_user),
+    requires_user_owner=Depends(auth.requires_user_owner),
+    session: Session = Depends(get_session),
+):
+    user = session.get(ent.User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # A user can only have one requisition per bank (institution_id).
+    # TODO
+
+    await refresh_tokens()
+
+    init = client.initialize_session(
+        # TODO: This has to redirect to the SPA.
+        redirect_uri=f"https://{DOMAIN_NAME}/users/{user_id}/gocardless-callback",
+        # TODO: Parse dynamically
+        institution_id="ING_INGBNL2A",
+        reference_id=format_user_timestamp(user.id),
+        max_historical_days=720,
+    )
+
+    new_requisition = ent.Requisition(
+        user_id=user_id,
+        api_institution_id="ING_INGBNL2A",
+        api_requisition_id=init.requisition_id,
+    )
+    session.add(new_requisition)
+    session.commit()
+    # TODO: Don´t return a redirect, but some json with the link.
+    return RedirectResponse(url=init.link)
 
 
 # # FUNDER

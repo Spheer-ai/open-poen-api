@@ -2,15 +2,17 @@ from sqlmodel import Session, SQLModel, select, col
 from typing import Type, TypeVar, Any
 from fastapi import HTTPException, Request
 import os
-from dotenv import load_dotenv
 import string
 import random
-from .schemas_and_models.models import entities as ent
-from . import schemas_and_models as s
+from ..schemas_and_models.models import entities as ent
+from .. import schemas_and_models as s
 
-load_dotenv()
+from .load_env import load_env_vars
+import datetime
 
-DEBUG = os.getenv("DEBUG") == "true"
+load_env_vars()
+
+DEBUG = os.environ.get("ENVIRONMENT") == "debug"
 
 
 def get_requester_ip(request: Request):
@@ -18,6 +20,12 @@ def get_requester_ip(request: Request):
         return request.client.host
     else:
         return "123.456.789.101"
+
+
+def format_user_timestamp(user_id: int | None) -> str:
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+    formatted_string = f"{user_id}-{timestamp}"
+    return formatted_string
 
 
 T = TypeVar("T", bound=SQLModel)

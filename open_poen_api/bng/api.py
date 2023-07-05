@@ -11,28 +11,22 @@ from Crypto.Signature import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 from urllib.parse import urlparse
 from urllib.parse import urlencode
+import os
 
+URI_FORMAT = os.environ.get("BNG_URI_FORMAT")
+CLIENT_ID = str(os.environ.get("BNG_CLIENT_ID"))
+KEYID_FDN = os.environ.get("BNG_KEYID_FDN")
+TLS_CERTS = (
+    str(os.environ.get("BNG_TLS_CER")),
+    str(os.environ.get("BNG_TLS_KEY")),
+)
+SIGNING_CERTS = (os.environ.get("BNG_SIGN_CER"), os.environ.get("BNG_SIGN_KEY"))
 
-REDIRECT_URL = app.config["REDIRECT_URL"]
-API_URL_PREFIX = "https://api.xs2a{}.bngbank.nl/api/v1/"
-OAUTH_URL_PREFIX = "https://api.xs2a{}.bngbank.nl/authorise?response_type=code&"
-ACCESS_TOKEN_URL = "https://api.xs2a{}.bngbank.nl/token"
-
-if app.config["USE_SANDBOX"]:
-    API_URL_PREFIX = API_URL_PREFIX.format("-sandbox")
-    OAUTH_URL_PREFIX = OAUTH_URL_PREFIX.format("-sandbox")
-    ACCESS_TOKEN_URL = ACCESS_TOKEN_URL.format("-sandbox")
-    CLIENT_ID = "PSDNL-AUT-SANDBOX"
-    TLS_CERTS = app.config["SANDBOX_CERTS"]["TLS"]
-    SIGNING_CERTS = app.config["SANDBOX_CERTS"]["SIGNING"]
-    KEYID_FDN = app.config["SANDBOX_KEYID_FDN"]
-else:
-    API_URL_PREFIX = API_URL_PREFIX.format("")
-    OAUTH_URL_PREFIX = OAUTH_URL_PREFIX.format("")
-    ACCESS_TOKEN_URL = ACCESS_TOKEN_URL.format("")
-    CLIENT_ID = app.config["CLIENT_ID"]
-    TLS_CERTS = SIGNING_CERTS = app.config["PRODUCTION_CERTS"]
-    KEYID_FDN = app.config["PRODUCTION_KEYID_FDN"]
+API_URL_PREFIX = f"https://api.xs2a{URI_FORMAT}.bngbank.nl/api/v1/"
+OAUTH_URL_PREFIX = (
+    f"https://api.xs2a{URI_FORMAT}.bngbank.nl/authorise?response_type=code&"
+)
+ACCESS_TOKEN_URL = f"https://api.xs2a{URI_FORMAT}.bngbank.nl/token"
 
 
 def get_current_rfc_1123_date():
@@ -150,20 +144,20 @@ def create_consent(
             "scope=" + "AIS:" + parsed_json["consentId"] + "&",
             "code_challenge=12345&",
             "code_challenge_method=Plain&",
-            "redirect_uri=" + REDIRECT_URL,
+            "redirect_uri=" + redirect_url,
         ]
     )
     return parsed_json["consentId"], oauth_url
 
 
-def retrieve_access_token(access_code: str):
+def retrieve_access_token(access_code: str, redirect_url: str):
     body = {
         "client_id": CLIENT_ID,
         "grant_type": "authorization_code",
         "code": access_code,
         "code_verifier": "12345",  # Not needed.
         "state": "state12345",  #  Not needed.
-        "redirect_uri": REDIRECT_URL,
+        "redirect_uri": redirect_url,
     }
     url_body = urlencode(body, doseq=False)
     request_id = str(uuid.uuid4())
