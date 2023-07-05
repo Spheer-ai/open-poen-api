@@ -1,12 +1,17 @@
-from sqlmodel import SQLModel, Field, Column, Relationship, UniqueConstraint, VARCHAR
 from pydantic import EmailStr
-from sqlalchemy import Column, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, String, VARCHAR
 from datetime import datetime
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
-from ..mixins import TimeStampMixin, HiddenMixin, Money
-from ..models.associations import ActivityToUser, InitiativeToUser
+
+# from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from fastapi_users.db import SQLAlchemyBaseUserTable
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Role(str, Enum):
@@ -18,206 +23,215 @@ class Role(str, Enum):
     USER = "user"
 
 
-class UserBase(SQLModel, HiddenMixin):
-    email: EmailStr = Field(
-        sa_column=Column("email", VARCHAR, unique=True, index=True, nullable=False)
-    )
-    first_name: str | None
-    last_name: str | None
-    biography: str | None
-    role: Role = Field(
-        sa_column=Column(ChoiceType(Role, impl=VARCHAR(length=32))),
-        nullable=False,
-        default=Role.USER,
-    )
-    active: bool = Field(nullable=False, default=True)
-    image: str | None
+class User(SQLAlchemyBaseUserTable[int], Base):
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    first_name: Mapped[str | None] = mapped_column(String(length=64))
+    last_name: Mapped[str | None] = mapped_column(String(length=64))
+    biography: Mapped[str | None] = mapped_column(String(length=512))
+    role: Mapped[Role] = mapped_column(ChoiceType(Role, impl=VARCHAR(length=32)))
+    image: Mapped[str | None] = mapped_column(String(length=128))
 
 
-class User(UserBase, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    hashed_password: str
-    initiatives: list["Initiative"] = Relationship(
-        back_populates="initiative_owners", link_model=InitiativeToUser
-    )
-    activities: list["Activity"] = Relationship(
-        back_populates="activity_owners", link_model=ActivityToUser
-    )
-    bng: Optional["BNG"] = Relationship(back_populates="user")
-    requisitions: list["Requisition"] = Relationship(back_populates="user")
+# class UserBase(SQLModel, HiddenMixin):
+#     email: EmailStr = Field(
+#         sa_column=Column("email", VARCHAR, unique=True, index=True, nullable=False)
+#     )
+#     first_name: str | None
+#     last_name: str | None
+#     biography: str | None
+#     role: Role = Field(
+#         sa_column=Column(ChoiceType(Role, impl=VARCHAR(length=32))),
+#         nullable=False,
+#         default=Role.USER,
+#     )
+#     active: bool = Field(nullable=False, default=True)
+#     image: str | None
 
 
-class InitiativeBase(SQLModel, HiddenMixin):
-    name: str = Field(index=True, unique=True)
-    description: str
-    purpose: str
-    target_audience: str
-    owner: str
-    owner_email: EmailStr = Field(sa_column=Column("email", VARCHAR, nullable=False))
-    # legal_entity
-    address_applicant: str
-    kvk_registration: str
-    location: str
-    # budget
-    # files
-    image: str | None
-    hidden_sponsors = Field(nullable=False, default=False)
+# class User(UserBase, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     hashed_password: str
+#     initiatives: list["Initiative"] = Relationship(
+#         back_populates="initiative_owners", link_model=InitiativeToUser
+#     )
+#     activities: list["Activity"] = Relationship(
+#         back_populates="activity_owners", link_model=ActivityToUser
+#     )
+#     bng: Optional["BNG"] = Relationship(back_populates="user")
+#     requisitions: list["Requisition"] = Relationship(back_populates="user")
 
 
-class Initiative(InitiativeBase, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    initiative_owners: list["User"] = Relationship(
-        back_populates="initiatives", link_model=InitiativeToUser
-    )
-    activities: list["Activity"] = Relationship(
-        back_populates="initiative",
-        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
-    )
-    payments: list["Payment"] = Relationship(back_populates="initiative")
-    debit_cards: list["DebitCard"] = Relationship(back_populates="initiative")
+# class InitiativeBase(SQLModel, HiddenMixin):
+#     name: str = Field(index=True, unique=True)
+#     description: str
+#     purpose: str
+#     target_audience: str
+#     owner: str
+#     owner_email: EmailStr = Field(sa_column=Column("email", VARCHAR, nullable=False))
+#     # legal_entity
+#     address_applicant: str
+#     kvk_registration: str
+#     location: str
+#     # budget
+#     # files
+#     image: str | None
+#     hidden_sponsors = Field(nullable=False, default=False)
 
 
-class ActivityBase(SQLModel, HiddenMixin):
-    name: str
-    description: str
-    purpose: str
-    target_audience: str
-    image: str | None
-    # budget
-    finished_description: str | None
-    finished: bool = Field(nullable=False, default=False)
+# class Initiative(InitiativeBase, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     initiative_owners: list["User"] = Relationship(
+#         back_populates="initiatives", link_model=InitiativeToUser
+#     )
+#     activities: list["Activity"] = Relationship(
+#         back_populates="initiative",
+#         sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
+#     )
+#     payments: list["Payment"] = Relationship(back_populates="initiative")
+#     debit_cards: list["DebitCard"] = Relationship(back_populates="initiative")
 
 
-class Activity(ActivityBase, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    activity_owners: list["User"] = Relationship(
-        back_populates="activities", link_model=ActivityToUser
-    )
-    initiative_id: int = Field(
-        sa_column=Column(
-            Integer, ForeignKey("initiative.id", ondelete="CASCADE"), nullable=False
-        )
-    )
-    initiative: "Initiative" = Relationship(back_populates="activities")
-    payments: list["Payment"] = Relationship(back_populates="activity")
-
-    __table_args__ = (
-        UniqueConstraint("name", "initiative_id", name="unique_activity_name"),
-    )
+# class ActivityBase(SQLModel, HiddenMixin):
+#     name: str
+#     description: str
+#     purpose: str
+#     target_audience: str
+#     image: str | None
+#     # budget
+#     finished_description: str | None
+#     finished: bool = Field(nullable=False, default=False)
 
 
-class Route(str, Enum):
-    """We need to distinguish between incoming and outcoming funds, so that
-    we can take corrective payments into account in the calculation rules, such
-    as refunds."""
+# class Activity(ActivityBase, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     activity_owners: list["User"] = Relationship(
+#         back_populates="activities", link_model=ActivityToUser
+#     )
+#     initiative_id: int = Field(
+#         sa_column=Column(
+#             Integer, ForeignKey("initiative.id", ondelete="CASCADE"), nullable=False
+#         )
+#     )
+#     initiative: "Initiative" = Relationship(back_populates="activities")
+#     payments: list["Payment"] = Relationship(back_populates="activity")
 
-    INCOME = "income"
-    EXPENSES = "expenses"
-
-
-class PaymentType(str, Enum):
-    BNG = "BNG"
-    NORDIGEN = "NORDIGEN"
-    MANUAL = "MANUAL"
-
-
-class PaymentBase(SQLModel, HiddenMixin):
-    booking_date: datetime = Field(sa_column=Column(DateTime(timezone=True)))
-    transaction_amount: Money
-    creditor_name: str
-    creditor_account: str
-    debtor_name: str
-    debtor_account: str
-    route: Route = Field(
-        sa_column=Column(ChoiceType(Route, impl=VARCHAR(length=32))),
-        nullable=False,
-    )
-    short_user_description: str | None
-    long_user_description: str | None
+#     __table_args__ = (
+#         UniqueConstraint("name", "initiative_id", name="unique_activity_name"),
+#     )
 
 
-class Payment(PaymentBase, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    transaction_id: str | None
-    entry_reference: str | None
-    end_to_end_id: str | None
-    remittance_information_unstructured: str | None
-    remittance_information_structured: str | None
-    type: PaymentType = Field(
-        sa_column=Column(
-            ChoiceType(PaymentType, impl=VARCHAR(length=32)), default=PaymentType.MANUAL
-        ),
-        nullable=False,
-    )
-    # TODO: How should these cascades work?
-    initiative_id: int = Field(
-        sa_column=Column(Integer, ForeignKey("initiative.id", ondelete="CASCADE"))
-    )
-    initiative: Initiative = Relationship(back_populates="payments")
-    # TODO: How should these cascades work?
-    activity_id: int = Field(
-        sa_column=Column(Integer, ForeignKey("activity.id", ondelete="CASCADE"))
-    )
-    activity: Activity = Relationship(back_populates="payments")
-    debit_card_id: int | None = Field(
-        sa_column=Column(Integer, ForeignKey("debitcard.id"), nullable=True)
-    )
-    debit_card: "DebitCard" = Relationship(back_populates="payments")
+# class Route(str, Enum):
+#     """We need to distinguish between incoming and outcoming funds, so that
+#     we can take corrective payments into account in the calculation rules, such
+#     as refunds."""
+
+#     INCOME = "income"
+#     EXPENSES = "expenses"
 
 
-class DebitCardBase(SQLModel):
-    card_number: str = Field(unique=True, nullable=False)
+# class PaymentType(str, Enum):
+#     BNG = "BNG"
+#     NORDIGEN = "NORDIGEN"
+#     MANUAL = "MANUAL"
 
 
-class DebitCard(DebitCardBase, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    initiative_id: int | None = Field(
-        sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
-    )
-    initiative: Initiative = Relationship(back_populates="debit_cards")
-    payments: list[Payment] = Relationship(back_populates="debit_card")
+# class PaymentBase(SQLModel, HiddenMixin):
+#     booking_date: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+#     transaction_amount: Money
+#     creditor_name: str
+#     creditor_account: str
+#     debtor_name: str
+#     debtor_account: str
+#     route: Route = Field(
+#         sa_column=Column(ChoiceType(Route, impl=VARCHAR(length=32))),
+#         nullable=False,
+#     )
+#     short_user_description: str | None
+#     long_user_description: str | None
 
 
-class BNGBase(SQLModel):
-    iban: str = Field(unique=True, nullable=False)
-    expires_on: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+# class Payment(PaymentBase, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     transaction_id: str | None
+#     entry_reference: str | None
+#     end_to_end_id: str | None
+#     remittance_information_unstructured: str | None
+#     remittance_information_structured: str | None
+#     type: PaymentType = Field(
+#         sa_column=Column(
+#             ChoiceType(PaymentType, impl=VARCHAR(length=32)), default=PaymentType.MANUAL
+#         ),
+#         nullable=False,
+#     )
+#     # TODO: How should these cascades work?
+#     initiative_id: int = Field(
+#         sa_column=Column(Integer, ForeignKey("initiative.id", ondelete="CASCADE"))
+#     )
+#     initiative: Initiative = Relationship(back_populates="payments")
+#     # TODO: How should these cascades work?
+#     activity_id: int = Field(
+#         sa_column=Column(Integer, ForeignKey("activity.id", ondelete="CASCADE"))
+#     )
+#     activity: Activity = Relationship(back_populates="payments")
+#     debit_card_id: int | None = Field(
+#         sa_column=Column(Integer, ForeignKey("debitcard.id"), nullable=True)
+#     )
+#     debit_card: "DebitCard" = Relationship(back_populates="payments")
 
 
-class BNG(BNGBase, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    user_id: int = Field(
-        sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
-    )
-    user: User = Relationship(back_populates="bng")
-    consent_id: str
-    access_token: str
-    last_import_on: datetime | None
+# class DebitCardBase(SQLModel):
+#     card_number: str = Field(unique=True, nullable=False)
 
 
-class Requisition(SQLModel, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    user_id: int = Field(
-        sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
-    )
-    user: User = Relationship(back_populates="requisitions")
-    api_institution_id: str
-    api_requisition_id: str
-
-    __table_args__ = (
-        UniqueConstraint("api_institution_id", "user_id", name="single_bank_per_user"),
-    )
+# class DebitCard(DebitCardBase, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     initiative_id: int | None = Field(
+#         sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
+#     )
+#     initiative: Initiative = Relationship(back_populates="debit_cards")
+#     payments: list[Payment] = Relationship(back_populates="debit_card")
 
 
-class Account(SQLModel, TimeStampMixin, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    api_account_id: str
+# class BNGBase(SQLModel):
+#     iban: str = Field(unique=True, nullable=False)
+#     expires_on: datetime = Field(sa_column=Column(DateTime(timezone=True)))
 
-    requisition_id: int | None = Field(
-        sa_column=Column(Integer, ForeignKey("requisition.id"), nullable=True)
-    )
-    requisition: Requisition = Relationship(back_populates="accounts")
 
-    initiative_id: int | None = Field(
-        sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
-    )
-    initiative: Initiative = Relationship(back_populates="accounts")
+# class BNG(BNGBase, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     user_id: int = Field(
+#         sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
+#     )
+#     user: User = Relationship(back_populates="bng")
+#     consent_id: str
+#     access_token: str
+#     last_import_on: datetime | None
+
+
+# class Requisition(SQLModel, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     user_id: int = Field(
+#         sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
+#     )
+#     user: User = Relationship(back_populates="requisitions")
+#     api_institution_id: str
+#     api_requisition_id: str
+
+#     __table_args__ = (
+#         UniqueConstraint("api_institution_id", "user_id", name="single_bank_per_user"),
+#     )
+
+
+# class Account(SQLModel, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     api_account_id: str
+
+#     requisition_id: int | None = Field(
+#         sa_column=Column(Integer, ForeignKey("requisition.id"), nullable=True)
+#     )
+#     requisition: Requisition = Relationship(back_populates="accounts")
+
+#     initiative_id: int | None = Field(
+#         sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
+#     )
+#     initiative: Initiative = Relationship(back_populates="accounts")

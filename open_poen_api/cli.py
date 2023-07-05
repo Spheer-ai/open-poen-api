@@ -1,24 +1,30 @@
 import typer
-from .database import engine
-from sqlmodel import Session
+from .database import engine, async_session_maker
 from .schemas_and_models.models.entities import User
 from .gocardless import client, refresh_tokens
 import asyncio
 from rich import print
+from pydantic import EmailStr
 
 app = typer.Typer()
 
 
-@app.command()
-def add_user():
+async def async_add_user(
+    email: EmailStr, is_superuser: bool = False, password: str = "bla"
+):
     # TODO: Share functionality for creating a user with the route.
     # TODO: We'll need this to add the first Admin.
     random_user = User()
-    with Session(engine) as session:
+    async with async_session_maker() as session:
         session.add(random_user)
-        session.commit()
-        session.refresh(random_user)
+        await session.commit()
+        await session.refresh(random_user)
         typer.echo(f"Added user with id {random_user.id}")
+
+
+@app.command()
+def add_user():
+    asyncio.run(async_add_user())
 
 
 @app.command()
