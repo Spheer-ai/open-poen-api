@@ -2,6 +2,7 @@ from fastapi import Depends, Request
 from .database import get_user_db
 from .schemas_and_models.models.entities import User
 from .utils.load_env import load_env_vars
+from .utils.mail import MessageSchema, conf
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -12,6 +13,7 @@ from fastapi_users.authentication import (
     AuthenticationBackend,
 )
 import contextlib
+from fastapi_mail import MessageType, FastMail
 
 load_env_vars()
 
@@ -26,6 +28,17 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         print(f"User {user.id} has registered.")
+
+        html = """<p>Hi this test mail, thanks for using Fastapi-mail</p> """
+        message = MessageSchema(
+            subject="Fastapi-Mail module",
+            recipients=["jamal@vleij.com"],
+            body=html,
+            subtype=MessageType.html,
+        )
+
+        fm = FastMail(conf)
+        await fm.send_message(message)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None

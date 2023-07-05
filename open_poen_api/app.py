@@ -8,8 +8,8 @@ from .schemas_and_models.models.entities import User
 from .schemas_and_models import UserRead, UserUpdate
 from .database import create_db_and_tables
 
-
 load_env_vars()
+
 
 app = FastAPI()
 
@@ -25,6 +25,7 @@ app.include_router(
     tags=["users"],
 )
 
+# TODO: Add back in.
 # app.include_router(router)
 
 
