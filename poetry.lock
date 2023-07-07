@@ -1000,6 +1000,56 @@ files = [
 requests = ">=2.26.0,<3.0.0"
 
 [[package]]
+name = "oso"
+version = "0.27.0"
+description = "oso is an open source policy engine for authorization that's embedded in your application"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "oso-0.27.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:6194362376097fe9c951412801426c0652050e8fefddd4383965050231f8a274"},
+    {file = "oso-0.27.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:7e5f4661d2f167ae34f6042cd157bc86838f2c037342405ed42c6e3c578d0e7f"},
+    {file = "oso-0.27.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:add0022a49f42883779dd27ce02f95f50728143a86827d95abf7ba6a0b4d3a68"},
+    {file = "oso-0.27.0-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:3216be1cdcbb92264acffaa7a4c15a49b60a53f0bc483ccdf889606a1fdb3dfc"},
+    {file = "oso-0.27.0-cp310-cp310-win_amd64.whl", hash = "sha256:8e9d9298cda598e75a1ba17ab67b1f0bd6781708753153a06d442ce8f86a4110"},
+    {file = "oso-0.27.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:e3745f2e87a6316c40c367aa1d51c5d29b3742de4f123412563939e9ef81c087"},
+    {file = "oso-0.27.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:6291ed90cd63bc334422e631440f9d68973856bff1325f3c7e6f52b2e818bce1"},
+    {file = "oso-0.27.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:707d5542248a205149b2ce9c4df5917ee26183b2092402c6e3036cfdeae6e912"},
+    {file = "oso-0.27.0-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:28b12fbcc87c11a625d12faa9c157704d0295ffc86ad3940fa3ced0cdf47e8a8"},
+    {file = "oso-0.27.0-cp311-cp311-win_amd64.whl", hash = "sha256:c8175de90dcf8d58582499749be949db6fa65328af533ed5aaaf79081b079b1a"},
+    {file = "oso-0.27.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:8a798cb4edc887325c91a45b92a3823e263e9649a8019cf23655b86a18991dd5"},
+    {file = "oso-0.27.0-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fc7af886519a122042777d3c2819b0c1b1ae516749f267f99ce18f4c62631155"},
+    {file = "oso-0.27.0-cp37-cp37m-musllinux_1_1_x86_64.whl", hash = "sha256:6b7cdf73cb9e8f4a6b30cf98e645523b35662f106d6710cd8e2859007d5f0fb4"},
+    {file = "oso-0.27.0-cp37-cp37m-win_amd64.whl", hash = "sha256:6b7603da5652b79e6993ec3e06627003e69c54b5a38d77ce53abb23ef0a8fd0e"},
+    {file = "oso-0.27.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:12e7e0fa07fe80c7079332cda498dce8f0f02f472d23dabbcd3919f12047ac74"},
+    {file = "oso-0.27.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:8786270c11e05b1a36744cf62fd0a10b058f17c88aceff0b8b7652ee1b83f451"},
+    {file = "oso-0.27.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:66c6f41a5a2be3acfdac3598e0cfed7b875475d3b5c7252db8ef7625c1f6383f"},
+    {file = "oso-0.27.0-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:ae38c0f8022d6913e01d4c21f2fdfa8d0a98e9e25adeaa76d54f78cf9d1767b5"},
+    {file = "oso-0.27.0-cp38-cp38-win_amd64.whl", hash = "sha256:dd9b4ac575de5827bcdf2ac3539422c2199dfd05e725e0daed5835f39f878b61"},
+    {file = "oso-0.27.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:ef25869cd0a6120576ea29ed0e85dfc1ec1ddbc7ec73e66c686b9e88bd219227"},
+    {file = "oso-0.27.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:4ccb8035fa5f74bfc235262f2bcbbde26400901b0b46ed72e40dd07195893f2c"},
+    {file = "oso-0.27.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c217d7fcac597f6c1b204a5935bfe511d30352a8771a6db5cfd49a2fecb12997"},
+    {file = "oso-0.27.0-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:eb34745d370f04dc475ee5f6ee090934b695174accbda1f6f93f9621c0450695"},
+    {file = "oso-0.27.0-cp39-cp39-win_amd64.whl", hash = "sha256:c88c750e5118b9faede9b95112f47a637c4e883e2e90fc64755865237fe3c568"},
+    {file = "oso-0.27.0-pp37-pypy37_pp73-macosx_10_9_x86_64.whl", hash = "sha256:00e9f72e9251d83a13be14857f0ef5a13fabc9164f5b50cf28dfa1ddb4047410"},
+    {file = "oso-0.27.0-pp37-pypy37_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5db5ee4f7caf052ecab85f06fa16dad0cc75e195eb5b999ab5acd4252b7cbe9a"},
+    {file = "oso-0.27.0-pp37-pypy37_pp73-win_amd64.whl", hash = "sha256:0397bc5df27b7fbefc52c7a6f3a79738946dc06f3cb278b06c2b2d31e60f3e4c"},
+    {file = "oso-0.27.0-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:f841a7c26ad43c9cb986850cb96fed29761c8734258922933f5146477a0997c1"},
+    {file = "oso-0.27.0-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5d10ede3d4ffa03bb17e0cde212ab3859bd0bdad0444fc2b294fe18a8c8dba6c"},
+    {file = "oso-0.27.0-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:1a462a0af5984a5fe9cd0a19064d85836e95f5cbb92193394f2377a35ee3001f"},
+    {file = "oso-0.27.0-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:6a537da09f14add0d8cce3a8884e3ca2494a2279b34b49c555c682f14cd846e7"},
+    {file = "oso-0.27.0-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4d092f23cdaf1867c6a9481b35fefcd0e58891ee2937fc2bf1ac265caa356393"},
+    {file = "oso-0.27.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:3fbd869a974a4df30211d02de869631c0630a5a7f7c0277dbf4e951b46ec3254"},
+]
+
+[package.dependencies]
+cffi = ">=1.15,<2.0"
+
+[package.extras]
+flask = ["authlib", "flask"]
+jwt = ["authlib"]
+
+[[package]]
 name = "packaging"
 version = "23.1"
 description = "Core utilities for Python packages"
@@ -1915,4 +1965,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "83cad8a31f97e4507526e6cac820105bafe1d28ef74e984822de12870f702921"
+content-hash = "be8e0bb5d0b3996538c95bc3eeef41d6d29c90c4e3096abd0a0020d6c2be8005"

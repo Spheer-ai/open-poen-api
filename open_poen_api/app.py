@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from oso import Oso
 
 # from .routes import router
 import uvicorn
@@ -11,6 +12,10 @@ from .database import create_db_and_tables
 from .user_routes.user import user_router
 
 load_env_vars()
+
+oso = Oso()
+oso.register_class(User)
+oso.load_file("open_poen_api/main.polar")
 
 
 app = FastAPI()
@@ -26,9 +31,9 @@ app.include_router(
 app.include_router(user_router)
 
 
-@app.get("/authenticated_route")
-async def authenticated_route(user: User = Depends(current_active_user)):
-    return {"message": f"Hello {user.email}"}
+# @app.get("/authenticated_route")
+# async def authenticated_route(user: User = Depends(current_active_user)):
+#     return {"message": f"Hello {user.email}"}
 
 
 @app.on_event("startup")
