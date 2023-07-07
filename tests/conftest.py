@@ -1,22 +1,46 @@
 import pytest
-from open_poen_api.database import create_db_and_tables, drop_all, async_session_maker
-from fastapi.testclient import TestClient
+from open_poen_api.database import (
+    create_db_and_tables,
+    drop_all,
+    async_session_maker,
+    engine,
+)
 from open_poen_api.app import app
+from open_poen_api.schemas_and_models.models.entities import Base
 import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+import pytest_asyncio
+from typing import Generator
+import asyncio
 
 
-@pytest.fixture(scope="function")
-async def clean_session():
-    await create_db_and_tables()
-    async with async_session_maker() as session:
-        yield session
-    session.close()
-    await drop_all()
+# @pytest.fixture(scope="session")
+# def event_loop(request) -> Generator:  # noqa: indirect usage
+#     loop = asyncio.get_event_loop_policy().new_event_loop()
+#     yield loop
+#     loop.close()
 
 
-@pytest.fixture(scope="module")
-def client():
-    return TestClient(app)
+@pytest_asyncio.fixture
+async def async_client(event_loop):
+    async with AsyncClient(app=app, base_url="http://localhost:8000") as client:
+        yield client
+
+
+@pytest_asyncio.fixture(scope="function")
+async def async_session(event_loop) -> AsyncSession:
+    async with async_session_maker() as s:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+
+        yield s
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    await engine.dispose()
 
 
 # @pytest.fixture(scope="module")

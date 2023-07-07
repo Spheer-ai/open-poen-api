@@ -48,7 +48,7 @@ build-backend = "poetry.core.masonry.api"
 testpaths = [
     "tests"
 ]
-asyncio_mode=auto
+asyncio_mode="auto"
 
 [tool.poetry.scripts]
 open-poen = "open_poen_api.cli:app"
