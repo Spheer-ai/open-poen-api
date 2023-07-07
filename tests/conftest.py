@@ -1,25 +1,43 @@
-import pytest
 from open_poen_api.database import (
-    create_db_and_tables,
-    drop_all,
     async_session_maker,
     engine,
 )
 from open_poen_api.app import app
-from open_poen_api.schemas_and_models.models.entities import Base
+from open_poen_api.schemas_and_models.models.entities import Base, User
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest_asyncio
-from typing import Generator
-import asyncio
+import base64
+import urllib.parse
 
 
-# @pytest.fixture(scope="session")
-# def event_loop(request) -> Generator:  # noqa: indirect usage
-#     loop = asyncio.get_event_loop_policy().new_event_loop()
-#     yield loop
-#     loop.close()
+async def retrieve_token_from_last_sent_email():
+    """Gets the last send email from Mailhog, assumes it's an email reply to a password
+    reset request and parses the token inside it to return it."""
+    async with AsyncClient() as client:
+        response = await client.get("http://localhost:8025/api/v2/messages")
+        if response.status_code == 200:
+            emails = response.json()["items"]
+            if len(emails) > 0:
+                response = await client.get(
+                    f"http://localhost:8025/api/v1/messages/{emails[0]['ID']}"
+                )
+                text = base64.b64decode(
+                    response.json()["MIME"]["Parts"][0]["Body"]
+                ).decode("utf-8")
+                lines = text.split("\n")
+                try:
+                    url = next(line for line in lines if "reset-password" in line)
+                except StopIteration:
+                    raise ValueError("No reset-password found.")
+                path = urllib.parse.urlparse(url).path
+                _, token = path.split("/reset-password/")
+                return token
+            else:
+                raise ValueError("No emails present.")
+        else:
+            raise ValueError("Request to Mailhog failed.")
 
 
 @pytest_asyncio.fixture
@@ -41,6 +59,13 @@ async def async_session(event_loop) -> AsyncSession:
         await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def existing_user(async_client, async_session):
+    test_user = {"email": "existing@user.com"}
+    response = await async_client.post("/user", json=test_user)
+    return test_user
 
 
 # @pytest.fixture(scope="module")

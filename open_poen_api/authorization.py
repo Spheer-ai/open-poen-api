@@ -2,7 +2,7 @@ from fastapi import Depends, Request
 from .database import get_user_db
 from .schemas_and_models.models.entities import User
 from .utils.load_env import load_env_vars
-from .utils.email import MessageSchema, conf
+from .utils.email import MessageSchema, conf, env
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -14,6 +14,7 @@ from fastapi_users.authentication import (
 )
 import contextlib
 from fastapi_mail import MessageType, FastMail
+import os
 
 load_env_vars()
 
@@ -27,26 +28,33 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     verification_token_secret = SECRET_KEY
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
-        # TODO: Send an email with the temporary password. Otherwise
-        # The user isn't notified and he can't login!
-
-        print(f"User {user.id} has registered.")
-
-        html = """<p>Hi this test mail, thanks for using Fastapi-mail</p> """
+        template = env.get_template("on_after_register.txt")
+        body = template.render(user=user)
         message = MessageSchema(
-            subject="Fastapi-Mail module",
-            recipients=["jamal@vleij.com"],
-            body=html,
-            subtype=MessageType.html,
+            subject=f"Uitnodiging {os.environ.get('WEBSITE_NAME')}",
+            recipients=[user.email],
+            body=body,
+            subtype=MessageType.plain,
         )
-
         fm = FastMail(conf)
         await fm.send_message(message)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ):
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
+        template = env.get_template("on_after_forgot_password.txt")
+        reset_password_url = os.environ.get("SPA_RESET_PASSWORD_URL").format(
+            token=token
+        )
+        body = template.render(user=user, reset_password_url=reset_password_url)
+        message = MessageSchema(
+            subject=f"Nieuw Wachtwoord {os.environ.get('WEBSITE_NAME')}",
+            recipients=[user.email],
+            body=body,
+            subtype=MessageType.plain,
+        )
+        fm = FastMail(conf)
+        await fm.send_message(message)
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):

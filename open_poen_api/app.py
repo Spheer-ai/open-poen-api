@@ -21,11 +21,6 @@ app.include_router(
 app.include_router(
     fastapi_users.get_reset_password_router(), prefix="/auth", tags=["auth"]
 )
-# app.include_router(
-#     fastapi_users.get_users_router(UserRead, UserUpdate),
-#     prefix="/users",
-#     tags=["users"],
-# )
 
 # TODO: Add back in.
 app.include_router(user_router)
