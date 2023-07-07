@@ -1,6 +1,6 @@
 import typer
 from .database import engine, get_async_session_context, get_user_db_context
-from .schemas_and_models import UserCreate
+from .schemas_and_models import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
 from .authorization import get_user_manager_context
@@ -9,13 +9,12 @@ from .schemas_and_models.models.entities import Role
 import asyncio
 from rich import print
 from pydantic import EmailStr
-from os import urandom
 from typing import Literal
 
 app = typer.Typer()
 
 
-async def async_add_user(
+async def add_user(
     email: EmailStr,
     superuser: bool,
     role: Literal["user", "financial", "admin"],
@@ -26,14 +25,13 @@ async def async_add_user(
         async with get_async_session_context() as session:
             async with get_user_db_context(session) as user_db:
                 async with get_user_manager_context(user_db) as user_manager:
-                    user = await user_manager.create(
-                        UserCreate(
-                            email=email,
-                            password=temp_password_generator(16),
-                            is_superuser=superuser,
-                            role=role,
-                        )
+                    user_schema = UserCreateWithPassword(
+                        email=email,
+                        is_superuser=superuser,
+                        role=role,
+                        password=temp_password_generator(16),
                     )
+                    user = await user_manager.create(user_schema)
                     typer.echo(f"Added user with id {user.id}")
     except UserAlreadyExists:
         print(f"User {email} already exists")
@@ -45,7 +43,7 @@ def add_user(
     superuser: bool = False,
     role: str = "user",
 ):
-    asyncio.run(async_add_user(email, superuser, role))
+    asyncio.run(add_user(email, superuser, role))
 
 
 @app.command()

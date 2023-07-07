@@ -5,6 +5,8 @@ import string
 import random
 from ..schemas_and_models.models import entities as ent
 from .. import schemas_and_models as s
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .load_env import load_env_vars
 import datetime
@@ -27,26 +29,26 @@ def format_user_timestamp(user_id: int | None) -> str:
     return formatted_string
 
 
-# T = TypeVar("T", bound=SQLModel)
+T = TypeVar("T", bound=DeclarativeBase)
 
 
-# def get_entities_by_ids(
-#     session: Session, model: Type[T], entity_ids: list[int]
-# ) -> list[T]:
-#     """Helper function that's useful to check that all ids of model that the user
-#     wants to link to an entity actually exist. Is used when a user created an initiatives
-#     and wants to links users to it by id for example."""
-#     entities = session.exec(select(model).where(model.id.in_(entity_ids))).all()
+async def get_entities_by_ids(
+    session: AsyncSession, model: Type[T], entity_ids: list[int]
+) -> list[T]:
+    """Helper function that's useful to check that all ids of model that the user
+    wants to link to an entity actually exist. Is used when a user created an initiatives
+    and wants to links users to it by id for example."""
+    entities = await session.exec(select(model).where(model.id.in_(entity_ids))).all()
 
-#     if len(entities) != len(entity_ids):
-#         raise HTTPException(
-#             status_code=404,
-#             # TODO: Specify which ids are missing.
-#             # TODO: Separate error if duplicate ids.
-#             detail=f"One or more instances of {model.__name__} to link do not exist",
-#         )
+    if len(entities) != len(entity_ids):
+        raise HTTPException(
+            status_code=404,
+            # TODO: Specify which ids are missing.
+            # TODO: Separate error if duplicate ids.
+            detail=f"One or more instances of {model.__name__} to link do not exist",
+        )
 
-#     return entities
+    return entities
 
 
 def temp_password_generator(

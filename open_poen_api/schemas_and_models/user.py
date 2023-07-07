@@ -5,18 +5,42 @@ from pydantic import EmailStr, BaseModel, Extra, validator, Field
 # from .models.entities import UserBase, Role
 from fastapi_users import schemas
 from .models.entities import Role
+from ..utils.utils import temp_password_generator
 
 
 class UserRead(schemas.BaseUser[int]):
-    pass
+    first_name: str | None
+    last_name: str | None
+    biography: str | None
+    role: Role
+    image: str | None
 
 
-class UserCreate(schemas.BaseUserCreate):
+class UserCreate(schemas.CreateUpdateDictModel):
+    # Intentionally not subclassing schemas.BaseUserCreate, because password
+    # is a required field there. We add users by invite only, where they get
+    # a random password assigned and a password reset link to change it.
+    email: EmailStr
+    first_name: str | None
+    last_name: str | None
+    biography: str | None
     role: Role = Field(default=Role.USER)
+    image: str | None
+    is_active: bool | None = True
+    is_superuser: bool | None = False
+    is_verified: bool | None = True
+
+
+class UserCreateWithPassword(UserCreate):
+    password: str
 
 
 class UserUpdate(schemas.BaseUserUpdate):
-    pass
+    first_name: str | None
+    last_name: str | None
+    biography: str | None
+    role: Role = Field(default=Role.USER)
+    image: str | None
 
 
 # class UserCreateAdmin(UserBase):

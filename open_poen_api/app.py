@@ -8,6 +8,8 @@ from .schemas_and_models.models.entities import User
 from .schemas_and_models import UserRead, UserUpdate
 from .database import create_db_and_tables
 
+from .user_routes.user import user_router
+
 load_env_vars()
 
 
@@ -19,14 +21,14 @@ app.include_router(
 app.include_router(
     fastapi_users.get_reset_password_router(), prefix="/auth", tags=["auth"]
 )
-app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
-    tags=["users"],
-)
+# app.include_router(
+#     fastapi_users.get_users_router(UserRead, UserUpdate),
+#     prefix="/users",
+#     tags=["users"],
+# )
 
 # TODO: Add back in.
-# app.include_router(router)
+app.include_router(user_router)
 
 
 @app.get("/authenticated_route")

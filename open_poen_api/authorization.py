@@ -2,7 +2,7 @@ from fastapi import Depends, Request
 from .database import get_user_db
 from .schemas_and_models.models.entities import User
 from .utils.load_env import load_env_vars
-from .utils.mail import MessageSchema, conf
+from .utils.email import MessageSchema, conf
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -27,6 +27,9 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     verification_token_secret = SECRET_KEY
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
+        # TODO: Send an email with the temporary password. Otherwise
+        # The user isn't notified and he can't login!
+
         print(f"User {user.id} has registered.")
 
         html = """<p>Hi this test mail, thanks for using Fastapi-mail</p> """
@@ -44,11 +47,6 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         self, user: User, token: str, request: Optional[Request] = None
     ):
         print(f"User {user.id} has forgot their password. Reset token: {token}")
-
-    async def on_after_request_verify(
-        self, user: User, token: str, request: Optional[Request] = None
-    ):
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):

@@ -31,6 +31,9 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     role: Mapped[Role] = mapped_column(ChoiceType(Role, impl=VARCHAR(length=32)))
     image: Mapped[str | None] = mapped_column(String(length=128))
 
+    def __repr__(self):
+        return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
+
 
 # class UserBase(SQLModel, HiddenMixin):
 #     email: EmailStr = Field(
