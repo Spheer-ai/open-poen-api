@@ -18,8 +18,8 @@ async def test_create_user(async_client, async_session):
 
 
 @pytest.mark.asyncio
-async def test_first_login(async_client, async_session, existing_user):
-    body = {"email": existing_user["email"]}
+async def test_first_login(async_client, async_session, user_created_by_admin):
+    body = {"email": user_created_by_admin["email"]}
     response = await async_client.post("/auth/forgot-password", json=body)
     assert response.status_code == 202
     # Give FastAPI to send the mail as a background task.
@@ -28,7 +28,7 @@ async def test_first_login(async_client, async_session, existing_user):
     body = {"token": token, "password": "SomeNewPassword"}
     response = await async_client.post("/auth/reset-password", json=body)
     assert response.status_code == 200
-    body = {"username": existing_user["email"], "password": "SomeNewPassword"}
+    body = {"username": user_created_by_admin["email"], "password": "SomeNewPassword"}
     response = await async_client.post(
         "/auth/jwt/login",
         data=body,
@@ -39,7 +39,26 @@ async def test_first_login(async_client, async_session, existing_user):
 
 
 @pytest.mark.asyncio
-async def test_delete_user(async_client, async_session, existing_user):
+async def test_delete_user(async_client, async_session, user_created_by_admin):
     user_id = 1
-    response = await async_client.delete("/user/{user_id}")
+    response = await async_client.delete(f"/user/{user_id}")
     assert response.status_code == 204
+    user = await async_session.get(User, user_id)
+    assert user is None
+
+
+@pytest.mark.asyncio
+async def test_patch_user(async_client, async_session, user_created_by_admin):
+    user_id = 1
+    body = {"email": "different@user.com"}
+    response = await async_client.patch(f"/user/{user_id}", json=body)
+    assert response.status_code == 200
+    user = await async_session.get(User, user_id)
+    assert user.email == "different@user.com"
+
+
+@pytest.mark.asyncio
+async def test_get_users(async_client, async_session, user_created_by_admin):
+    response = await async_client.get("/users")
+    assert response.status_code == 200
+    assert len(response.json()["users"]) == 1

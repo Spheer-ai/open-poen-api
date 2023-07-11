@@ -19,13 +19,17 @@ DOMAIN_NAME = os.environ.get("DOMAIN_NAME")
 
 user_router = APIRouter()
 
+# We define dependencies this way because we can otherwise not override them
+# easily during testing.
+superuser_dep = auth.fastapi_users.current_user(superuser=True)
+
 
 @user_router.post("/user", response_model=s.UserRead)
 async def create_user(
     user: s.UserCreate,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    superuser=Depends(auth.fastapi_users.current_user(superuser=True)),
+    superuser=Depends(superuser_dep),
     user_manager: auth.UserManager = Depends(auth.get_user_manager),
 ):
     user_with_password = s.UserCreateWithPassword(
@@ -60,6 +64,7 @@ async def update_user(
         edited_user = await user_manager.update(user, user_db, request=request)
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
+    return s.UserRead.from_orm(edited_user)
 
 
 @user_router.delete("/user/{user_id}")
@@ -67,14 +72,13 @@ async def delete_user(
     user_id: int,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    superuser=Depends(auth.fastapi_users.current_user(superuser=True)),
+    superuser=Depends(superuser_dep),
     user_manager: auth.UserManager = Depends(auth.get_user_manager),
 ):
     user = await session.get(e.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await user_manager.delete(user, request=request)
-    await session.commit(user)
     return Response(status_code=204)
 
 
@@ -87,8 +91,8 @@ async def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
-    users = await session.exec(select(e.User)).all()
-    return s.UserReadList.from_orm(users)
+    users = await session.execute(select(e.User))
+    return s.UserReadList(users=users.scalars().all())
 
 
 # # # BNG

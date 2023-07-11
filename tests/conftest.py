@@ -4,6 +4,7 @@ from open_poen_api.database import (
 )
 from open_poen_api.app import app
 from open_poen_api.schemas_and_models.models.entities import Base, User
+from open_poen_api.user_routes.user import superuser_dep
 from open_poen_api import authorization as auth
 import pytest
 from httpx import AsyncClient
@@ -41,9 +42,9 @@ async def retrieve_token_from_last_sent_email():
             raise ValueError("Request to Mailhog failed.")
 
 
-async def get_mock_user(superuser=True, role="user"):
+async def get_mock_user(superuser=True):
     return User(
-        role=role,
+        role="user",
         email="mock@gmail.com",
         is_superuser=superuser,
     )
@@ -51,7 +52,7 @@ async def get_mock_user(superuser=True, role="user"):
 
 @pytest_asyncio.fixture
 async def overridden_app():
-    app.dependency_overrides[auth.fastapi_users.current_user] = get_mock_user
+    app.dependency_overrides[superuser_dep] = get_mock_user
     yield app
     app.dependency_overrides = {}
 
@@ -80,22 +81,13 @@ async def async_session(event_loop) -> AsyncSession:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def existing_user(async_client, async_session):
+async def user_created_by_admin(async_client, async_session):
+    # We intentionally don't add them with the session, because this
+    # routes sets a temporary password and sends an email with instructions
+    # as well.
     test_user = {"email": "existing@user.com"}
     response = await async_client.post("/user", json=test_user)
     return test_user
-
-
-def generate_auth_header(username: str, client, session):
-    data = {"username": username, "password": "DEBUG_PASSWORD"}
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
-    response = client.post("/token", headers=headers, data=data)
-    assert response.status_code == 200
-    assert (
-        "access_token" in response.json() and response.json()["token_type"] == "bearer"
-    )
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 # @pytest.fixture(scope="module")

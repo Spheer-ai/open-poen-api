@@ -1,10 +1,9 @@
-from pydantic import EmailStr, BaseModel, Extra, validator, Field
+from pydantic import EmailStr, BaseModel, Field
 
 # from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
 
 from fastapi_users import schemas
 from .models.entities import Role
-from ..utils.utils import temp_password_generator
 
 
 class UserRead(schemas.BaseUser[int]):
@@ -17,6 +16,9 @@ class UserRead(schemas.BaseUser[int]):
 
 class UserReadList(BaseModel):
     users: list[UserRead]
+
+    class Config:
+        orm_mode = True
 
 
 class UserCreate(schemas.CreateUpdateDictModel):
