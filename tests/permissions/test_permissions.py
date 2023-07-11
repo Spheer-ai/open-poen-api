@@ -1,4 +1,4 @@
-from open_poen_api.app import oso
+from open_poen_api.authorization import oso
 from open_poen_api.schemas_and_models.models.entities import User
 import pytest_asyncio
 import pytest

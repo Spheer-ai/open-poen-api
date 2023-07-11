@@ -15,8 +15,14 @@ from fastapi_users.authentication import (
 import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
+from oso import Oso
 
 load_env_vars()
+
+
+oso = Oso()
+oso.register_class(User)
+oso.load_file("open_poen_api/main.polar")
 
 
 SECRET_KEY = os.environ.get("SECRET_KEY")

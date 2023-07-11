@@ -2,7 +2,6 @@ from pydantic import EmailStr, BaseModel, Extra, validator, Field
 
 # from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
 
-# from .models.entities import UserBase, Role
 from fastapi_users import schemas
 from .models.entities import Role
 from ..utils.utils import temp_password_generator

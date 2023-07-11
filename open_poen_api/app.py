@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Depends
-from oso import Oso
 
 # from .routes import router
 import uvicorn
@@ -12,11 +11,6 @@ from .database import create_db_and_tables
 from .user_routes.user import user_router
 
 load_env_vars()
-
-oso = Oso()
-oso.register_class(User)
-oso.load_file("open_poen_api/main.polar")
-
 
 app = FastAPI()
 
