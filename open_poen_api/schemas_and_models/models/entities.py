@@ -18,8 +18,8 @@ class Role(str, Enum):
     """These are the roles we save in the db, but there are more roles that
     are not based on a a field, but on relationship(s)."""
 
-    ADMIN = "admin"
     FINANCIAL = "financial"
+    ADMINISTRATOR = "administrator"
     USER = "user"
 
 
