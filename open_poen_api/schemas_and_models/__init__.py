@@ -5,4 +5,4 @@
 # from .user import *
 # from .debit_card import *
 # from .bng import *
-from .user import UserRead, UserCreate, UserUpdate, UserCreateWithPassword
+from .user import UserRead, UserCreate, UserUpdate, UserCreateWithPassword, UserReadList

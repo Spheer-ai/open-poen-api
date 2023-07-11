@@ -1,5 +1,5 @@
 from pydantic import EmailStr
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, String, VARCHAR
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, String, VARCHAR, Boolean
 from datetime import datetime
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
@@ -30,6 +30,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     biography: Mapped[str | None] = mapped_column(String(length=512))
     role: Mapped[Role] = mapped_column(ChoiceType(Role, impl=VARCHAR(length=32)))
     image: Mapped[str | None] = mapped_column(String(length=128))
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"

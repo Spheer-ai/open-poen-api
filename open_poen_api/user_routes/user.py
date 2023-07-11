@@ -1,22 +1,17 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Request,
-)
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from fastapi_users.exceptions import UserAlreadyExists
 from ..database import get_async_session
 from .. import schemas_and_models as s
+from ..schemas_and_models.models import entities as e
 from .. import authorization as auth
 from ..utils.utils import (
     temp_password_generator,
 )
 import os
-from requests.exceptions import RequestException
-import os
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import select
+from sqlalchemy import select
 
 
 DOMAIN_NAME = os.environ.get("DOMAIN_NAME")
@@ -30,7 +25,7 @@ async def create_user(
     user: s.UserCreate,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(auth.fastapi_users.current_user(optional=True)),
+    superuser=Depends(auth.fastapi_users.current_user(superuser=True)),
     user_manager: auth.UserManager = Depends(auth.get_user_manager),
 ):
     user_with_password = s.UserCreateWithPassword(
@@ -44,99 +39,56 @@ async def create_user(
     return s.UserRead.from_orm(new_user)
 
 
-# @router.patch(
-#     "/user/{user_id}",
-#     response_model=le.UserOutputAdminWithLinkedEntities,
-#     response_model_exclude_unset=True,
-# )
-# @router.patch("/user/{user_id}")
-# async def update_user(
-#     user_id: int,
-#     user: s.UserUpdateAdmin,
-#     session: AsyncSession = Depends(get_async_session),
-#     auth_levels: list[auth.AuthLevel] = Depends(
-#         auth.get_user_auth_levels(requires_login=True)
-#     ),
-# ):
-#     user_db = session.get(ent.User, user_id)
-#     if not user_db:
-#         raise HTTPException(status_code=404, detail="User not found")
-
-#     auth.validate_input_schema(
-#         unified_input_schema=user,
-#         parse_schemas=[
-#             (auth.AuthLevel.ADMIN, s.UserUpdateAdmin),
-#             (auth.AuthLevel.USER_OWNER, s.UserUpdateUserOwner),
-#         ],
-#         auth_levels=auth_levels,
-#     )
-
-#     fields = get_fields_dict(user.dict(exclude_unset=True))
-#     for key, value in fields.items():
-#         setattr(user_db, key, value)
-#     if user.initiative_ids is not None:
-#         user_db.initiatives = get_entities_by_ids(
-#             session, ent.Initiative, user.initiative_ids
-#         )
-#     if user.activity_ids is not None:
-#         user_db.activities = get_entities_by_ids(
-#             session, ent.Activity, user.activity_ids
-#         )
-#     try:
-#         session.add(user_db)
-#         session.commit()
-#         session.refresh(user_db)
-#         return auth.validate_output_schema(
-#             user_db,
-#             parse_schemas=[
-#                 (auth.AuthLevel.ADMIN, le.UserOutputAdminWithLinkedEntities),
-#                 (auth.AuthLevel.USER_OWNER, le.UserOutputUserOwnerWithLinkedEntities),
-#             ],
-#             auth_levels=auth_levels,
-#         )
-#     except IntegrityError:
-#         session.rollback()
-#         raise HTTPException(status_code=400, detail="Email address already registered")
+@user_router.patch(
+    "/user/{user_id}",
+    response_model=s.UserRead,
+    response_model_exclude_unset=True,
+)
+@user_router.patch("/user/{user_id}")
+async def update_user(
+    user_id: int,
+    user: s.UserUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    current_user=Depends(auth.fastapi_users.current_user(optional=True)),
+    user_manager: auth.UserManager = Depends(auth.get_user_manager),
+):
+    user_db = await session.get(e.User, user_id)
+    if not user_db:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        edited_user = await user_manager.update(user, user_db, request=request)
+    except UserAlreadyExists:
+        raise HTTPException(status_code=400, detail="Email address already registered")
 
 
-# @router.delete("/user/{user_id}")
-# async def delete_user(
-#     user_id: int,
-#     requires_admin=Depends(auth.requires_admin),
-#     session: AsyncSession = Depends(get_async_session),
-# ):
-#     # TODO: Make soft delete.
-#     user = session.get(ent.User, user_id)
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
+@user_router.delete("/user/{user_id}")
+async def delete_user(
+    user_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    superuser=Depends(auth.fastapi_users.current_user(superuser=True)),
+    user_manager: auth.UserManager = Depends(auth.get_user_manager),
+):
+    user = await session.get(e.User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await user_manager.delete(user, request=request)
+    await session.commit(user)
+    return Response(status_code=204)
 
-#     session.delete(user)
-#     session.commit()
-#     return Response(status_code=204)
 
-
-# @router.get(
-#     "/users", response_model=s.UserOutputAdminList, response_model_exclude_unset=True
-# )
-# def get_users(
-#     session: AsyncSession = Depends(get_async_session),
-#     auth_levels: list[auth.AuthLevel] = Depends(
-#         auth.get_user_auth_levels(requires_login=True)
-#     ),
-# ):
-#     # TODO: Enable searching by email.
-#     # TODO: pagination.
-#     users = session.exec(select(ent.User)).all()
-#     parsed_users = auth.validate_output_schema(
-#         users,
-#         parse_schemas=[
-#             (auth.AuthLevel.ADMIN, s.UserOutputAdminList),
-#             (auth.AuthLevel.USER, s.UserOutputUserList),
-#         ],
-#         auth_levels=auth_levels,
-#         seq_key="users",
-#     )
-#     return parsed_users
+@user_router.get(
+    "/users", response_model=s.UserReadList, response_model_exclude_unset=True
+)
+async def get_users(
+    session: AsyncSession = Depends(get_async_session),
+    current_user=Depends(auth.fastapi_users.current_user(optional=True)),
+):
+    # TODO: Enable searching by email.
+    # TODO: pagination.
+    users = await session.exec(select(e.User)).all()
+    return s.UserReadList.from_orm(users)
 
 
 # # # BNG

@@ -15,6 +15,10 @@ class UserRead(schemas.BaseUser[int]):
     image: str | None
 
 
+class UserReadList(BaseModel):
+    users: list[UserRead]
+
+
 class UserCreate(schemas.CreateUpdateDictModel):
     # Intentionally not subclassing schemas.BaseUserCreate, because password
     # is a required field there. We add users by invite only, where they get

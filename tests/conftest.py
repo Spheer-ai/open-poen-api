@@ -4,6 +4,7 @@ from open_poen_api.database import (
 )
 from open_poen_api.app import app
 from open_poen_api.schemas_and_models.models.entities import Base, User
+from open_poen_api import authorization as auth
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,9 +41,26 @@ async def retrieve_token_from_last_sent_email():
             raise ValueError("Request to Mailhog failed.")
 
 
+async def get_mock_user(superuser=True, role="user"):
+    return User(
+        role=role,
+        email="mock@gmail.com",
+        is_superuser=superuser,
+    )
+
+
 @pytest_asyncio.fixture
-async def async_client(event_loop):
-    async with AsyncClient(app=app, base_url="http://localhost:8000") as client:
+async def overridden_app():
+    app.dependency_overrides[auth.fastapi_users.current_user] = get_mock_user
+    yield app
+    app.dependency_overrides = {}
+
+
+@pytest_asyncio.fixture
+async def async_client(event_loop, overridden_app):
+    async with AsyncClient(
+        app=overridden_app, base_url="http://localhost:8000"
+    ) as client:
         yield client
 
 
@@ -66,6 +84,18 @@ async def existing_user(async_client, async_session):
     test_user = {"email": "existing@user.com"}
     response = await async_client.post("/user", json=test_user)
     return test_user
+
+
+def generate_auth_header(username: str, client, session):
+    data = {"username": username, "password": "DEBUG_PASSWORD"}
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+    response = client.post("/token", headers=headers, data=data)
+    assert response.status_code == 200
+    assert (
+        "access_token" in response.json() and response.json()["token_type"] == "bearer"
+    )
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 # @pytest.fixture(scope="module")
