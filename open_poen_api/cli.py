@@ -14,7 +14,7 @@ from typing import Literal
 app = typer.Typer()
 
 
-async def add_user(
+async def async_add_user(
     email: EmailStr,
     superuser: bool,
     role: Literal["user", "financial", "admin"],
@@ -43,7 +43,7 @@ def add_user(
     superuser: bool = False,
     role: str = "user",
 ):
-    asyncio.run(add_user(email, superuser, role))
+    asyncio.run(async_add_user(email, superuser, role))
 
 
 @app.command()
