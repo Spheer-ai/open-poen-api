@@ -109,31 +109,6 @@ async def get_users(
     return s.UserReadList(users=users.scalars().all())
 
 
-import re
-
-
-def validate_iban(iban: str = Query(...)):
-    # Roughly validate an IBAN: begins with two uppercase letters followed by 2 digits and up to 30 alphanumeric characters
-    if not re.match(r"^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$", iban):
-        raise HTTPException(status_code=400, detail="Invalid IBAN format")
-    return iban
-
-
-def validate_expires_on(expires_on: date = Query(...)):
-    amsterdam_tz = pytz.timezone("Europe/Amsterdam")
-    today = datetime.now(amsterdam_tz).date()
-    if expires_on < today:
-        raise HTTPException(
-            status_code=400, detail="expires_on should not be before today"
-        )
-    elif expires_on > (today + timedelta(days=90)):
-        raise HTTPException(
-            status_code=400,
-            detail="expires_on should not be later than 90 days from now",
-        )
-    return expires_on
-
-
 # BNG
 @user_router.get(
     "/users/{user_id}/bng-initiate",
@@ -141,8 +116,8 @@ def validate_expires_on(expires_on: date = Query(...)):
 )
 async def bng_initiate(
     user_id: int,
-    iban: str = Depends(validate_iban),
-    expires_on: date = Depends(validate_expires_on),
+    iban: str = Depends(s.validate_iban),
+    expires_on: date = Depends(s.validate_expires_on),
     session: AsyncSession = Depends(get_async_session),
     current_user=Depends(auth.fastapi_users.current_user(optional=True)),
     requester_ip: str = Depends(get_requester_ip),
