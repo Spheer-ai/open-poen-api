@@ -1,20 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    BackgroundTasks,
+    Query,
+)
+from fastapi.responses import RedirectResponse
 from fastapi_users.exceptions import UserAlreadyExists
 from ..database import get_async_session
 from .. import schemas_and_models as s
-from ..schemas_and_models.models import entities as e
+from ..schemas_and_models.models import entities as ent
 from .. import authorization as auth
-from ..utils.utils import (
-    temp_password_generator,
-)
+from ..utils.utils import temp_password_generator, get_requester_ip
 import os
+from ..bng.api import create_consent
+from ..bng import get_bng_payments, retrieve_access_token, create_consent
+from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from requests import RequestException
+from datetime import datetime, timedelta, date
+from time import time
+import pytz
 
 
 DOMAIN_NAME = os.environ.get("DOMAIN_NAME")
+SPA_BNG_CALLBACK_REDIRECT_URL = os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL")
 
 
 user_router = APIRouter()
@@ -39,7 +53,7 @@ async def create_user(
         new_user = await user_manager.create(user_with_password, request=request)
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
-    session.refresh(new_user)
+    await session.refresh(new_user)
     return s.UserRead.from_orm(new_user)
 
 
@@ -57,7 +71,7 @@ async def update_user(
     current_user=Depends(auth.fastapi_users.current_user(optional=True)),
     user_manager: auth.UserManager = Depends(auth.get_user_manager),
 ):
-    user_db = await session.get(e.User, user_id)
+    user_db = await session.get(ent.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
     try:
@@ -75,7 +89,7 @@ async def delete_user(
     superuser=Depends(superuser_dep),
     user_manager: auth.UserManager = Depends(auth.get_user_manager),
 ):
-    user = await session.get(e.User, user_id)
+    user = await session.get(ent.User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await user_manager.delete(user, request=request)
@@ -91,100 +105,123 @@ async def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
-    users = await session.execute(select(e.User))
+    users = await session.execute(select(ent.User))
     return s.UserReadList(users=users.scalars().all())
 
 
-# # # BNG
-# @router.get(
-#     "/users/{user_id}/bng-initiate",
-#     response_class=RedirectResponse,
-# )
-# async def bng_initiate(
-#     user_id: int,
-#     bng: s.BNGCreateAdmin,
-#     requires_user_owner=Depends(auth.requires_user_owner),
-#     requires_admin=Depends(auth.requires_admin),
-#     session: AsyncSession = Depends(get_async_session),
-#     requester_ip: str = Depends(get_requester_ip),
-# ):
-#     user = session.get(ent.User, user_id)
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
-
-#     existing_bng = session.exec(select(ent.BNG)).first()
-#     if existing_bng:
-#         raise HTTPException(
-#             status_code=400,
-#             detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
-#         )
-#     try:
-#         consent_id, oauth_url = create_consent(
-#             iban=bng.iban,
-#             valid_until=bng.expires_on,
-#             redirect_url=f"https://{DOMAIN_NAME}/users/{user_id}/bng-callback",
-#             requester_ip=requester_ip,
-#         )
-#     except RequestException as e:
-#         raise HTTPException(
-#             status_code=500, detail="Error in request for consent to BNG."
-#         )
-#     token = jwt.encode(
-#         {
-#             "user_id": user_id,
-#             "iban": bng.iban,
-#             "bank_name": "BNG",
-#             "exp": time() + 1800,
-#             "consent_id": consent_id,
-#         },
-#         auth.SECRET_KEY,
-#         auth.ALGORITHM,
-#     ).decode("utf-8")
-#     url_to_return = oauth_url.format(token)
-#     # TODO: Don't return a redirect, but some json with the link.
-#     return RedirectResponse(url=url_to_return)
+import re
 
 
-# @router.post("/users/{user_id}/bng-callback", response_model=s.BNGOutputAdmin)
-# async def bng_callback(
-#     user_id: int,
-#     background_tasks: BackgroundTasks,
-#     code: str = Query(),
-#     state: str = Query(),
-#     session: AsyncSession = Depends(get_async_session),
-# ):
-#     try:
-#         payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
-#     except ExpiredSignatureError:
-#         raise HTTPException(status_code=401, detail="JWT token expired")
-#     except JWTError:
-#         raise HTTPException(status_code=401, detail="Could not validate JWT token")
+def validate_iban(iban: str = Query(...)):
+    # Roughly validate an IBAN: begins with two uppercase letters followed by 2 digits and up to 30 alphanumeric characters
+    if not re.match(r"^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$", iban):
+        raise HTTPException(status_code=400, detail="Invalid IBAN format")
+    return iban
 
-#     try:
-#         response = retrieve_access_token(code, redirect_url="")
-#     except RequestException as e:
-#         raise HTTPException(
-#             status_code=500, detail="Error in retrieval of access token from BNG"
-#         )
 
-#     access_token, expires_in = response["access_token"], response["expires_in"]
-#     expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
-#         seconds=int(expires_in)
-#     )
-#     new_bng_account = ent.BNG(
-#         iban=payload["iban"],
-#         expires_on=expires_on,
-#         user_id=payload["user_id"],
-#         consent_id=payload["consent_id"],
-#         access_token=access_token,
-#         last_import_on=None,
-#     )
-#     session.add(new_bng_account)
-#     session.commit()
-#     session.refresh(new_bng_account)
-#     background_tasks.add_task(get_bng_payments, session)
-#     # Here we should redirect the user back to a route in the SPA.
-#     return new_bng_account
+def validate_expires_on(expires_on: date = Query(...)):
+    amsterdam_tz = pytz.timezone("Europe/Amsterdam")
+    today = datetime.now(amsterdam_tz).date()
+    if expires_on < today:
+        raise HTTPException(
+            status_code=400, detail="expires_on should not be before today"
+        )
+    elif expires_on > (today + timedelta(days=90)):
+        raise HTTPException(
+            status_code=400,
+            detail="expires_on should not be later than 90 days from now",
+        )
+    return expires_on
+
+
+# BNG
+@user_router.get(
+    "/users/{user_id}/bng-initiate",
+    response_model=s.BNGInitiate,
+)
+async def bng_initiate(
+    user_id: int,
+    iban: str = Depends(validate_iban),
+    expires_on: date = Depends(validate_expires_on),
+    session: AsyncSession = Depends(get_async_session),
+    current_user=Depends(auth.fastapi_users.current_user(optional=True)),
+    requester_ip: str = Depends(get_requester_ip),
+):
+    user = await session.get(ent.User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    existing_bng = await session.execute(select(ent.BNG))
+    if existing_bng.first():
+        raise HTTPException(
+            status_code=400,
+            detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
+        )
+    try:
+        consent_id, oauth_url = create_consent(
+            iban=iban,
+            valid_until=expires_on,
+            redirect_url=f"https://{DOMAIN_NAME}/users/{user_id}/bng-callback",
+            requester_ip=requester_ip,
+        )
+    except RequestException as e:
+        raise HTTPException(
+            status_code=500, detail="Error in request for consent to BNG."
+        )
+    token = jwt.encode(
+        {
+            "user_id": user_id,
+            "iban": iban,
+            "bank_name": "BNG",
+            "exp": time() + 1800,
+            "consent_id": consent_id,
+        },
+        auth.SECRET_KEY,
+        auth.ALGORITHM,
+    )
+    url_to_return = oauth_url.format(token)
+    return s.BNGInitiate(url=url_to_return)
+
+
+@user_router.post("/users/{user_id}/bng-callback")
+async def bng_callback(
+    user_id: int,
+    background_tasks: BackgroundTasks,
+    code: str = Query(),
+    state: str = Query(),
+    session: AsyncSession = Depends(get_async_session),
+):
+    try:
+        payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="JWT token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate JWT token")
+
+    try:
+        response = retrieve_access_token(code, redirect_url="")
+    except RequestException as e:
+        raise HTTPException(
+            status_code=500, detail="Error in retrieval of access token from BNG"
+        )
+
+    access_token, expires_in = response["access_token"], response["expires_in"]
+    expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
+        seconds=int(expires_in)
+    )
+    new_bng_account = ent.BNG(
+        iban=payload["iban"],
+        expires_on=expires_on,
+        user_id=payload["user_id"],
+        consent_id=payload["consent_id"],
+        access_token=access_token,
+        last_import_on=None,
+    )
+    session.add(new_bng_account)
+    session.commit()
+    session.refresh(new_bng_account)
+    background_tasks.add_task(get_bng_payments, session)
+    return RedirectResponse(url=SPA_BNG_CALLBACK_REDIRECT_URL)
 
 
 # @router.delete("/users/{user_id}/bng-connection")

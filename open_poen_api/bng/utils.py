@@ -11,8 +11,9 @@ import pytz
 from fastapi import Request
 from .api import read_account_information, read_transaction_list
 from ..schemas_and_models.models import entities as ent
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal
+from sqlalchemy import select
 
 
 CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
@@ -29,7 +30,7 @@ def _flatten(d, parent_key="", sep="_"):
     return dict(items)
 
 
-def _parse_and_save_payments(session: Session, payments):
+def _parse_and_save_payments(session: AsyncSession, payments):
     for payment in payments:
         # Flatten the nested dictionary. Otherwise we won't be able to save it in the database.
         payment = _flatten(payment)
@@ -77,7 +78,7 @@ def _parse_and_save_payments(session: Session, payments):
 
 
 def get_bng_payments(
-    session: Session, date_from: datetime = datetime.today() - timedelta(days=31)
+    session: AsyncSession, date_from: datetime = datetime.today() - timedelta(days=31)
 ):
     bng_account = session.exec(select(ent.BNG)).first()
     if not bng_account:
