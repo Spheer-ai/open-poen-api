@@ -6,7 +6,7 @@ from sqlalchemy_utils import ChoiceType
 
 # from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from fastapi_users.db import SQLAlchemyBaseUserTable
 
 
@@ -32,8 +32,34 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     image: Mapped[str | None] = mapped_column(String(length=128))
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    bng = relationship("BNG", uselist=False, back_populates="user")
+
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
+
+
+class BNG(Base):
+    __tablename__ = "bng"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    iban: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    expires_on: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consent_id: Mapped[str] = mapped_column(String(length=64))
+    access_token: Mapped[str] = mapped_column(String(length=2048))
+    last_import_on: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
+    user = relationship("User", back_populates="bng")
+
+
+#     id: int | None = Field(default=None, primary_key=True)
+#     user_id: int = Field(
+#         sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
+#     )
+#     user: User = Relationship(back_populates="bng")
+#     consent_id: str
+#     access_token: str
+#     last_import_on: datetime | None
 
 
 # class UserBase(SQLModel, HiddenMixin):
@@ -194,22 +220,6 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 #     )
 #     initiative: Initiative = Relationship(back_populates="debit_cards")
 #     payments: list[Payment] = Relationship(back_populates="debit_card")
-
-
-# class BNGBase(SQLModel):
-#     iban: str = Field(unique=True, nullable=False)
-#     expires_on: datetime = Field(sa_column=Column(DateTime(timezone=True)))
-
-
-# class BNG(BNGBase, TimeStampMixin, table=True):
-#     id: int | None = Field(default=None, primary_key=True)
-#     user_id: int = Field(
-#         sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
-#     )
-#     user: User = Relationship(back_populates="bng")
-#     consent_id: str
-#     access_token: str
-#     last_import_on: datetime | None
 
 
 # class Requisition(SQLModel, TimeStampMixin, table=True):
