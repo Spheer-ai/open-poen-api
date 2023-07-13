@@ -27,10 +27,6 @@ from time import time
 import pytz
 
 
-DOMAIN_NAME = os.environ.get("DOMAIN_NAME")
-SPA_BNG_CALLBACK_REDIRECT_URL = os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL")
-
-
 user_router = APIRouter()
 
 # We define dependencies this way because we can otherwise not override them
@@ -136,7 +132,7 @@ async def bng_initiate(
         consent_id, oauth_url = create_consent(
             iban=iban,
             valid_until=expires_on,
-            redirect_url=f"https://{DOMAIN_NAME}/users/{user_id}/bng-callback",
+            redirect_url=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/bng-callback",
             requester_ip=requester_ip,
         )
     except RequestException as e:
@@ -196,7 +192,7 @@ async def bng_callback(
     session.commit()
     session.refresh(new_bng_account)
     background_tasks.add_task(get_bng_payments, session)
-    return RedirectResponse(url=SPA_BNG_CALLBACK_REDIRECT_URL)
+    return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
 
 
 # @router.delete("/users/{user_id}/bng-connection")
