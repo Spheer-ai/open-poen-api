@@ -1,0 +1,13 @@
+Beste mevrouw of meneer,
+
+
+Bij dezen nodigen wij u graag uit om deel te nemen aan het platform '{{ env_var('WEBSITE_NAME') }}'. Dit is het platform waar burgers laagdrempelig subisidies kunnen ontvangen en hun uitgaven publiekelijk kunnen delen en verantwoorden.
+
+** Hoe kan ik inloggen? **
+Er is al een account voor u aangemaakt met het e-mailadres {{ user.email }}. Om in te loggen hoeft u alleen nog een wachtwoord aan te maken voor uw account. Hier kunt u een verzoek voor indienen op de volgende pagina:
+
+{{ env_var('SPA_REQUEST_NEW_PASSWORD_URL') }}
+
+
+Met vriendelijke groet,
+{{ env_var('SERVER_NAME') }}

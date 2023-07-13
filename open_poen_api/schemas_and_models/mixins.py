@@ -1,6 +1,5 @@
-from sqlmodel import Field, Column
 from datetime import datetime
-from pydantic import BaseModel, ConstrainedDecimal
+from pydantic import BaseModel, ConstrainedDecimal, Field
 from sqlalchemy import Column, DateTime
 
 

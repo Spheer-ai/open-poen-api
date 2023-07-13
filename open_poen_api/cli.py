@@ -1,24 +1,49 @@
 import typer
-from .database import engine
-from sqlmodel import Session
-from .schemas_and_models.models.entities import User
+from .database import engine, get_async_session_context, get_user_db_context
+from .schemas_and_models import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
+from .utils.utils import temp_password_generator
+from .authorization import get_user_manager_context
+from fastapi_users.exceptions import UserAlreadyExists
+from .schemas_and_models.models.entities import Role
 import asyncio
 from rich import print
+from pydantic import EmailStr
+from typing import Literal
 
 app = typer.Typer()
 
 
-@app.command()
-def add_user():
+async def add_user(
+    email: EmailStr,
+    superuser: bool,
+    role: Literal["user", "financial", "admin"],
+):
     # TODO: Share functionality for creating a user with the route.
     # TODO: We'll need this to add the first Admin.
-    random_user = User()
-    with Session(engine) as session:
-        session.add(random_user)
-        session.commit()
-        session.refresh(random_user)
-        typer.echo(f"Added user with id {random_user.id}")
+    try:
+        async with get_async_session_context() as session:
+            async with get_user_db_context(session) as user_db:
+                async with get_user_manager_context(user_db) as user_manager:
+                    user_schema = UserCreateWithPassword(
+                        email=email,
+                        is_superuser=superuser,
+                        role=role,
+                        password=temp_password_generator(16),
+                    )
+                    user = await user_manager.create(user_schema)
+                    typer.echo(f"Added user with id {user.id}")
+    except UserAlreadyExists:
+        print(f"User {email} already exists")
+
+
+@app.command()
+def add_user(
+    email: str,
+    superuser: bool = False,
+    role: str = "user",
+):
+    asyncio.run(add_user(email, superuser, role))
 
 
 @app.command()

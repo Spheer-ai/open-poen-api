@@ -15,5 +15,10 @@ services:
     image: adminer
     ports:
       - 8080:8080
+  mail:
+    image: mailhog/mailhog
+    ports:
+      - 1025:1025  # SMTP server
+      - 8025:8025  # Web UI
 volumes:
   postgres_data:
