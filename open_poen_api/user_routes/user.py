@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from requests import RequestException
 from datetime import datetime, timedelta, date
-import time
+from time import time
 import pytz
 
 
@@ -137,7 +137,7 @@ def validate_expires_on(expires_on: date = Query(...)):
 # BNG
 @user_router.get(
     "/users/{user_id}/bng-initiate",
-    response_class=s.BNGInitiate,
+    response_model=s.BNGInitiate,
 )
 async def bng_initiate(
     user_id: int,
@@ -178,7 +178,7 @@ async def bng_initiate(
         },
         auth.SECRET_KEY,
         auth.ALGORITHM,
-    ).decode("utf-8")
+    )
     url_to_return = oauth_url.format(token)
     return s.BNGInitiate(url=url_to_return)
 

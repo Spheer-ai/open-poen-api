@@ -8,4 +8,5 @@ async def test_create_bng(async_client, async_session, user_created_by_admin):
     }
     user_id = 1
     response = await async_client.get(f"/users/{user_id}/bng-initiate", params=params)
-    print("stop")
+    assert response.status_code == 200
+    assert "url" in response.json()

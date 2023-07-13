@@ -87,6 +87,7 @@ def make_headers(
     url: str,
     request_id: str,
     body: str,
+    psu_ip_address: str,
     content_type: str = "application/json",
     extra_headers: dict[str, str] = {},
 ):
@@ -98,6 +99,7 @@ def make_headers(
         "Date": get_current_rfc_1123_date(),
         "Digest": get_digest(body),
         "X-Request-ID": request_id,
+        "PSU-IP-Address": psu_ip_address,
     }
     return {
         **headers,
@@ -131,9 +133,9 @@ def create_consent(
         url,
         request_id,
         json_body,
-        extra_headers={"PSU-IP-Address": requester_ip},
+        psu_ip_address=requester_ip,
     )
-    r = requests.post(url, data=body, headers=headers, cert=TLS_CERTS)
+    r = requests.post(url, data=json_body, headers=headers, cert=TLS_CERTS)
     r.raise_for_status()
     parsed_json = r.json()
     oauth_url = "".join(
