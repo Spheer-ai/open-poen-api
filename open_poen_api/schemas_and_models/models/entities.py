@@ -53,7 +53,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     initiatives = relationship(
         "Initiative",
         secondary=user_initiative,
-        back_populates="users",
+        back_populates="initiative_owners",
     )
 
     def __repr__(self):
@@ -108,7 +108,7 @@ class Initiative(Base):
         Boolean, default=False, nullable=False
     )
 
-    users = relationship(
+    initiative_owners = relationship(
         "User",
         secondary=user_initiative,
         back_populates="initiatives",

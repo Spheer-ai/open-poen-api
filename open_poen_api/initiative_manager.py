@@ -1,9 +1,10 @@
 from .database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, Request
-from .schemas_and_models.models.entities import Initiative
+from fastapi import Depends, Request, HTTPException
+from .schemas_and_models.models.entities import Initiative, User
 from .schemas_and_models import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
+from .utils.utils import get_entities_by_ids
 
 
 class InitiativeAlreadyExists(BaseException):
@@ -13,6 +14,12 @@ class InitiativeAlreadyExists(BaseException):
 class InitiativeManager:
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def fetch_and_verify(self, id: int) -> Initiative:
+        initiative = await self.session.get(Initiative, id)
+        if not initiative:
+            raise HTTPException(status_code=404, detail="Initiative not found")
+        return initiative
 
     async def create(
         self, initiative_create: InitiativeCreate, request: Request | None = None
@@ -47,6 +54,18 @@ class InitiativeManager:
     ) -> None:
         await self.session.delete(initiative)
         await self.session.commit()
+
+    async def make_users_owner(
+        self,
+        initiative: Initiative,
+        user_ids: list[int],
+        request: Request | None = None,
+    ):
+        users = await get_entities_by_ids(self.session, User, user_ids)
+        initiative.initiative_owners = users
+        self.session.add(initiative)
+        await self.session.commit()
+        return initiative
 
 
 async def get_initiative_manager(session: AsyncSession = Depends(get_async_session)):

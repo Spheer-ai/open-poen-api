@@ -62,3 +62,7 @@ class InitiativeUpdate(NotNullValidatorMixin):
     kvk_registration: str | None
     location: str | None
     hidden_sponsors: bool | None
+
+
+class InitiativeOwnersUpdate(BaseModel):
+    user_ids: list[int]

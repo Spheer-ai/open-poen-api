@@ -8,3 +8,4 @@ from .initiative import *
 from .bng import *
 from .user import *
 from .mixins import *
+from .linked_entities import *

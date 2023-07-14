@@ -8,7 +8,7 @@ from fastapi import (
     Query,
 )
 from fastapi.responses import RedirectResponse
-from fastapi_users.exceptions import UserAlreadyExists
+from fastapi_users.exceptions import UserAlreadyExists, UserNotExists
 from .database import get_async_session
 from . import schemas_and_models as s
 from .schemas_and_models.models import entities as ent
@@ -53,6 +53,23 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Email address already registered")
     await session.refresh(new_user)
     return s.UserRead.from_orm(new_user)
+
+
+@router.get(
+    "/user/{user_id}",
+    response_model=s.UserReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_initiative(
+    user_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    user_manager: um.UserManager = Depends(im.get_initiative_manager),
+):
+    user_db = await session.get(ent.User, user_id)
+    if not user_db:
+        raise HTTPException(status_code=404, detail="User not found")
+    return s.UserReadLinked.from_orm(user_db)
 
 
 @router.patch(
@@ -269,6 +286,21 @@ async def create_initiative(
     return s.InitiativeRead.from_orm(new_initiative)
 
 
+@router.get(
+    "/initiative/{initiative_id}",
+    response_model=s.InitiativeReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_initiative(
+    initiative_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+):
+    initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
+    return s.InitiativeReadLinked.from_orm(initiative_db)
+
+
 @router.patch(
     "/initiative/{initiative_id}",
     response_model=s.InitiativeRead,
@@ -282,16 +314,35 @@ async def update_initiative(
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
-    initiative_db = await session.get(ent.Initiative, initiative_id)
-    if not initiative_db:
-        raise HTTPException(status_code=404, detail="Initiative not found")
+    initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
     try:
         edited_initiative = await initiative_manager.update(
             initiative, initiative_db, request=request
         )
     except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
+    await session.refresh(edited_initiative)
     return s.InitiativeRead.from_orm(edited_initiative)
+
+
+@router.patch(
+    "/initiative/{initiative_id}/owners",
+    response_model=s.UserReadList,
+)
+async def link_initiative_owners(
+    initiative_id: int,
+    initiative: s.InitiativeOwnersUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(required_login_dep),
+    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+):
+    initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
+    initiative_db = await initiative_manager.make_users_owner(
+        initiative_db, initiative.user_ids, request=request
+    )
+    await session.refresh(initiative_db)
+    return s.UserReadList(users=initiative_db.initiative_owners)
 
 
 @router.delete("/initiative/{initiative_id}")
@@ -302,9 +353,7 @@ async def delete_initiative(
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
-    initiative = await session.get(ent.Initiative, initiative_id)
-    if not initiative:
-        raise HTTPException(status_code=404, detail="Initiative not found")
+    initiative = await initiative_manager.fetch_and_verify(initiative_id)
     await initiative_manager.delete(initiative, request=request)
     return Response(status_code=204)
 
