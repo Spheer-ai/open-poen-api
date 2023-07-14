@@ -3,7 +3,7 @@ from open_poen_api.schemas_and_models.models.entities import User
 from tests.conftest import retrieve_token_from_last_sent_email
 import asyncio
 from open_poen_api.app import app
-import open_poen_api.authorization as auth
+import open_poen_api.user_manager as auth
 
 
 @pytest.mark.asyncio

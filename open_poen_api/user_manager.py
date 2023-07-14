@@ -43,7 +43,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             subtype=MessageType.plain,
         )
         fm = FastMail(conf)
-        await fm.send_message(message)
+        await fm.send_message(message)  # Make async.
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -60,7 +60,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             subtype=MessageType.plain,
         )
         fm = FastMail(conf)
-        await fm.send_message(message)
+        await fm.send_message(message)  # Make async.
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):

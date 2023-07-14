@@ -12,7 +12,8 @@ from fastapi_users.exceptions import UserAlreadyExists
 from .database import get_async_session
 from . import schemas_and_models as s
 from .schemas_and_models.models import entities as ent
-from . import authorization as auth
+from . import user_manager as um
+from . import initiative_manager as im
 from .utils.utils import temp_password_generator, get_requester_ip
 import os
 from .bng.api import create_consent
@@ -30,9 +31,9 @@ router = APIRouter()
 
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
-superuser_dep = auth.fastapi_users.current_user(superuser=True)
-user_dep = auth.fastapi_users.current_user(optional=False)
-opt_user_dep = auth.fastapi_users.current_user(optional=True)
+superuser_dep = um.fastapi_users.current_user(superuser=True)
+user_dep = um.fastapi_users.current_user(optional=False)
+opt_user_dep = um.fastapi_users.current_user(optional=True)
 
 
 @router.post("/user", response_model=s.UserRead)
@@ -41,7 +42,7 @@ async def create_user(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
     superuser=Depends(superuser_dep),
-    user_manager: auth.UserManager = Depends(auth.get_user_manager),
+    user_manager: um.UserManager = Depends(um.get_user_manager),
 ):
     user_with_password = s.UserCreateWithPassword(
         **user.dict(), password=temp_password_generator(16)
@@ -65,7 +66,7 @@ async def update_user(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user=Depends(user_dep),
-    user_manager: auth.UserManager = Depends(auth.get_user_manager),
+    user_manager: um.UserManager = Depends(um.get_user_manager),
 ):
     user_db = await session.get(ent.User, user_id)
     if not user_db:
@@ -83,7 +84,7 @@ async def delete_user(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
     superuser=Depends(superuser_dep),
-    user_manager: auth.UserManager = Depends(auth.get_user_manager),
+    user_manager: um.UserManager = Depends(um.get_user_manager),
 ):
     user = await session.get(ent.User, user_id)
     if not user:
@@ -145,8 +146,8 @@ async def bng_initiate(
             "exp": time() + 1800,
             "consent_id": consent_id,
         },
-        auth.SECRET_KEY,
-        auth.ALGORITHM,
+        um.SECRET_KEY,
+        um.ALGORITHM,
     )
     url_to_return = oauth_url.format(token)
     return s.BNGInitiate(url=url_to_return)
@@ -161,7 +162,7 @@ async def bng_callback(
     session: AsyncSession = Depends(get_async_session),
 ):
     try:
-        payload = jwt.decode(state, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        payload = jwt.decode(state, um.SECRET_KEY, algorithms=[um.ALGORITHM])
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="JWT token expired")
     except JWTError:
@@ -258,11 +259,11 @@ async def create_initiative(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user=Depends(user_dep),
-    initiative_manager: InitiativeManager = Depends(get_initiative_manager),
+    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     try:
         new_initiative = await initiative_manager.create(initiative, request=request)
-    except InitiativeAlreadyExists:
+    except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
     await session.refresh(new_initiative)
     return s.InitiativeRead.from_orm(new_initiative)
@@ -273,13 +274,13 @@ async def create_initiative(
     response_model=s.InitiativeRead,
     response_model_exclude_unset=True,
 )
-async def patch_initiative(
+async def update_initiative(
     initiative_id: int,
     initiative: s.InitiativeUpdate,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user=Depends(user_dep),
-    initiative_manager: InitiativeManager = Depends(get_initiative_manager),
+    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative_db = await session.get(ent.Initiative, initiative_id)
     if not initiative_db:
@@ -288,7 +289,7 @@ async def patch_initiative(
         edited_initiative = await initiative_manager.update(
             initiative, initiative_db, request=request
         )
-    except InitiativeAlreadyExists:
+    except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
     return s.InitiativeRead.from_orm(edited_initiative)
 
@@ -299,7 +300,7 @@ async def delete_initiative(
     request: Request,
     session: AsyncSession = Depends(get_async_session),
     current_user=Depends(user_dep),
-    initiative_manager: InitiativeManager = Depends(get_initiative_manager),
+    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative = await session.get(ent.Initiative, initiative_id)
     if not initiative:

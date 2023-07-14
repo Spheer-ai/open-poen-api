@@ -1,6 +1,7 @@
 from fastapi import Query, HTTPException
 import re
 from pydantic import validator
+from pydantic import BaseModel
 
 
 def validate_iban(iban: str = Query(...)):
@@ -42,7 +43,7 @@ def validate_iban(iban: str = Query(...)):
 #         return value
 
 
-class NotNullValidatorMetaclass(type):
+class NotNullValidatorMixin(BaseModel):
     def __init__(cls, name, bases, attrs):
         super().__init__(name, bases, attrs)
         for field_name in cls.NOT_NULL_FIELDS:
@@ -60,10 +61,6 @@ class NotNullValidatorMetaclass(type):
             validator_func.__name__,
             classmethod(validator(field_name)(validator_func)),
         )
-
-
-class NotNullValidatorMixin(metaclass=NotNullValidatorMetaclass):
-    NOT_NULL_FIELDS = []
 
 
 # class Money(ConstrainedDecimal):

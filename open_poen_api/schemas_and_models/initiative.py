@@ -39,7 +39,7 @@ class InitiativeCreate(BaseModel):
     hidden_sponsors: bool
 
 
-class InitiativeUpdate(BaseModel, NotNullValidatorMixin):
+class InitiativeUpdate(NotNullValidatorMixin):
     NOT_NULL_FIELDS = [
         "name",
         "description",
