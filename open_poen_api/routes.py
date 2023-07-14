@@ -32,8 +32,8 @@ router = APIRouter()
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
 superuser_dep = um.fastapi_users.current_user(superuser=True)
-user_dep = um.fastapi_users.current_user(optional=False)
-opt_user_dep = um.fastapi_users.current_user(optional=True)
+required_login_dep = um.fastapi_users.current_user(optional=False)
+optional_login_dep = um.fastapi_users.current_user(optional=True)
 
 
 @router.post("/user", response_model=s.UserRead)
@@ -65,7 +65,7 @@ async def update_user(
     user: s.UserUpdate,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(user_dep),
+    required_user=Depends(required_login_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
 ):
     user_db = await session.get(ent.User, user_id)
@@ -96,7 +96,7 @@ async def delete_user(
 @router.get("/users", response_model=s.UserReadList, response_model_exclude_unset=True)
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(opt_user_dep),
+    optional_user=Depends(optional_login_dep),
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
@@ -114,7 +114,7 @@ async def bng_initiate(
     iban: str = Depends(s.validate_iban),
     expires_on: date = Depends(s.validate_expires_on),
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(user_dep),
+    required_user=Depends(required_login_dep),
     requester_ip: str = Depends(get_requester_ip),
 ):
     user = await session.get(ent.User, user_id)
@@ -258,7 +258,7 @@ async def create_initiative(
     initiative: s.InitiativeCreate,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(user_dep),
+    required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     try:
@@ -279,7 +279,7 @@ async def update_initiative(
     initiative: s.InitiativeUpdate,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(user_dep),
+    required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative_db = await session.get(ent.Initiative, initiative_id)
@@ -299,7 +299,7 @@ async def delete_initiative(
     initiative_id: int,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(user_dep),
+    required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative = await session.get(ent.Initiative, initiative_id)
@@ -310,13 +310,13 @@ async def delete_initiative(
 
 
 @router.get(
-    "/initiative",
+    "/initiatives",
     response_model=s.InitiativeReadList,
     response_model_exclude_unset=True,
 )
 async def get_initiatives(
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(opt_user_dep),
+    optional_user=Depends(optional_login_dep),
 ):
     initiatives = await session.execute(select(ent.Initiative))
     return s.InitiativeReadList(initiatives=initiatives.scalars().all())
