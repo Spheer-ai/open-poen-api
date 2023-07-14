@@ -1,119 +1,64 @@
-from pydantic import EmailStr, BaseModel, Extra, validator
-from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
-from .models.entities import InitiativeBase
+from pydantic import BaseModel
+from .models.entities import LegalEntity
+from .mixins import NotNullValidatorMixin
 
 
-class InitiativeCreateAdmin(InitiativeBase):
-    initiative_owner_ids: list[int] | None
-    # TODO: Remove this.
-    activity_ids: list[int] | None
-
-    class Config:
-        title = "InitiativeCreate"
-        extra = Extra.forbid
-
-
-class InitiativeUpdateInitiativeOwner(BaseModel, NotNullValidatorMixin):
-    name: str | None
-    description: str | None
-
-    @validator("description", "name")
-    def val_description_and_name(cls, value, field):
-        return cls.not_null(value, field)
-
-    class Config:
-        extra = Extra.forbid
-        orm_mode = True
-
-
-class InitiativeUpdateAdmin(InitiativeUpdateInitiativeOwner, HiddenMixin):
-    purpose: str | None
-    target_audience: str | None
+class InitiativeRead(BaseModel):
+    name: str
+    description: str
+    target_audience: str
     owner: str | None
-    owner_email: EmailStr | None
+    owner_email: str | None
+    legal_entity: LegalEntity
     address_applicant: str | None
     kvk_registration: str | None
     location: str | None
     hidden_sponsors: bool | None
-    initiative_owner_ids: list[int] | None
-    # TODO: Remove this.
-    activity_ids: list[int] | None
 
-    @validator(
-        "purpose",
+    class Config:
+        orm_mode = True
+
+
+class InitiativeReadList(BaseModel):
+    initiatives: list[InitiativeRead]
+
+    class Config:
+        orm_mode = True
+
+
+class InitiativeCreate(BaseModel):
+    name: str
+    description: str
+    target_audience: str
+    owner: str
+    owner_email: str
+    legal_entity: LegalEntity
+    address_applicant: str
+    kvk_registration: str
+    location: str
+    hidden_sponsors: bool
+
+
+class InitiativeUpdate(BaseModel, NotNullValidatorMixin):
+    NOT_NULL_FIELDS = [
+        "name",
+        "description",
         "target_audience",
         "owner",
         "owner_email",
+        "legal_entity",
         "address_applicant",
-        "kvk_registration",
         "location",
         "hidden_sponsors",
-        "hidden",
-    )
-    def val_fields(cls, value, field):
-        return cls.not_null(value, field)
+    ]
 
-    class Config:
-        title = "InitiativeUpdate"
-        extra = Extra.forbid
-        orm_mode = True
-
-
-class InitiativeOutputGuest(BaseModel):
-    id: int
-    name: str
-    description: str
-    purpose: str
-    target_audience: str
-    kvk_registration: str
-    location: str
-
-
-class InitiativeOutputUser(InitiativeOutputGuest):
-    pass
-
-
-class InitiativeOutputUserOwner(InitiativeOutputUser):
-    pass
-
-
-class InitiativeOutputActivityOwner(InitiativeOutputUserOwner):
+    name: str | None
+    description: str | None
+    target_audience: str | None
     owner: str | None
     owner_email: str | None
+    legal_entity: LegalEntity | None
     address_applicant: str | None
+    kvk_registration: str | None
+    location: str | None
     hidden_sponsors: bool | None
-
-
-class InitiativeOutputInitiativeOwner(InitiativeOutputActivityOwner):
-    pass
-
-
-class InitiativeOutputAdmin(
-    InitiativeOutputInitiativeOwner, TimeStampMixin, HiddenMixin
-):
-    pass
-
-    class Config:
-        title = "InitiativeOutput"
-
-
-class InitiativeOutputGuestList(BaseModel):
-    initiatives: list[InitiativeOutputGuest]
-
-    class Config:
-        orm_mode = True
-
-
-class InitiativeOutputActivityOwnerList(BaseModel):
-    initiatives: list[InitiativeOutputActivityOwner]
-
-    class Config:
-        orm_mode = True
-
-
-class InitiativeOutputAdminList(BaseModel):
-    initiatives: list[InitiativeOutputAdmin]
-
-    class Config:
-        title = "InitiativeOutputList"
-        orm_mode = True

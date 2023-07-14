@@ -1,6 +1,6 @@
-from pydantic import EmailStr, BaseModel, Field
+from pydantic import EmailStr, BaseModel, Field, validator
 
-# from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
+from .mixins import NotNullValidatorMixin
 
 from fastapi_users import schemas
 from .models.entities import Role
@@ -12,6 +12,9 @@ class UserRead(schemas.BaseUser[int]):
     biography: str | None
     role: Role
     image: str | None
+
+    class Config:
+        orm_mode = True
 
 
 class UserReadList(BaseModel):
@@ -40,11 +43,21 @@ class UserCreateWithPassword(UserCreate):
     password: str
 
 
-class UserUpdate(schemas.BaseUserUpdate):
+# TODO: Supply field and is not None, or don't supply
+class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
+    NOT_NULL_FIELDS = [
+        "role",
+        "password",
+        "email",
+        "is_active",
+        "is_superuser",
+        "is_verified",
+    ]
+
     first_name: str | None
     last_name: str | None
     biography: str | None
-    role: Role = Field(default=Role.USER)
+    role: Role | None
     image: str | None
 
 

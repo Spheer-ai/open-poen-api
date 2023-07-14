@@ -31,6 +31,8 @@ router = APIRouter()
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
 superuser_dep = auth.fastapi_users.current_user(superuser=True)
+user_dep = auth.fastapi_users.current_user(optional=False)
+opt_user_dep = auth.fastapi_users.current_user(optional=True)
 
 
 @router.post("/user", response_model=s.UserRead)
@@ -57,13 +59,12 @@ async def create_user(
     response_model=s.UserRead,
     response_model_exclude_unset=True,
 )
-@router.patch("/user/{user_id}")
 async def update_user(
     user_id: int,
     user: s.UserUpdate,
     request: Request,
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(auth.fastapi_users.current_user(optional=True)),
+    current_user=Depends(user_dep),
     user_manager: auth.UserManager = Depends(auth.get_user_manager),
 ):
     user_db = await session.get(ent.User, user_id)
@@ -94,7 +95,7 @@ async def delete_user(
 @router.get("/users", response_model=s.UserReadList, response_model_exclude_unset=True)
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(auth.fastapi_users.current_user(optional=True)),
+    current_user=Depends(opt_user_dep),
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
@@ -112,7 +113,7 @@ async def bng_initiate(
     iban: str = Depends(s.validate_iban),
     expires_on: date = Depends(s.validate_expires_on),
     session: AsyncSession = Depends(get_async_session),
-    current_user=Depends(auth.fastapi_users.current_user(optional=True)),
+    current_user=Depends(user_dep),
     requester_ip: str = Depends(get_requester_ip),
 ):
     user = await session.get(ent.User, user_id)
@@ -249,6 +250,75 @@ async def bng_callback(
 #     session.commit()
 #     # TODO: Don´t return a redirect, but some json with the link.
 #     return RedirectResponse(url=init.link)
+
+
+@router.post("/initiative", response_model=s.InitiativeRead)
+async def create_initiative(
+    initiative: s.InitiativeCreate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    current_user=Depends(user_dep),
+    initiative_manager: InitiativeManager = Depends(get_initiative_manager),
+):
+    try:
+        new_initiative = await initiative_manager.create(initiative, request=request)
+    except InitiativeAlreadyExists:
+        raise HTTPException(status_code=400, detail="Name already registered")
+    await session.refresh(new_initiative)
+    return s.InitiativeRead.from_orm(new_initiative)
+
+
+@router.patch(
+    "/initiative/{initiative_id}",
+    response_model=s.InitiativeRead,
+    response_model_exclude_unset=True,
+)
+async def patch_initiative(
+    initiative_id: int,
+    initiative: s.InitiativeUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    current_user=Depends(user_dep),
+    initiative_manager: InitiativeManager = Depends(get_initiative_manager),
+):
+    initiative_db = await session.get(ent.Initiative, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    try:
+        edited_initiative = await initiative_manager.update(
+            initiative, initiative_db, request=request
+        )
+    except InitiativeAlreadyExists:
+        raise HTTPException(status_code=400, detail="Name already registered")
+    return s.InitiativeRead.from_orm(edited_initiative)
+
+
+@router.delete("/initiative/{initiative_id}")
+async def delete_initiative(
+    initiative_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    current_user=Depends(user_dep),
+    initiative_manager: InitiativeManager = Depends(get_initiative_manager),
+):
+    initiative = await session.get(ent.Initiative, initiative_id)
+    if not initiative:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    await initiative_manager.delete(initiative, request=request)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/initiative",
+    response_model=s.InitiativeReadList,
+    response_model_exclude_unset=True,
+)
+async def get_initiatives(
+    session: AsyncSession = Depends(get_async_session),
+    current_user=Depends(opt_user_dep),
+):
+    initiatives = await session.execute(select(ent.Initiative))
+    return s.InitiativeReadList(initiatives=initiatives.scalars().all())
 
 
 # ROUTES
