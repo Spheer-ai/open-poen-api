@@ -21,18 +21,16 @@ erDiagram
     FUNDER ||--o{ REGULATION : issues
     REGULATION ||--o{ GRANT : part_of
 
-    GRANT_ROLES }o--o{ USER : has
-    GRANT }o--o{ GRANT_ROLES : gives_access_to
+    REGULATION_ROLES }o--o{ USER : has
+    REGULATION }o--o{ REGULATION_ROLES : gives_access_to
     %% What type of relationship should this be?
     GRANT }|--o{ INITIATIVE : part_of
-    INITIATIVE ||--o{ ATTACHMENT : attached_to
-    ACTIVITY ||--o{ ATTACHMENT : attached_to
     ACCOUNTABILITY_REPORT |o--|| GRANT : reports_on
     PAYMENT_IMPORT |o--|{ PAYMENT : part_of
     USER ||--o{ PAYMENT_IMPORT : done_by
 
     
-    GRANT_ROLES {
+    REGULATION_ROLES {
         int user_id
         int grant_id
         %% subsidy_officer, policy_officer or overseer

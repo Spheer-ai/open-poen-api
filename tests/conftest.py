@@ -4,7 +4,7 @@ from open_poen_api.database import (
 )
 from open_poen_api.app import app
 from open_poen_api.schemas_and_models.models.entities import Base, User
-from open_poen_api.routes import superuser_dep
+from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api import user_manager as um
 import pytest
 from httpx import AsyncClient
@@ -53,6 +53,8 @@ async def get_mock_user(superuser=True):
 @pytest_asyncio.fixture
 async def overridden_app():
     app.dependency_overrides[superuser_dep] = get_mock_user
+    app.dependency_overrides[required_login_dep] = get_mock_user
+    app.dependency_overrides[optional_login_dep] = get_mock_user
     yield app
     app.dependency_overrides = {}
 

@@ -44,23 +44,13 @@ def validate_iban(iban: str = Query(...)):
 
 
 class NotNullValidatorMixin(BaseModel):
-    def __init__(cls, name, bases, attrs):
-        super().__init__(name, bases, attrs)
-        for field_name in cls.NOT_NULL_FIELDS:
-            cls.add_not_null_validator(field_name)
+    NOT_NULL_FIELDS = []
 
-    def add_not_null_validator(cls, field_name):
-        def validator_func(cls, value):
-            if value is None:
-                raise ValueError(f"{field_name} cannot be null")
-            return value
-
-        validator_func.__name__ = f"validate_{field_name}_not_null"
-        setattr(
-            cls,
-            validator_func.__name__,
-            classmethod(validator(field_name)(validator_func)),
-        )
+    def __init__(self, **data):
+        super().__init__(**data)
+        for field in self.NOT_NULL_FIELDS:
+            if field in data.keys() and data[field] is None:
+                raise ValueError(f"field '{field}' cannot be None")
 
 
 # class Money(ConstrainedDecimal):
