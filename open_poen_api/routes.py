@@ -8,7 +8,7 @@ from fastapi import (
     Query,
 )
 from fastapi.responses import RedirectResponse
-from fastapi_users.exceptions import UserAlreadyExists, UserNotExists
+from fastapi_users.exceptions import UserAlreadyExists
 from .database import get_async_session
 from . import schemas_and_models as s
 from .schemas_and_models.models import entities as ent

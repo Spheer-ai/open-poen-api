@@ -1,5 +1,5 @@
-from initiative import InitiativeRead
-from user import UserRead
+from .initiative import InitiativeRead
+from .user import UserRead
 
 
 class UserReadLinked(UserRead):
