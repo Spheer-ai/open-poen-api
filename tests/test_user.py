@@ -64,9 +64,9 @@ async def test_delete_user(async_client, async_session, user_created_by_admin):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "async_client, status_code",
+    "get_mock_user, status_code",
     [(superuser_info, 200), (userowner_info, 200), (user_info, 403)],
-    indirect=["async_client"],
+    indirect=["get_mock_user"],
 )
 async def test_patch_user(
     async_client, async_session, user_created_by_admin, status_code
