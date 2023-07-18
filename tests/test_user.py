@@ -6,6 +6,21 @@ from open_poen_api.app import app
 import open_poen_api.user_manager as auth
 
 
+superuser_info = {
+    "obj_id": 1,
+    "role": "user",
+    "email": "test@example.com",
+    "is_active": True,
+    "is_superuser": True,
+    "is_verified": True,
+    "return_none": False,
+}
+userowner_info = superuser_info.copy()
+userowner_info.update({"is_superuser": False})
+user_info = userowner_info.copy()
+user_info.update({"obj_id": 42})
+
+
 @pytest.mark.asyncio
 async def test_create_user(async_client, async_session):
     body = {"email": "test@example.com"}
@@ -48,13 +63,21 @@ async def test_delete_user(async_client, async_session, user_created_by_admin):
 
 
 @pytest.mark.asyncio
-async def test_patch_user(async_client_admin, async_session, user_created_by_admin):
+@pytest.mark.parametrize(
+    "async_client, status_code",
+    [(superuser_info, 200), (userowner_info, 200), (user_info, 403)],
+    indirect=["async_client"],
+)
+async def test_patch_user(
+    async_client, async_session, user_created_by_admin, status_code
+):
     user_id = 1
     body = {"email": "different@user.com"}
-    response = await async_client_admin.patch(f"/user/{user_id}", json=body)
-    assert response.status_code == 200
-    user = await async_session.get(User, user_id)
-    assert user.email == "different@user.com"
+    response = await async_client.patch(f"/user/{user_id}", json=body)
+    assert response.status_code == status_code
+    if status_code == 200:
+        user = await async_session.get(User, user_id)
+        assert user.email == "different@user.com"
 
 
 @pytest.mark.asyncio
