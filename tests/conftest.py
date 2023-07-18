@@ -30,6 +30,8 @@ userowner_info = superuser_info.copy()
 userowner_info.update({"is_superuser": False})
 user_info = userowner_info.copy()
 user_info.update({"obj_id": 42})
+anon_info = user_info.copy()
+anon_info.update({"return_none": True})
 
 initiative_info = {
     "name": "Piets Buurtbarbeque",

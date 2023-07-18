@@ -26,6 +26,7 @@ from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
 import pytz
+from typing import Set, Any
 
 router = APIRouter()
 
@@ -36,6 +37,16 @@ required_login_dep = um.fastapi_users.current_user(optional=False)
 optional_login_dep = um.fastapi_users.current_user(optional=True)
 
 
+def extract_fields_from_model(
+    instance: ent.Base, input_fields: Set[str]
+) -> dict[str, Any]:
+    return {
+        field: getattr(instance, field)
+        for field in input_fields
+        if hasattr(instance, field)
+    }
+
+
 @router.post("/user", response_model=s.UserRead)
 async def create_user(
     user: s.UserCreate,
@@ -44,6 +55,10 @@ async def create_user(
     superuser=Depends(superuser_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
 ):
+    try:
+        um.oso.authorize(superuser, "create", ent.User)
+    except:
+        raise HTTPException(status_code=403, detail="Not authorized")
     user_with_password = s.UserCreateWithPassword(
         **user.dict(), password=temp_password_generator(16)
     )
@@ -52,7 +67,9 @@ async def create_user(
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
     await session.refresh(new_user)
-    return s.UserRead.from_orm(new_user)
+    return extract_fields_from_model(
+        new_user, um.oso.authorized_fields(superuser, "read", new_user)
+    )
 
 
 @router.get(
@@ -69,7 +86,14 @@ async def get_initiative(
     user_db = await session.get(ent.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    return s.UserReadLinked.from_orm(user_db)
+    try:
+        u = um.Anon if optional_user is None else optional_user
+        um.oso.authorize(u, "read", user_db)
+    except:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return extract_fields_from_model(
+        user_db, um.oso.authorized_fields(u, "read", user_db)
+    )
 
 
 @router.patch(

@@ -5,6 +5,7 @@ from tests.conftest import (
     superuser_info,
     userowner_info,
     user_info,
+    anon_info,
 )
 import asyncio
 
@@ -82,7 +83,19 @@ async def test_patch_user(async_client, as_1, status_code):
     [(superuser_info, 200)],
     indirect=["get_mock_user"],
 )
-async def test_get_users(async_client, as_1, status_code):
+async def test_get_users_list(async_client, as_1, status_code):
     response = await async_client.get("/users")
     assert response.status_code == status_code
     assert len(response.json()["users"]) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_user_detail(async_client, as_1, status_code):
+    user_id = 1
+    response = await async_client.get(f"/user/{user_id}")
+    assert response.status_code == status_code

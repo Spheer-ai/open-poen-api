@@ -20,8 +20,13 @@ from oso import Oso
 load_env_vars()
 
 
+class Anon:
+    pass
+
+
 oso = Oso()
 oso.register_class(User)
+oso.register_class(Anon)
 oso.load_file("open_poen_api/main.polar")
 
 
