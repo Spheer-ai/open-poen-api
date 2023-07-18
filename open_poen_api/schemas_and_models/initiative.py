@@ -1,9 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from .models.entities import LegalEntity
 from .mixins import NotNullValidatorMixin
 
 
 class InitiativeRead(BaseModel):
+    id: int
     name: str
     description: str
     target_audience: str
@@ -29,6 +30,7 @@ class InitiativeReadList(BaseModel):
 class InitiativeCreate(BaseModel):
     name: str
     description: str
+    purpose: str
     target_audience: str
     owner: str
     owner_email: str
@@ -36,24 +38,27 @@ class InitiativeCreate(BaseModel):
     address_applicant: str
     kvk_registration: str
     location: str
-    hidden_sponsors: bool
+    hidden_sponsors: bool = Field(default=False)
+    hidden: bool = Field(default=False)
 
 
 class InitiativeUpdate(NotNullValidatorMixin):
     NOT_NULL_FIELDS = [
         "name",
         "description",
-        "target_audience",
+        "purpose" "target_audience",
         "owner",
         "owner_email",
         "legal_entity",
         "address_applicant",
         "location",
         "hidden_sponsors",
+        "hidden",
     ]
 
     name: str | None
     description: str | None
+    purpose: str | None
     target_audience: str | None
     owner: str | None
     owner_email: str | None
@@ -62,6 +67,7 @@ class InitiativeUpdate(NotNullValidatorMixin):
     kvk_registration: str | None
     location: str | None
     hidden_sponsors: bool | None
+    hidden: bool | None
 
 
 class InitiativeOwnersUpdate(BaseModel):

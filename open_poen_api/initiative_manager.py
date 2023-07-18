@@ -24,7 +24,7 @@ class InitiativeManager:
     async def create(
         self, initiative_create: InitiativeCreate, request: Request | None = None
     ) -> Initiative:
-        initiative = Initiative(initiative_create.dict())
+        initiative = Initiative(**initiative_create.dict())
         self.session.add(initiative)
         try:
             await self.session.commit()

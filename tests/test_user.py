@@ -7,8 +7,6 @@ from tests.conftest import (
     user_info,
 )
 import asyncio
-from open_poen_api.app import app
-import open_poen_api.user_manager as auth
 
 
 @pytest.mark.asyncio

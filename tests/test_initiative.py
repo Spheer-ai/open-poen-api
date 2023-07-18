@@ -1,3 +1,28 @@
+import pytest
+from tests.conftest import (
+    retrieve_token_from_last_sent_email,
+    superuser_info,
+    userowner_info,
+    user_info,
+    initiative_info,
+)
+from open_poen_api.schemas_and_models.models.entities import Initiative
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+)
+async def test_create_initiative(async_client, async_session, status_code):
+    body = initiative_info
+    response = await async_client.post("/initiative", json=body)
+    assert response.status_code == status_code
+    db_initiative = async_session.get(Initiative, response.json()["id"])
+    assert db_initiative is not None
+    initiative_data = response.json()
+    assert initiative_data["name"] == body["name"]
+
+
 # # from .fixtures import client, created_user
 # import pytest
 # from sqlmodel import select

@@ -31,6 +31,19 @@ userowner_info.update({"is_superuser": False})
 user_info = userowner_info.copy()
 user_info.update({"obj_id": 42})
 
+initiative_info = {
+    "name": "Piets Buurtbarbeque",
+    "description": "Piet wordt vijftig.",
+    "purpose": "Saamhorigheid in de buurt bevorderen.",
+    "target_audience": "Mensen uit buurt De Florijn.",
+    "owner": "Mark de Wijk",
+    "owner_email": "markdewijk@spheer.ai",
+    "legal_entity": "stichting",
+    "address_applicant": "Het stoepje 42, Assen, 9408DT, Nederland",
+    "kvk_registration": "12345678",
+    "location": "Amsterdam",
+}
+
 
 async def retrieve_token_from_last_sent_email():
     """Gets the last send email from Mailhog, assumes it's an email reply to a password
@@ -375,18 +388,6 @@ async def as_1(async_session):
 
 
 # @pytest.fixture
-# def initiative_data():
-#     return {
-#         "name": "Piets Buurtbarbeque",
-#         "description": "Piet wordt vijftig.",
-#         "purpose": "Saamhorigheid in de buurt bevorderen.",
-#         "target_audience": "Mensen uit buurt De Florijn.",
-#         "owner": "Mark de Wijk",
-#         "owner_email": "markdewijk@spheer.ai",
-#         "address_applicant": "Het stoepje 42, Assen, 9408DT, Nederland",
-#         "kvk_registration": "12345678",
-#         "location": "Amsterdam",
-#     }
 
 
 # @pytest.fixture
@@ -396,19 +397,4 @@ async def as_1(async_session):
 #         "description": "Eten voor de barbeque",
 #         "purpose": "Ervoor zorgen dat er voldoende te eten en te drinken is",
 #         "target_audience": "Alle bezoekers",
-#     }
-
-
-# @pytest.fixture
-# def payment_data():
-#     return {
-#         "booking_date": datetime.now().isoformat(),
-#         "transaction_amount": 123.12,
-#         "creditor_name": "Creditor Test",
-#         "creditor_account": "CR123456789",
-#         "debtor_name": "Debtor Test",
-#         "debtor_account": "DB123456789",
-#         "short_user_description": "Test short description",
-#         "long_user_description": "Test long description",
-#         "route": "income",
 #     }
