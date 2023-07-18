@@ -48,10 +48,10 @@ async def test_delete_user(async_client, async_session, user_created_by_admin):
 
 
 @pytest.mark.asyncio
-async def test_patch_user(async_client, async_session, user_created_by_admin):
+async def test_patch_user(async_client_admin, async_session, user_created_by_admin):
     user_id = 1
     body = {"email": "different@user.com"}
-    response = await async_client.patch(f"/user/{user_id}", json=body)
+    response = await async_client_admin.patch(f"/user/{user_id}", json=body)
     assert response.status_code == 200
     user = await async_session.get(User, user_id)
     assert user.email == "different@user.com"

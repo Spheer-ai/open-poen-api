@@ -3,7 +3,7 @@ from open_poen_api.database import (
     engine,
 )
 from open_poen_api.app import app
-from open_poen_api.schemas_and_models.models.entities import Base, User
+from open_poen_api.schemas_and_models.models.entities import Base, User, Initiative
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api import user_manager as um
 import pytest
@@ -42,7 +42,7 @@ async def retrieve_token_from_last_sent_email():
             raise ValueError("Request to Mailhog failed.")
 
 
-async def get_mock_user(superuser=True):
+async def get_mock_superuser(superuser=True):
     return User(
         role="user",
         email="mock@gmail.com",
@@ -50,21 +50,20 @@ async def get_mock_user(superuser=True):
     )
 
 
-@pytest_asyncio.fixture
-async def overridden_app():
-    app.dependency_overrides[superuser_dep] = get_mock_user
-    app.dependency_overrides[required_login_dep] = get_mock_user
-    app.dependency_overrides[optional_login_dep] = get_mock_user
-    yield app
+async def _async_client(user_factory):
+    app.dependency_overrides[superuser_dep] = user_factory
+    app.dependency_overrides[required_login_dep] = user_factory
+    app.dependency_overrides[optional_login_dep] = user_factory
+
+    async with AsyncClient(app=app, base_url="http://localhost:8000") as client:
+        yield client
+
     app.dependency_overrides = {}
 
 
 @pytest_asyncio.fixture
-async def async_client(event_loop, overridden_app):
-    async with AsyncClient(
-        app=overridden_app, base_url="http://localhost:8000"
-    ) as client:
-        yield client
+async def async_client_admin(event_loop):
+    return await _async_client(get_mock_superuser)
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -83,18 +82,49 @@ async def async_session(event_loop) -> AsyncSession:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def user_created_by_admin(async_client, async_session):
+async def user_created_by_admin(async_client_admin, async_session):
     # We intentionally don't add them with the session, because this
     # routes sets a temporary password and sends an email with instructions
     # as well.
     test_user = {"email": "existing@user.com"}
-    response = await async_client.post("/user", json=test_user)
+    response = await async_client_admin.post("/user", json=test_user)
     return test_user
 
 
-# @pytest.fixture(scope="module")
-# def pwd_context():
-#     return CryptContext(schemes=["bcrypt"], deprecated="auto")
+@pytest_asyncio.fixture(scope="function")
+async def async_session_init(async_session):
+    user1 = User(
+        email="superuser@example.com",
+        role="user",
+        hashed_password="",
+        is_superuser=True,
+        is_verified=True,
+    )
+    user2 = User(
+        email="normaluser@example.com",
+        role="user",
+        hashed_password="",
+        is_superuser=False,
+        is_verified=True,
+    )
+    async_session.add_all([user1, user2])
+    await async_session.commit()
+    initiative1 = Initiative(
+        name="Initiative 1",
+        description="Description 1",
+        target_audience="Target Audience 1",
+        owner="Owner 1",
+        owner_email="email1@example.com",
+        address_applicant="Address 1",
+        kvk_registration="Registration 1",
+        location="Location 1",
+        hidden_sponsors=False,
+        initiative_owners=[user2],
+    )
+    async_session.add_all([initiative1])
+    await async_session.commit()
+    yield async_session
+    return
 
 
 # @pytest.fixture(scope="function")

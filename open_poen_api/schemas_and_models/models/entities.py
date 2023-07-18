@@ -109,6 +109,7 @@ class Initiative(Base):
     hidden_sponsors: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
+    # TODO: Add hidden and purpose?
 
     initiative_owners = relationship(
         "User",
