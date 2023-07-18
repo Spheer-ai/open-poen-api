@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import pytest
+from tests.conftest import superuser_info
 
 
 param_combs = [
@@ -18,13 +19,13 @@ param_combs = [
 
 
 @pytest.mark.parametrize("iban,expires_on,should_return_200", param_combs)
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200)],
+    indirect=["get_mock_user"],
+)
 async def test_create_bng(
-    iban,
-    expires_on,
-    should_return_200,
-    async_client,
-    async_session,
-    user_created_by_admin,
+    iban, expires_on, should_return_200, async_client, as_1, status_code
 ):
     params = {
         "iban": iban,
@@ -32,7 +33,7 @@ async def test_create_bng(
     }
     user_id = 1
     response = await async_client.get(f"/users/{user_id}/bng-initiate", params=params)
-    if should_return_200:
+    if should_return_200 and status_code == 200:
         assert response.status_code == 200
         assert "url" in response.json()
     else:

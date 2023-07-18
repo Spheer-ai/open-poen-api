@@ -12,6 +12,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import pytest_asyncio
 import base64
 import urllib.parse
+from open_poen_api.user_manager import get_user_manager
+from open_poen_api.database import get_user_db
+from open_poen_api.schemas_and_models import UserCreateWithPassword
+
+
+superuser_info = {
+    "obj_id": 1,
+    "role": "user",
+    "email": "test@example.com",
+    "is_active": True,
+    "is_superuser": True,
+    "is_verified": True,
+    "return_none": False,
+}
+userowner_info = superuser_info.copy()
+userowner_info.update({"is_superuser": False})
+user_info = userowner_info.copy()
+user_info.update({"obj_id": 42})
 
 
 async def retrieve_token_from_last_sent_email():
@@ -80,6 +98,12 @@ async def async_client(event_loop, overridden_app):
         yield client
 
 
+@pytest_asyncio.fixture
+async def clean_async_client(event_loop):
+    async with AsyncClient(app=app, base_url="http://localhost:8000") as client:
+        yield client
+
+
 @pytest_asyncio.fixture(scope="function")
 async def async_session(event_loop) -> AsyncSession:
     async with async_session_maker() as s:
@@ -96,13 +120,16 @@ async def async_session(event_loop) -> AsyncSession:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def user_created_by_admin(async_client, async_session):
-    # We intentionally don't add them with the session, because this
-    # routes sets a temporary password and sends an email with instructions
-    # as well.
-    test_user = {"email": "existing@user.com"}
-    response = await async_client.post("/user", json=test_user)
-    return test_user
+async def as_1(async_session):
+    # Uses the user manager dependency because it does some extra things
+    # like hashing the password and sending a welcome email.
+    db = await get_user_db(async_session).__anext__()
+    um = await get_user_manager(db).__anext__()
+    s = UserCreateWithPassword(
+        email="existing@user.com", role="user", password="testing"
+    )
+    u = await um.create(s, request=None)
+    return async_session
 
 
 # @pytest_asyncio.fixture(scope="function")
