@@ -39,7 +39,7 @@ async def get_entities_by_ids(
     wants to link to an entity actually exist. Is used when a user created an initiatives
     and wants to links users to it by id for example."""
     entities = await session.execute(select(model).where(model.id.in_(entity_ids)))
-    entities = entities.all()
+    entities = entities.scalars().all()
 
     if len(entities) != len(entity_ids):
         raise HTTPException(

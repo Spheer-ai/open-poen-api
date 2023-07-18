@@ -14,7 +14,8 @@ import base64
 import urllib.parse
 from open_poen_api.user_manager import get_user_manager
 from open_poen_api.database import get_user_db
-from open_poen_api.schemas_and_models import UserCreateWithPassword
+from open_poen_api.initiative_manager import get_initiative_manager
+from open_poen_api.schemas_and_models import UserCreateWithPassword, InitiativeCreate
 
 
 superuser_info = {
@@ -145,6 +146,14 @@ async def as_1(async_session):
     )
     u = await um.create(s, request=None)
     return async_session
+
+
+@pytest_asyncio.fixture(scope="function")
+async def as_2(as_1):
+    im = await get_initiative_manager(as_1).__anext__()
+    s = InitiativeCreate(**initiative_info)
+    i = await im.create(s, request=None)
+    return as_1
 
 
 # @pytest_asyncio.fixture(scope="function")

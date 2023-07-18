@@ -23,6 +23,22 @@ async def test_create_initiative(async_client, async_session, status_code):
     assert initiative_data["name"] == body["name"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+)
+async def test_add_initiative_owner(async_client, as_2, status_code):
+    initiative_id = 1
+    body = {"user_ids": [1]}
+    response = await async_client.patch(
+        f"/initiative/{initiative_id}/owners", json=body
+    )
+    assert response.status_code == status_code
+    db_initiative = as_2.get(Initiative, response.json()["id"])
+    assert len(db_initiative.initiative_owners) == 1
+    assert db_initiative.initiative_owners[0]["email"] == "existing@user.com"
+
+
 # # from .fixtures import client, created_user
 # import pytest
 # from sqlmodel import select
