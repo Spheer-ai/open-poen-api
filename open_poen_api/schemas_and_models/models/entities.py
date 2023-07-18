@@ -50,11 +50,12 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     image: Mapped[str | None] = mapped_column(String(length=128))
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    bng = relationship("BNG", uselist=False, back_populates="user")
+    bng = relationship("BNG", uselist=False, back_populates="user", lazy="joined")
     initiatives = relationship(
         "Initiative",
         secondary=user_initiative,
         back_populates="initiative_owners",
+        lazy="joined",
     )
 
     def __repr__(self):
@@ -72,7 +73,7 @@ class BNG(Base):
     last_import_on: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
-    user = relationship("User", back_populates="bng")
+    user = relationship("User", back_populates="bng", lazy="joined")
 
     def __repr__(self):
         return f"BNG(id={self.id}, iban='{self.iban}', expires_on='{self.expires_on}'"
@@ -116,6 +117,7 @@ class Initiative(Base):
         "User",
         secondary=user_initiative,
         back_populates="initiatives",
+        lazy="joined",
     )
 
     def __repr__(self):
