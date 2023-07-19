@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, date
 from time import time
 import pytz
 from typing import Set, Any
+from oso import exceptions
 
 router = APIRouter()
 
@@ -45,6 +46,52 @@ def extract_fields_from_model(
         for field in input_fields
         if hasattr(instance, field)
     }
+
+
+def authorize(actor: ent.User | None, action: str, resource: ent.Base):
+    # Because Oso works nicely with user defined classes, not with the None type.
+    oso_actor = um.Anon if actor is None else actor
+
+    try:
+        um.oso.authorize(oso_actor, action, resource)
+    except (exceptions.ForbiddenError, exceptions.NotFoundError):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+
+def filter_fields(actor: ent.User | None, action: str, resource: ent.Base):
+    # Because Oso works nicely with user defined classes, not with the None type.
+    oso_actor = um.Anon if actor is None else actor
+
+    degree1_fields = um.oso.authorized_fields(oso_actor, action, resource)
+    degree2_fields = {}
+
+    for rel_name, rel in resource.__mapper__.relationships.items():
+        if rel_name in degree1_fields:
+            related_class = rel.mapper.class_
+            second_degree_rels = set(related_class.__mapper__.relationships.keys())
+            related_class_fields = {
+                i
+                for i in um.oso.authorized_fields(oso_actor, action, related_class)
+                if i not in second_degree_rels
+            }
+            degree2_fields[rel_name] = related_class_fields
+
+    out_dict = {}
+    for f in degree1_fields:
+        val = getattr(resource, f)
+        if f not in degree2_fields:
+            out_dict[f] = val
+        else:
+            if isinstance(val, ent.Base) and f in degree2_fields:
+                out_dict[f] = {k: getattr(val, k) for k in degree2_fields[f]}
+            elif isinstance(val, list) and f in degree2_fields:
+                out_dict[f] = [
+                    {k: getattr(i, k) for k in degree2_fields[f]} for i in val
+                ]
+            else:
+                raise ValueError("Relationship of unfamiliar type")
+
+    return out_dict
 
 
 @router.post("/user", response_model=s.UserRead)
@@ -327,13 +374,10 @@ async def get_initiative(
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
     try:
-        u = um.Anon if optional_user is None else optional_user
-        um.oso.authorize(u, "read", initiative_db)
+        authorize(optional_user, "read", initiative_db)
     except:
         raise HTTPException(status_code=403, detail="Not authorized")
-    return extract_fields_from_model(
-        initiative_db, um.oso.authorized_fields(u, "read", initiative_db)
-    )
+    return filter_fields(optional_user, "read", initiative_db)
 
 
 @router.patch(
