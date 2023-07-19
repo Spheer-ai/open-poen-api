@@ -34,9 +34,9 @@ async def test_add_initiative_owner(async_client, as_2, status_code):
         f"/initiative/{initiative_id}/owners", json=body
     )
     assert response.status_code == status_code
-    db_initiative = as_2.get(Initiative, response.json()["id"])
+    db_initiative = await as_2.get(Initiative, response.json()["users"][0]["id"])
     assert len(db_initiative.initiative_owners) == 1
-    assert db_initiative.initiative_owners[0]["email"] == "existing@user.com"
+    assert db_initiative.initiative_owners[0].email == "existing@user.com"
 
 
 # # from .fixtures import client, created_user

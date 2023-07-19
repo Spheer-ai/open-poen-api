@@ -7,6 +7,7 @@ from .models.entities import Role
 
 
 class UserRead(schemas.BaseUser[int]):
+    email: EmailStr | None
     first_name: str | None
     last_name: str | None
     biography: str | None
