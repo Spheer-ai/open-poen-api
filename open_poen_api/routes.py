@@ -28,6 +28,8 @@ from time import time
 import pytz
 from typing import Set, Any
 from oso import exceptions
+from .authorization import SECRET_KEY, ALGORITHM
+from . import authorization as auth
 
 router = APIRouter()
 
@@ -38,62 +40,6 @@ required_login_dep = um.fastapi_users.current_user(optional=False)
 optional_login_dep = um.fastapi_users.current_user(optional=True)
 
 
-def extract_fields_from_model(
-    instance: ent.Base, input_fields: Set[str]
-) -> dict[str, Any]:
-    return {
-        field: getattr(instance, field)
-        for field in input_fields
-        if hasattr(instance, field)
-    }
-
-
-def authorize(actor: ent.User | None, action: str, resource: ent.Base):
-    # Because Oso works nicely with user defined classes, not with the None type.
-    oso_actor = um.Anon if actor is None else actor
-
-    try:
-        um.oso.authorize(oso_actor, action, resource)
-    except (exceptions.ForbiddenError, exceptions.NotFoundError):
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-
-def filter_fields(actor: ent.User | None, action: str, resource: ent.Base):
-    # Because Oso works nicely with user defined classes, not with the None type.
-    oso_actor = um.Anon if actor is None else actor
-
-    degree1_fields = um.oso.authorized_fields(oso_actor, action, resource)
-    degree2_fields = {}
-
-    for rel_name, rel in resource.__mapper__.relationships.items():
-        if rel_name in degree1_fields:
-            related_class = rel.mapper.class_
-            second_degree_rels = set(related_class.__mapper__.relationships.keys())
-            related_class_fields = {
-                i
-                for i in um.oso.authorized_fields(oso_actor, action, related_class)
-                if i not in second_degree_rels
-            }
-            degree2_fields[rel_name] = related_class_fields
-
-    out_dict = {}
-    for f in degree1_fields:
-        val = getattr(resource, f)
-        if f not in degree2_fields:
-            out_dict[f] = val
-        else:
-            if isinstance(val, ent.Base) and f in degree2_fields:
-                out_dict[f] = {k: getattr(val, k) for k in degree2_fields[f]}
-            elif isinstance(val, list) and f in degree2_fields:
-                out_dict[f] = [
-                    {k: getattr(i, k) for k in degree2_fields[f]} for i in val
-                ]
-            else:
-                raise ValueError("Relationship of unfamiliar type")
-
-    return out_dict
-
-
 @router.post("/user", response_model=s.UserRead)
 async def create_user(
     user: s.UserCreate,
@@ -102,10 +48,7 @@ async def create_user(
     superuser=Depends(superuser_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
 ):
-    try:
-        um.oso.authorize(superuser, "create", ent.User)
-    except:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    auth.authorize(superuser, "create", ent.User)
     user_with_password = s.UserCreateWithPassword(
         **user.dict(), password=temp_password_generator(16)
     )
@@ -114,9 +57,7 @@ async def create_user(
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
     await session.refresh(new_user)
-    return extract_fields_from_model(
-        new_user, um.oso.authorized_fields(superuser, "read", new_user)
-    )
+    return auth.select_authorized_fields(superuser, "read", new_user)
 
 
 @router.get(
@@ -133,14 +74,8 @@ async def get_initiative(
     user_db = await session.get(ent.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    try:
-        u = um.Anon if optional_user is None else optional_user
-        um.oso.authorize(u, "read", user_db)
-    except:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    return extract_fields_from_model(
-        user_db, um.oso.authorized_fields(u, "read", user_db)
-    )
+    auth.authorize(optional_user, "read", user_db)
+    return auth.select_authorized_fields(optional_user, "read", user_db)
 
 
 @router.patch(
@@ -234,8 +169,8 @@ async def bng_initiate(
             "exp": time() + 1800,
             "consent_id": consent_id,
         },
-        um.SECRET_KEY,
-        um.ALGORITHM,
+        SECRET_KEY,
+        ALGORITHM,
     )
     url_to_return = oauth_url.format(token)
     return s.BNGInitiate(url=url_to_return)
@@ -250,7 +185,7 @@ async def bng_callback(
     session: AsyncSession = Depends(get_async_session),
 ):
     try:
-        payload = jwt.decode(state, um.SECRET_KEY, algorithms=[um.ALGORITHM])
+        payload = jwt.decode(state, SECRET_KEY, algorithms=[ALGORITHM])
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="JWT token expired")
     except JWTError:
@@ -373,11 +308,8 @@ async def get_initiative(
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
-    try:
-        authorize(optional_user, "read", initiative_db)
-    except:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    return filter_fields(optional_user, "read", initiative_db)
+    auth.authorize(optional_user, "read", initiative_db)
+    return auth.select_authorized_fields(optional_user, "read", initiative_db)
 
 
 @router.patch(

@@ -16,23 +16,9 @@ import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
 from oso import Oso
+from .authorization import SECRET_KEY
 
 load_env_vars()
-
-
-class Anon:
-    pass
-
-
-oso = Oso()
-oso.register_class(User)
-oso.register_class(Anon)
-oso.register_class(Initiative)
-oso.load_file("open_poen_api/main.polar")
-
-
-SECRET_KEY = os.environ.get("SECRET_KEY")
-ALGORITHM = "HS256"
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
@@ -73,20 +59,16 @@ async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db
     yield UserManager(user_db)
 
 
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
-
-
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=3600)
 
+
+bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
 auth_backend = AuthenticationBackend(
     name="jwt", transport=bearer_transport, get_strategy=get_jwt_strategy
 )
 
-
 fastapi_users = FastAPIUsers[User, int](get_user_manager, [auth_backend])
-
-current_active_user = fastapi_users.current_user(active=True)
 
 get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)

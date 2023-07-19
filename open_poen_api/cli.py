@@ -19,8 +19,6 @@ async def async_add_user(
     superuser: bool,
     role: Literal["user", "financial", "admin"],
 ):
-    # TODO: Share functionality for creating a user with the route.
-    # TODO: We'll need this to add the first Admin.
     try:
         async with get_async_session_context() as session:
             async with get_user_db_context(session) as user_db:
