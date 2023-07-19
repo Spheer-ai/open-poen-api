@@ -53,11 +53,11 @@ async def create_user(
         **user.dict(), password=temp_password_generator(16)
     )
     try:
-        new_user = await user_manager.create(user_with_password, request=request)
+        user_db = await user_manager.create(user_with_password, request=request)
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
-    await session.refresh(new_user)
-    return auth.select_authorized_fields(superuser, "read", new_user)
+    await session.refresh(user_db)
+    return auth.select_authorized_fields(superuser, "read", user_db)
 
 
 @router.get(
@@ -94,11 +94,14 @@ async def update_user(
     user_db = await session.get(ent.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
+    auth.authorize(required_user, "edit", user_db)
+    # TODO: Add field level authorization for updates (and creates)?
     try:
         edited_user = await user_manager.update(user, user_db, request=request)
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
-    return s.UserRead.from_orm(edited_user)
+    await session.refresh(edited_user)
+    return auth.select_authorized_fields(required_user, "read", edited_user)
 
 
 @router.delete("/user/{user_id}")
@@ -109,10 +112,11 @@ async def delete_user(
     superuser=Depends(superuser_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
 ):
-    user = await session.get(ent.User, user_id)
-    if not user:
+    user_db = await session.get(ent.User, user_id)
+    if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    await user_manager.delete(user, request=request)
+    auth.authorize(superuser, "delete", user_db)
+    await user_manager.delete(user_db, request=request)
     return Response(status_code=204)
 
 
@@ -123,8 +127,10 @@ async def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
+    # TODO: How to authorize this?
     users = await session.execute(select(ent.User))
-    return s.UserReadList(users=users.scalars().all())
+    users = users.scalars().all()
+    return s.UserReadList(users=users)  # TODO: How to filter these fields?
 
 
 # BNG
@@ -288,12 +294,13 @@ async def create_initiative(
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
+    auth.authorize(required_user, "create", ent.Initiative)
     try:
-        new_initiative = await initiative_manager.create(initiative, request=request)
+        initiative_db = await initiative_manager.create(initiative, request=request)
     except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
-    await session.refresh(new_initiative)
-    return s.InitiativeRead.from_orm(new_initiative)
+    await session.refresh(initiative_db)
+    return auth.select_authorized_fields(required_user, "read", initiative_db)
 
 
 @router.get(
@@ -326,6 +333,8 @@ async def update_initiative(
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
+    auth.authorize(required_user, "edit", initiative_db)
+    # TODO: Add field level authorization for updates (and creates)?
     try:
         edited_initiative = await initiative_manager.update(
             initiative, initiative_db, request=request
@@ -333,7 +342,7 @@ async def update_initiative(
     except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
     await session.refresh(edited_initiative)
-    return s.InitiativeRead.from_orm(edited_initiative)
+    return auth.select_authorized_fields(required_user, "read", edited_initiative)
 
 
 @router.patch(
@@ -349,11 +358,14 @@ async def link_initiative_owners(
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
+    auth.authorize(required_user, "edit", initiative_db)
     initiative_db = await initiative_manager.make_users_owner(
         initiative_db, initiative.user_ids, request=request
     )
     await session.refresh(initiative_db)
-    return s.UserReadList(users=initiative_db.initiative_owners)
+    return s.UserReadList(
+        users=initiative_db.initiative_owners
+    )  # TODO: How to filter these fields?
 
 
 @router.delete("/initiative/{initiative_id}")
@@ -364,8 +376,9 @@ async def delete_initiative(
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
-    initiative = await initiative_manager.fetch_and_verify(initiative_id)
-    await initiative_manager.delete(initiative, request=request)
+    initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
+    auth.authorize(required_user, "delete", initiative_db)
+    await initiative_manager.delete(initiative_db, request=request)
     return Response(status_code=204)
 
 
@@ -378,8 +391,11 @@ async def get_initiatives(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
 ):
+    # TODO: How to authorize this?
     initiatives = await session.execute(select(ent.Initiative))
-    return s.InitiativeReadList(initiatives=initiatives.scalars().all())
+    return s.InitiativeReadList(
+        initiatives=initiatives.scalars().all()
+    )  # TODO: How to filter these fields?
 
 
 # ROUTES

@@ -40,7 +40,9 @@ def authorize(actor: ent.User | None, action: str, resource: ent.Base):
 def select_authorized_fields(actor: ent.User | None, action: str, resource: ent.Base):
     """
     Filters the fields of a resource that an actor is authorized to access to give
-    field-level access control as defined by Oso's policies.
+    field-level access control as defined by Oso's policies. It filters the first
+    degree fields of resource itself and the second degree fields of relationships
+    of resource, but makes sure to not include relationships of relationships.
     """
     oso_actor = get_oso_actor(actor)
 
