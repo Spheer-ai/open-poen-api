@@ -152,7 +152,7 @@ def create_consent(
     return parsed_json["consentId"], oauth_url
 
 
-def retrieve_access_token(access_code: str, redirect_url: str):
+def retrieve_access_token(access_code: str, redirect_url: str, requester_ip: str):
     body = {
         "client_id": CLIENT_ID,
         "grant_type": "authorization_code",
@@ -169,6 +169,7 @@ def retrieve_access_token(access_code: str, redirect_url: str):
         request_id,
         url_body,
         content_type="application/x-www-form-urlencoded;charset=UTF-8",
+        psu_ip_address=requester_ip,
     )
     r = requests.post(ACCESS_TOKEN_URL, data=url_body, headers=headers, cert=TLS_CERTS)
     r.raise_for_status()

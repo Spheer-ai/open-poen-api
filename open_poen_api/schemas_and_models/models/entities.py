@@ -70,13 +70,15 @@ class BNG(Base):
     expires_on: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     consent_id: Mapped[str] = mapped_column(String(length=64))
     access_token: Mapped[str] = mapped_column(String(length=2048))
-    last_import_on: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_import_on: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
     user = relationship("User", back_populates="bng", lazy="selectin")
 
     def __repr__(self):
-        return f"BNG(id={self.id}, iban='{self.iban}', expires_on='{self.expires_on}'"
+        return f"BNG(id={self.id}, iban='{self.iban}', expires_on='{self.expires_on}')"
 
 
 class LegalEntity(str, Enum):

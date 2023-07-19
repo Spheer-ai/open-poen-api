@@ -155,7 +155,7 @@ async def bng_initiate(
     iban: str = Depends(s.validate_iban),
     expires_on: date = Depends(s.validate_expires_on),
     session: AsyncSession = Depends(get_async_session),
-    required_user=Depends(required_login_dep),
+    optional_user=Depends(optional_login_dep),  # TODO
     requester_ip: str = Depends(get_requester_ip),
 ):
     user = await session.get(ent.User, user_id)
@@ -194,7 +194,7 @@ async def bng_initiate(
     return s.BNGInitiate(url=url_to_return)
 
 
-@router.post("/users/{user_id}/bng-callback")
+@router.get("/users/{user_id}/bng-callback")
 async def bng_callback(
     user_id: int,
     background_tasks: BackgroundTasks,
@@ -210,7 +210,11 @@ async def bng_callback(
         raise HTTPException(status_code=401, detail="Could not validate JWT token")
 
     try:
-        response = retrieve_access_token(code, redirect_url="")
+        response = retrieve_access_token(
+            code,
+            redirect_url=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/bng-callback",
+            requester_ip="",
+        )
     except RequestException as e:
         raise HTTPException(
             status_code=500, detail="Error in retrieval of access token from BNG"
@@ -229,9 +233,9 @@ async def bng_callback(
         last_import_on=None,
     )
     session.add(new_bng_account)
-    session.commit()
-    session.refresh(new_bng_account)
-    background_tasks.add_task(get_bng_payments, session)
+    await session.commit()
+    await session.refresh(new_bng_account)
+    # background_tasks.add_task(get_bng_payments, session)  # TODO
     return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
 
 
