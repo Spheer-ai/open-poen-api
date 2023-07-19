@@ -1,6 +1,6 @@
 from fastapi import Depends, Request
 from .database import get_user_db
-from .schemas_and_models.models.entities import User
+from .schemas_and_models.models.entities import User, Initiative
 from .utils.load_env import load_env_vars
 from .utils.email import MessageSchema, conf, env
 import os
@@ -27,6 +27,7 @@ class Anon:
 oso = Oso()
 oso.register_class(User)
 oso.register_class(Anon)
+oso.register_class(Initiative)
 oso.load_file("open_poen_api/main.polar")
 
 

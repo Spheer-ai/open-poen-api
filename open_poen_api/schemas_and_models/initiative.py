@@ -15,6 +15,7 @@ class InitiativeRead(BaseModel):
     kvk_registration: str | None
     location: str | None
     hidden_sponsors: bool | None
+    hidden: bool | None
 
     class Config:
         orm_mode = True

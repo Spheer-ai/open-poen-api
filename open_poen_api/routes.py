@@ -326,7 +326,14 @@ async def get_initiative(
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
-    return s.InitiativeReadLinked.from_orm(initiative_db)
+    try:
+        u = um.Anon if optional_user is None else optional_user
+        um.oso.authorize(u, "read", initiative_db)
+    except:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return extract_fields_from_model(
+        initiative_db, um.oso.authorized_fields(u, "read", initiative_db)
+    )
 
 
 @router.patch(

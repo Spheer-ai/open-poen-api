@@ -137,8 +137,7 @@ async def async_session(event_loop) -> AsyncSession:
 
 @pytest_asyncio.fixture(scope="function")
 async def as_1(async_session):
-    # Uses the user manager dependency because it does some extra things
-    # like hashing the password and sending a welcome email.
+    # One user.
     db = await get_user_db(async_session).__anext__()
     um = await get_user_manager(db).__anext__()
     s = UserCreateWithPassword(
@@ -150,10 +149,20 @@ async def as_1(async_session):
 
 @pytest_asyncio.fixture(scope="function")
 async def as_2(as_1):
+    # One initiative and one user.
     im = await get_initiative_manager(as_1).__anext__()
     s = InitiativeCreate(**initiative_info)
     i = await im.create(s, request=None)
     return as_1
+
+
+@pytest_asyncio.fixture(scope="function")
+async def as_3(as_2):
+    # One initiative and one user linked to one another.
+    im = await get_initiative_manager(as_2).__anext__()
+    i = await as_2.get(Initiative, 1)
+    i = await im.make_users_owner(i, [1], request=None)
+    return as_2
 
 
 # @pytest_asyncio.fixture(scope="function")
