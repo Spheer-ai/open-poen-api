@@ -3,6 +3,7 @@ from oso import Oso
 from oso.exceptions import ForbiddenError, NotFoundError
 from .schemas_and_models.models import entities as ent
 from fastapi import HTTPException
+from pydantic import BaseModel
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -43,7 +44,18 @@ def authorize(actor: ent.User | None, action: str, resource: ent.Base):
         raise HTTPException(status_code=403, detail="Not authorized")
 
 
-def select_authorized_fields(actor: ent.User | None, action: str, resource: ent.Base):
+def authorize_input_fields(
+    actor: ent.User | None, action: str, resource: ent.Base, input_schema: BaseModel
+):
+    oso_actor = get_oso_actor(actor)
+    fields = OSO.authorized_fields(oso_actor, action, resource)
+    if not all([k in fields for k in input_schema.dict(exclude_unset=True).keys()]):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+
+def get_authorized_output_fields(
+    actor: ent.User | None, action: str, resource: ent.Base
+):
     """
     Filters the fields of a resource that an actor is authorized to access to give
     field-level access control as defined by Oso's policies. It filters the first

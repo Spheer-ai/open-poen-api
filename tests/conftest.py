@@ -3,7 +3,12 @@ from open_poen_api.database import (
     engine,
 )
 from open_poen_api.app import app
-from open_poen_api.schemas_and_models.models.entities import Base, User, Initiative
+from open_poen_api.schemas_and_models.models.entities import (
+    Base,
+    User,
+    Initiative,
+    Role,
+)
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api import user_manager as um
 import pytest
@@ -19,8 +24,8 @@ from open_poen_api.schemas_and_models import UserCreateWithPassword, InitiativeC
 
 
 superuser_info = {
-    "obj_id": 1,
-    "role": "user",
+    "obj_id": 42,
+    "role": Role.USER,
     "email": "test@example.com",
     "is_active": True,
     "is_superuser": True,
@@ -28,6 +33,7 @@ superuser_info = {
     "return_none": False,
 }
 userowner_info = superuser_info.copy()
+userowner_info.update({"obj_id": 1})
 userowner_info.update({"is_superuser": False})
 user_info = userowner_info.copy()
 user_info.update({"obj_id": 42})

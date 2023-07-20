@@ -59,7 +59,7 @@ async def create_user(
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
     await session.refresh(user_db)
-    return auth.select_authorized_fields(superuser, "read", user_db)
+    return auth.get_authorized_output_fields(superuser, "read", user_db)
 
 
 @router.get(
@@ -77,7 +77,7 @@ async def get_initiative(
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
     auth.authorize(optional_user, "read", user_db)
-    return auth.select_authorized_fields(optional_user, "read", user_db)
+    return auth.get_authorized_output_fields(optional_user, "read", user_db)
 
 
 @router.patch(
@@ -97,13 +97,13 @@ async def update_user(
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
     auth.authorize(required_user, "edit", user_db)
-    # TODO: Add field level authorization for updates (and creates)?
+    auth.authorize_input_fields(required_user, "edit", user_db, user)
     try:
         edited_user = await user_manager.update(user, user_db, request=request)
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
     await session.refresh(edited_user)
-    return auth.select_authorized_fields(required_user, "read", edited_user)
+    return auth.get_authorized_output_fields(required_user, "read", edited_user)
 
 
 @router.delete("/user/{user_id}")
@@ -129,13 +129,15 @@ async def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
+    auth.authorize(optional_user, "read", ent.User)  # TODO: Is this logical?
     users_result = await session.execute(
         select(ent.User).options(noload(ent.User.initiatives), noload(ent.User.bng))
     )
     users_orm = users_result.scalars().all()
     allowed_users = [i for i in users_orm if auth.is_allowed(optional_user, "read", i)]
     filtered_users = [
-        auth.select_authorized_fields(optional_user, "read", i) for i in allowed_users
+        auth.get_authorized_output_fields(optional_user, "read", i)
+        for i in allowed_users
     ]
     return s.UserReadList(users=filtered_users)
 
@@ -307,7 +309,7 @@ async def create_initiative(
     except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
     await session.refresh(initiative_db)
-    return auth.select_authorized_fields(required_user, "read", initiative_db)
+    return auth.get_authorized_output_fields(required_user, "read", initiative_db)
 
 
 @router.get(
@@ -323,7 +325,7 @@ async def get_initiative(
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
     auth.authorize(optional_user, "read", initiative_db)
-    return auth.select_authorized_fields(optional_user, "read", initiative_db)
+    return auth.get_authorized_output_fields(optional_user, "read", initiative_db)
 
 
 @router.patch(
@@ -341,7 +343,7 @@ async def update_initiative(
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
     auth.authorize(required_user, "edit", initiative_db)
-    # TODO: Add field level authorization for updates (and creates)?
+    auth.authorize_input_fields(required_user, "edit", initiative_db, initiative)
     try:
         edited_initiative = await initiative_manager.update(
             initiative, initiative_db, request=request
@@ -349,7 +351,7 @@ async def update_initiative(
     except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
     await session.refresh(edited_initiative)
-    return auth.select_authorized_fields(required_user, "read", edited_initiative)
+    return auth.get_authorized_output_fields(required_user, "read", edited_initiative)
 
 
 @router.patch(
