@@ -22,6 +22,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import noload
 from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
@@ -30,6 +31,7 @@ from typing import Set, Any
 from oso import exceptions
 from .authorization import SECRET_KEY, ALGORITHM
 from . import authorization as auth
+
 
 router = APIRouter()
 
@@ -127,10 +129,15 @@ async def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
-    # TODO: How to authorize this?
-    users = await session.execute(select(ent.User))
-    users = users.scalars().all()
-    return s.UserReadList(users=users)  # TODO: How to filter these fields?
+    users_result = await session.execute(
+        select(ent.User).options(noload(ent.User.initiatives), noload(ent.User.bng))
+    )
+    users_orm = users_result.scalars().all()
+    allowed_users = [i for i in users_orm if auth.is_allowed(optional_user, "read", i)]
+    filtered_users = [
+        auth.select_authorized_fields(optional_user, "read", i) for i in allowed_users
+    ]
+    return s.UserReadList(users=filtered_users)
 
 
 # BNG

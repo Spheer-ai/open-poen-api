@@ -80,7 +80,7 @@ async def test_patch_user(async_client, as_1, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200)],
+    [(superuser_info, 200), (anon_info, 200)],
     indirect=["get_mock_user"],
 )
 async def test_get_users_list(async_client, as_1, status_code):

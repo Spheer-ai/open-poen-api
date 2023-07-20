@@ -24,6 +24,12 @@ def get_oso_actor(actor: ent.User | None):
     return Anon if actor is None else actor
 
 
+def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):
+    oso_actor = get_oso_actor(actor)
+
+    return OSO.is_allowed(oso_actor, action, resource)
+
+
 def authorize(actor: ent.User | None, action: str, resource: ent.Base):
     """
     Authorizes a given user (actor) to perform an action on a resource
@@ -43,6 +49,10 @@ def select_authorized_fields(actor: ent.User | None, action: str, resource: ent.
     field-level access control as defined by Oso's policies. It filters the first
     degree fields of resource itself and the second degree fields of relationships
     of resource, but makes sure to not include relationships of relationships.
+
+    This function also works for resources that have its relationships not loaded.
+    In that case, scalar relationships have a value of None and list relationships
+    are an emtpy list. These fields in that case remain as they are.
     """
     oso_actor = get_oso_actor(actor)
 
@@ -66,12 +76,18 @@ def select_authorized_fields(actor: ent.User | None, action: str, resource: ent.
         if f not in degree2_fields:
             out_dict[f] = val
         else:
+            # Case of a single instance of a related model.
             if isinstance(val, ent.Base) and f in degree2_fields:
                 out_dict[f] = {k: getattr(val, k) for k in degree2_fields[f]}
+            # Case of a list of related models and of an empty list for a relationship
+            # that's not loaded.
             elif isinstance(val, list) and f in degree2_fields:
                 out_dict[f] = [
                     {k: getattr(i, k) for k in degree2_fields[f]} for i in val
                 ]
+            # Case of a non loaded scalar relationship.
+            elif val is None:
+                out_dict[f] = None
             else:
                 raise ValueError("Relationship of unfamiliar type")
 
