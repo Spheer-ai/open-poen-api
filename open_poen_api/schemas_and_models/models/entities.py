@@ -31,6 +31,13 @@ user_initiative = Table(
     Column("initiative_id", Integer, ForeignKey("initiative.id")),
 )
 
+user_activity = Table(
+    "user_activity",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("user.id")),
+    Column("activity_id", Integer, ForeignKey("activity.id")),
+)
+
 
 class Role(str, Enum):
     """These are the roles we save in the db, but there are more roles that
@@ -56,6 +63,12 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "Initiative",
         secondary=user_initiative,
         back_populates="initiative_owners",
+        lazy="selectin",
+    )
+    activities = relationship(
+        "Activity",
+        secondary=user_activity,
+        back_populates="activity_owners",
         lazy="selectin",
     )
 
@@ -122,9 +135,39 @@ class Initiative(Base):
         back_populates="initiatives",
         lazy="selectin",
     )
+    activities = relationship("Activity", back_populates="initiative", lazy="selectin")
 
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"
+
+
+class Activity(Base):
+    __tablename__ = "activity"
+    __table_args__ = (UniqueConstraint("name", "initiative_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    description: Mapped[str] = mapped_column(String(length=512), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    target_audience: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    image: Mapped[str | None] = mapped_column(String(length=128))
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    finished_description: Mapped[str] = mapped_column(String(length=512))
+
+    activity_owners = relationship(
+        "User",
+        secondary=user_activity,
+        back_populates="activities",
+        lazy="selectin",
+    )
+    initiative_id: Mapped[int] = mapped_column(Integer, ForeignKey("initiative.id"))
+    initiative = relationship(
+        "Initiative", back_populates="activities", lazy="selectin"
+    )
+
+    def __repr__(self):
+        return f"Activity(id={self.id}, name='{self.name}')"
 
 
 # class UserBase(SQLModel, HiddenMixin):
