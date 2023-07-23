@@ -1,14 +1,8 @@
 from fastapi import FastAPI, Depends
-
-# from .routes import router
-import uvicorn
 from .utils.load_env import load_env_vars
-from .authorization import fastapi_users, auth_backend, current_active_user
-from .schemas_and_models.models.entities import User
-from .schemas_and_models import UserRead, UserUpdate
+from .user_manager import fastapi_users, auth_backend
 from .database import create_db_and_tables
-
-from .user_routes.user import user_router
+from .routes import router
 
 load_env_vars()
 
@@ -21,13 +15,7 @@ app.include_router(
     fastapi_users.get_reset_password_router(), prefix="/auth", tags=["auth"]
 )
 
-# TODO: Add back in.
-app.include_router(user_router)
-
-
-# @app.get("/authenticated_route")
-# async def authenticated_route(user: User = Depends(current_active_user)):
-#     return {"message": f"Hello {user.email}"}
+app.include_router(router)
 
 
 @app.on_event("startup")

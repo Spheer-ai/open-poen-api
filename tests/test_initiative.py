@@ -1,3 +1,69 @@
+import pytest
+from tests.conftest import (
+    retrieve_token_from_last_sent_email,
+    superuser_info,
+    userowner_info,
+    user_info,
+    initiative_info,
+    anon_info,
+)
+from open_poen_api.schemas_and_models.models.entities import Initiative
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+)
+async def test_create_initiative(async_client, async_session, status_code):
+    body = initiative_info
+    response = await async_client.post("/initiative", json=body)
+    assert response.status_code == status_code
+    db_initiative = async_session.get(Initiative, response.json()["id"])
+    assert db_initiative is not None
+    initiative_data = response.json()
+    assert initiative_data["name"] == body["name"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+)
+async def test_add_initiative_owner(async_client, as_2, status_code):
+    initiative_id = 1
+    body = {"user_ids": [1]}
+    response = await async_client.patch(
+        f"/initiative/{initiative_id}/owners", json=body
+    )
+    assert response.status_code == status_code
+    db_initiative = await as_2.get(Initiative, response.json()["users"][0]["id"])
+    assert len(db_initiative.initiative_owners) == 1
+    assert db_initiative.initiative_owners[0].email == "existing@user.com"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_linked_initiative_detail(async_client, as_3, status_code):
+    initiative_id = 1
+    response = await async_client.get(f"/initiative/{initiative_id}")
+    assert response.status_code == status_code
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_initiatives_list(async_client, as_3, status_code):
+    response = await async_client.get("/initiatives")
+    assert response.status_code == status_code
+    assert len(response.json()["initiatives"]) == 1
+
+
 # # from .fixtures import client, created_user
 # import pytest
 # from sqlmodel import select

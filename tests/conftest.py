@@ -3,15 +3,55 @@ from open_poen_api.database import (
     engine,
 )
 from open_poen_api.app import app
-from open_poen_api.schemas_and_models.models.entities import Base, User
-from open_poen_api.user_routes.user import superuser_dep
-from open_poen_api import authorization as auth
+from open_poen_api.schemas_and_models.models.entities import (
+    Base,
+    User,
+    Initiative,
+    Role,
+)
+from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
+from open_poen_api import user_manager as um
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest_asyncio
 import base64
 import urllib.parse
+from open_poen_api.user_manager import get_user_manager
+from open_poen_api.database import get_user_db
+from open_poen_api.initiative_manager import get_initiative_manager
+from open_poen_api.schemas_and_models import UserCreateWithPassword, InitiativeCreate
+
+
+superuser_info = {
+    "obj_id": 42,
+    "role": Role.USER,
+    "email": "test@example.com",
+    "is_active": True,
+    "is_superuser": True,
+    "is_verified": True,
+    "return_none": False,
+}
+userowner_info = superuser_info.copy()
+userowner_info.update({"obj_id": 1})
+userowner_info.update({"is_superuser": False})
+user_info = userowner_info.copy()
+user_info.update({"obj_id": 42})
+anon_info = user_info.copy()
+anon_info.update({"return_none": True})
+
+initiative_info = {
+    "name": "Piets Buurtbarbeque",
+    "description": "Piet wordt vijftig.",
+    "purpose": "Saamhorigheid in de buurt bevorderen.",
+    "target_audience": "Mensen uit buurt De Florijn.",
+    "owner": "Mark de Wijk",
+    "owner_email": "markdewijk@spheer.ai",
+    "legal_entity": "stichting",
+    "address_applicant": "Het stoepje 42, Assen, 9408DT, Nederland",
+    "kvk_registration": "12345678",
+    "location": "Amsterdam",
+}
 
 
 async def retrieve_token_from_last_sent_email():
@@ -42,17 +82,32 @@ async def retrieve_token_from_last_sent_email():
             raise ValueError("Request to Mailhog failed.")
 
 
-async def get_mock_user(superuser=True):
-    return User(
-        role="user",
-        email="mock@gmail.com",
-        is_superuser=superuser,
-    )
+@pytest_asyncio.fixture
+async def get_mock_user(request):
+    user_info = request.param
+    if user_info["return_none"]:
+        val = None
+    else:
+        val = User(
+            id=user_info["obj_id"],
+            role=user_info["role"],
+            email=user_info["email"],
+            is_active=user_info["is_active"],
+            is_superuser=user_info["is_superuser"],
+            is_verified=user_info["is_verified"],
+        )
+
+    async def func():
+        return val
+
+    return func
 
 
 @pytest_asyncio.fixture
-async def overridden_app():
+async def overridden_app(get_mock_user):
     app.dependency_overrides[superuser_dep] = get_mock_user
+    app.dependency_overrides[required_login_dep] = get_mock_user
+    app.dependency_overrides[optional_login_dep] = get_mock_user
     yield app
     app.dependency_overrides = {}
 
@@ -62,6 +117,12 @@ async def async_client(event_loop, overridden_app):
     async with AsyncClient(
         app=overridden_app, base_url="http://localhost:8000"
     ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def clean_async_client(event_loop):
+    async with AsyncClient(app=app, base_url="http://localhost:8000") as client:
         yield client
 
 
@@ -81,18 +142,69 @@ async def async_session(event_loop) -> AsyncSession:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def user_created_by_admin(async_client, async_session):
-    # We intentionally don't add them with the session, because this
-    # routes sets a temporary password and sends an email with instructions
-    # as well.
-    test_user = {"email": "existing@user.com"}
-    response = await async_client.post("/user", json=test_user)
-    return test_user
+async def as_1(async_session):
+    # One user.
+    db = await get_user_db(async_session).__anext__()
+    um = await get_user_manager(db).__anext__()
+    s = UserCreateWithPassword(
+        email="existing@user.com", role="user", password="testing"
+    )
+    u = await um.create(s, request=None)
+    return async_session
 
 
-# @pytest.fixture(scope="module")
-# def pwd_context():
-#     return CryptContext(schemes=["bcrypt"], deprecated="auto")
+@pytest_asyncio.fixture(scope="function")
+async def as_2(as_1):
+    # One initiative and one user.
+    im = await get_initiative_manager(as_1).__anext__()
+    s = InitiativeCreate(**initiative_info)
+    i = await im.create(s, request=None)
+    return as_1
+
+
+@pytest_asyncio.fixture(scope="function")
+async def as_3(as_2):
+    # One initiative and one user linked to one another.
+    im = await get_initiative_manager(as_2).__anext__()
+    i = await as_2.get(Initiative, 1)
+    i = await im.make_users_owner(i, [1], request=None)
+    return as_2
+
+
+# @pytest_asyncio.fixture(scope="function")
+# async def async_session_init(async_session):
+#     user1 = User(
+#         email="superuser@example.com",
+#         role="user",
+#         hashed_password="",
+#         is_superuser=True,
+#         is_verified=True,
+#     )
+#     user2 = User(
+#         email="normaluser@example.com",
+#         role="user",
+#         hashed_password="",
+#         is_superuser=False,
+#         is_verified=True,
+#     )
+#     async_session.add_all([user1, user2])
+#     await async_session.commit()
+#     initiative1 = Initiative(
+#         name="Initiative 1",
+#         description="Description 1",
+#         target_audience="Target Audience 1",
+#         owner="Owner 1",
+#         owner_email="email1@example.com",
+#         address_applicant="Address 1",
+#         kvk_registration="Registration 1",
+#         location="Location 1",
+#         hidden_sponsors=False,
+#         initiative_owners=[user2],
+#     )
+#     async_session.add_all([initiative1])
+#     await async_session.commit()
+#     yield async_session
+#     return
 
 
 # @pytest.fixture(scope="function")
@@ -302,18 +414,6 @@ async def user_created_by_admin(async_client, async_session):
 
 
 # @pytest.fixture
-# def initiative_data():
-#     return {
-#         "name": "Piets Buurtbarbeque",
-#         "description": "Piet wordt vijftig.",
-#         "purpose": "Saamhorigheid in de buurt bevorderen.",
-#         "target_audience": "Mensen uit buurt De Florijn.",
-#         "owner": "Mark de Wijk",
-#         "owner_email": "markdewijk@spheer.ai",
-#         "address_applicant": "Het stoepje 42, Assen, 9408DT, Nederland",
-#         "kvk_registration": "12345678",
-#         "location": "Amsterdam",
-#     }
 
 
 # @pytest.fixture
@@ -323,19 +423,4 @@ async def user_created_by_admin(async_client, async_session):
 #         "description": "Eten voor de barbeque",
 #         "purpose": "Ervoor zorgen dat er voldoende te eten en te drinken is",
 #         "target_audience": "Alle bezoekers",
-#     }
-
-
-# @pytest.fixture
-# def payment_data():
-#     return {
-#         "booking_date": datetime.now().isoformat(),
-#         "transaction_amount": 123.12,
-#         "creditor_name": "Creditor Test",
-#         "creditor_account": "CR123456789",
-#         "debtor_name": "Debtor Test",
-#         "debtor_account": "DB123456789",
-#         "short_user_description": "Test short description",
-#         "long_user_description": "Test long description",
-#         "route": "income",
 #     }

@@ -1,4 +1,4 @@
-from open_poen_api.authorization import oso
+from open_poen_api.authorization.authorization import OSO
 from open_poen_api.schemas_and_models.models.entities import User
 import pytest_asyncio
 import pytest
@@ -52,9 +52,9 @@ async def test_action_permissions(actor, action, resource, allowed, user_data):
     resource = user_data[resource]
     if not allowed:
         with pytest.raises((NotFoundError, ForbiddenError)):
-            oso.authorize(actor, action, resource)
+            OSO.authorize(actor, action, resource)
     else:
-        oso.authorize(actor, action, resource)
+        OSO.authorize(actor, action, resource)
 
 
 field_combs = [
@@ -71,7 +71,7 @@ async def test_field_permissions(
 ):
     actor = user_data[actor]
     resource = user_data[resource]
-    authorized_fields = oso.authorized_fields(actor, "read", resource)
+    authorized_fields = OSO.authorized_fields(actor, "read", resource)
     all_fields_are_authorized = all([i in authorized_fields for i in fields])
     if are_authorized:
         assert all_fields_are_authorized

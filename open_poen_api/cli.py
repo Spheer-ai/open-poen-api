@@ -3,7 +3,7 @@ from .database import engine, get_async_session_context, get_user_db_context
 from .schemas_and_models import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
-from .authorization import get_user_manager_context
+from .user_manager import get_user_manager_context
 from fastapi_users.exceptions import UserAlreadyExists
 from .schemas_and_models.models.entities import Role
 import asyncio
@@ -14,13 +14,11 @@ from typing import Literal
 app = typer.Typer()
 
 
-async def add_user(
+async def async_add_user(
     email: EmailStr,
     superuser: bool,
     role: Literal["user", "financial", "admin"],
 ):
-    # TODO: Share functionality for creating a user with the route.
-    # TODO: We'll need this to add the first Admin.
     try:
         async with get_async_session_context() as session:
             async with get_user_db_context(session) as user_db:
@@ -43,7 +41,7 @@ def add_user(
     superuser: bool = False,
     role: str = "user",
 ):
-    asyncio.run(add_user(email, superuser, role))
+    asyncio.run(async_add_user(email, superuser, role))
 
 
 @app.command()

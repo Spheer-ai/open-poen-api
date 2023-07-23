@@ -1,6 +1,6 @@
 from fastapi import Depends, Request
 from .database import get_user_db
-from .schemas_and_models.models.entities import User
+from .schemas_and_models.models.entities import User, Initiative
 from .utils.load_env import load_env_vars
 from .utils.email import MessageSchema, conf, env
 import os
@@ -16,17 +16,9 @@ import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
 from oso import Oso
+from .authorization.authorization import SECRET_KEY
 
 load_env_vars()
-
-
-oso = Oso()
-oso.register_class(User)
-oso.load_file("open_poen_api/main.polar")
-
-
-SECRET_KEY = os.environ.get("SECRET_KEY")
-ALGORITHM = "HS256"
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
@@ -43,7 +35,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             subtype=MessageType.plain,
         )
         fm = FastMail(conf)
-        await fm.send_message(message)
+        await fm.send_message(message)  # Make async.
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -60,27 +52,23 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             subtype=MessageType.plain,
         )
         fm = FastMail(conf)
-        await fm.send_message(message)
+        await fm.send_message(message)  # Make async.
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
     yield UserManager(user_db)
 
 
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
-
-
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=3600)
 
+
+bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
 auth_backend = AuthenticationBackend(
     name="jwt", transport=bearer_transport, get_strategy=get_jwt_strategy
 )
 
-
 fastapi_users = FastAPIUsers[User, int](get_user_manager, [auth_backend])
-
-current_active_user = fastapi_users.current_user(active=True)
 
 get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)
