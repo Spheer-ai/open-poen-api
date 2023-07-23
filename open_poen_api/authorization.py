@@ -2,27 +2,52 @@ import os
 from oso import Oso
 from oso.exceptions import ForbiddenError, NotFoundError
 from .schemas_and_models.models import entities as ent
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
 from pydantic import BaseModel
+
+# from polar.data.adapter.sqlalchemy_adapter import SqlAlchemyAdapter
+from .database import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from .data_adapter import SqlAlchemyAdapter
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
 
 
-class Anon:
-    pass
+# class Anon(ent.User):
+#     __abstract__ = True
+#     __mapper_args__ = {"polymorphic_identity": None, "concrete": True}
+#     id = -1
+#     role = "anon"
 
+
+# see https://github.com/osohq/gitcloud/blob/main/policy/authorization.polar
 
 OSO = Oso()
-OSO.register_class(ent.User)
-OSO.register_class(Anon)
+OSO.register_class(
+    ent.User,
+    fields={
+        "id": int,
+        "is_superuser": bool,
+        "role": str,
+        "hidden": bool,
+    },
+)
 OSO.register_class(ent.Initiative)
+OSO.set_data_filtering_adapter(SqlAlchemyAdapter)
+# OSO.authorized_resources(None, "read", None)
 OSO.load_file("open_poen_api/main.polar")
+
+
+# async def get_sql_alchemy_adapter(session: AsyncSession = Depends(get_async_session)):
+#     OSO.set_data_filtering_adapter(SqlAlchemyAdapter(session))
+#     yield OSO
 
 
 def get_oso_actor(actor: ent.User | None):
     """Because Oso works nicely with user defined classes, not with the None type."""
-    return Anon if actor is None else actor
+    anon = ent.User(id=-1, role="anon", is_superuser=False)
+    return anon if actor is None else actor
 
 
 def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):

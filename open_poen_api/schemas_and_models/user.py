@@ -13,6 +13,7 @@ class UserRead(schemas.BaseUser[int]):
     biography: str | None
     role: Role
     image: str | None
+    hidden: bool
 
     class Config:
         orm_mode = True
@@ -38,13 +39,13 @@ class UserCreate(schemas.CreateUpdateDictModel):
     is_active: bool | None = True
     is_superuser: bool | None = False
     is_verified: bool | None = True
+    hidden: bool | None = False
 
 
 class UserCreateWithPassword(UserCreate):
     password: str
 
 
-# TODO: Supply field and is not None, or don't supply
 class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
     NOT_NULL_FIELDS = [
         "role",
@@ -53,6 +54,7 @@ class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
         "is_active",
         "is_superuser",
         "is_verified",
+        "hidden",
     ]
 
     first_name: str | None
@@ -60,6 +62,7 @@ class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
     biography: str | None
     role: Role | None
     image: str | None
+    hidden: bool | None
 
 
 # class UserCreateAdmin(UserBase):

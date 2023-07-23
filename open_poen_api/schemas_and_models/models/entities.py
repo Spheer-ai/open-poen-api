@@ -49,6 +49,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     role: Mapped[Role] = mapped_column(ChoiceType(Role, impl=VARCHAR(length=32)))
     image: Mapped[str | None] = mapped_column(String(length=128))
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     bng = relationship("BNG", uselist=False, back_populates="user", lazy="selectin")
     initiatives = relationship(

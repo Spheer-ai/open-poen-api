@@ -126,9 +126,18 @@ async def delete_user(
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
+    # adapter=Depends(auth.get_sql_alchemy_adapter),
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
+
+    # q = adapter.authorized_query(optional_user, "read", ent.User)
+
+    a = auth.get_oso_actor(optional_user)
+    q = auth.OSO.authorized_query(a, "read", ent.User)
+    r = await session.execute(q)
+    s = r.scalars().all()
+
     auth.authorize(optional_user, "read", ent.User)  # TODO: Is this logical?
     users_result = await session.execute(
         select(ent.User).options(noload(ent.User.initiatives), noload(ent.User.bng))
