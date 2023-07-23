@@ -13,7 +13,7 @@ class UserRead(schemas.BaseUser[int]):
     biography: str | None
     role: Role
     image: str | None
-    hidden: bool
+    hidden: bool | None
 
     class Config:
         orm_mode = True

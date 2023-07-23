@@ -16,7 +16,7 @@ import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
 from oso import Oso
-from .authorization import SECRET_KEY
+from .authorization.authorization import SECRET_KEY
 
 load_env_vars()
 

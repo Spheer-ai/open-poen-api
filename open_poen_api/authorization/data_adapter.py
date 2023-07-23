@@ -1,10 +1,7 @@
 from functools import reduce
-
 from sqlalchemy.inspection import inspect
-from sqlalchemy.orm import Session
 from sqlalchemy.sql import false, true
 from sqlalchemy import select
-
 from polar.data.filter import Projection
 from polar.data.adapter import DataAdapter
 
