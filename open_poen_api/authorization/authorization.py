@@ -20,6 +20,7 @@ OSO.register_class(
     },
 )
 OSO.register_class(ent.Initiative)
+OSO.register_class(ent.Activity)
 OSO.set_data_filtering_adapter(SqlAlchemyAdapter)
 OSO.load_file("open_poen_api/main.polar")
 
@@ -81,6 +82,11 @@ def get_authorized_output_fields(
 
     degree1_fields = OSO.authorized_fields(oso_actor, action, resource)
     degree2_fields = {}
+
+    # TODO: I made a logic error here. The allowed fields are retrieved on a class
+    # basis instead of an instance basis. Then a term like this one will fail:
+    # (user in init_resource.initiative_owners and name = "initiative_owner")
+    # Because initiative_owners is not an iterable.
 
     for rel_name, rel in resource.__mapper__.relationships.items():
         if rel_name in degree1_fields:
