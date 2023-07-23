@@ -50,7 +50,18 @@ async def test_get_linked_initiative_detail(async_client, as_3, status_code):
     initiative_id = 1
     response = await async_client.get(f"/initiative/{initiative_id}")
     assert response.status_code == status_code
-    print("stop")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_initiatives_list(async_client, as_3, status_code):
+    response = await async_client.get("/initiatives")
+    assert response.status_code == status_code
+    assert len(response.json()["initiatives"]) == 1
 
 
 # # from .fixtures import client, created_user

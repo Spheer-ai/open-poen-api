@@ -130,7 +130,6 @@ async def get_users(
     # TODO: Enable searching by email.
     # TODO: pagination.
     q = auth.get_authorized_query(optional_user, "read", ent.User)
-
     users_result = await session.execute(
         q.options(noload(ent.User.initiatives), noload(ent.User.bng))
     )
@@ -230,7 +229,6 @@ async def bng_callback(
     )
     session.add(new_bng_account)
     await session.commit()
-    await session.refresh(new_bng_account)
     # background_tasks.add_task(get_bng_payments, session)  # TODO
     return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
 
@@ -370,10 +368,11 @@ async def link_initiative_owners(
     initiative_db = await initiative_manager.make_users_owner(
         initiative_db, initiative.user_ids, request=request
     )
-    await session.refresh(initiative_db)
-    return s.UserReadList(
-        users=initiative_db.initiative_owners
-    )  # TODO: How to filter these fields?
+    filtered_initiative_owners = [
+        auth.get_authorized_output_fields(required_user, "read", i)
+        for i in initiative_db.initiative_owners
+    ]
+    return s.UserReadList(users=filtered_initiative_owners)
 
 
 @router.delete("/initiative/{initiative_id}")
@@ -399,11 +398,15 @@ async def get_initiatives(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
 ):
-    # TODO: How to authorize this?
-    initiatives = await session.execute(select(ent.Initiative))
-    return s.InitiativeReadList(
-        initiatives=initiatives.scalars().all()
-    )  # TODO: How to filter these fields?
+    q = auth.get_authorized_query(optional_user, "read", ent.Initiative)
+    initiative_results = await session.execute(
+        q.options(noload(ent.Initiative.initiative_owners))
+    )
+    filtered_initiatives = [
+        auth.get_authorized_output_fields(optional_user, "read", i)
+        for i in initiative_results.scalars().all()
+    ]
+    return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
 # ROUTES
