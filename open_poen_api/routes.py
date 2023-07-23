@@ -71,7 +71,6 @@ async def get_initiative(
     user_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
-    user_manager: um.UserManager = Depends(im.get_initiative_manager),
 ):
     user_db = await session.get(ent.User, user_id)
     if not user_db:
