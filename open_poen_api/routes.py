@@ -12,8 +12,8 @@ from fastapi_users.exceptions import UserAlreadyExists
 from .database import get_async_session
 from . import schemas_and_models as s
 from .schemas_and_models.models import entities as ent
-from . import user_manager as um
-from . import initiative_manager as im
+from .managers import user_manager as um
+from .managers import initiative_manager as im
 from .utils.utils import temp_password_generator, get_requester_ip
 import os
 from .bng.api import create_consent

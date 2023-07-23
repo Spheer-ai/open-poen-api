@@ -10,16 +10,16 @@ from open_poen_api.schemas_and_models.models.entities import (
     Role,
 )
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
-from open_poen_api import user_manager as um
+from open_poen_api.managers import user_manager as um
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest_asyncio
 import base64
 import urllib.parse
-from open_poen_api.user_manager import get_user_manager
+from open_poen_api.managers.user_manager import get_user_manager
 from open_poen_api.database import get_user_db
-from open_poen_api.initiative_manager import get_initiative_manager
+from open_poen_api.managers.initiative_manager import get_initiative_manager
 from open_poen_api.schemas_and_models import UserCreateWithPassword, InitiativeCreate
 
 

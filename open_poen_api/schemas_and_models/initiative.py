@@ -7,6 +7,7 @@ class InitiativeRead(BaseModel):
     id: int
     name: str
     description: str
+    purpose: str
     target_audience: str
     owner: str | None
     owner_email: str | None

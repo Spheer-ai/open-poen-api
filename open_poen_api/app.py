@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
 from .utils.load_env import load_env_vars
-from .user_manager import fastapi_users, auth_backend
+from .managers.user_manager import fastapi_users, auth_backend
 from .database import create_db_and_tables
 from .routes import router
 

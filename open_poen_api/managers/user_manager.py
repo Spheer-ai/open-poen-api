@@ -1,8 +1,8 @@
 from fastapi import Depends, Request
-from .database import get_user_db
-from .schemas_and_models.models.entities import User, Initiative
-from .utils.load_env import load_env_vars
-from .utils.email import MessageSchema, conf, env
+from ..database import get_user_db
+from ..schemas_and_models.models.entities import User, Initiative
+from ..utils.load_env import load_env_vars
+from ..utils.email import MessageSchema, conf, env
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -16,7 +16,7 @@ import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
 from oso import Oso
-from .authorization.authorization import SECRET_KEY
+from ..authorization.authorization import SECRET_KEY
 
 load_env_vars()
 
