@@ -1,7 +1,7 @@
 from ..database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request, HTTPException
-from ..schemas_and_models.models.entities import Initiative, User
+from ..schemas_and_models.models.entities import Initiative, User, UserInitiativeRole
 from ..schemas_and_models import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
 from ..utils.utils import get_entities_by_ids
@@ -61,8 +61,10 @@ class InitiativeManager:
         user_ids: list[int],
         request: Request | None = None,
     ):
-        users = await get_entities_by_ids(self.session, User, user_ids)
-        initiative.initiative_owners = users
+        new_user_roles = [
+            UserInitiativeRole(user_id=i, initiative_id=initiative.id) for i in user_ids
+        ]
+        initiative.user_roles = new_user_roles
         self.session.add(initiative)
         await self.session.commit()
         return initiative
