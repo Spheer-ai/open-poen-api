@@ -1,6 +1,6 @@
 from open_poen_api.database import (
     async_session_maker,
-    engine,
+    asyng_engine,
 )
 from open_poen_api.app import app
 from open_poen_api.schemas_and_models.models.entities import (
@@ -129,16 +129,16 @@ async def clean_async_client(event_loop):
 @pytest_asyncio.fixture(scope="function")
 async def async_session(event_loop) -> AsyncSession:
     async with async_session_maker() as s:
-        async with engine.begin() as conn:
+        async with asyng_engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
         yield s
 
-    async with engine.begin() as conn:
+    async with asyng_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-    await engine.dispose()
+    await asyng_engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")

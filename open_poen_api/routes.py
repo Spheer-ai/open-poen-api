@@ -9,7 +9,7 @@ from fastapi import (
 )
 from fastapi.responses import RedirectResponse
 from fastapi_users.exceptions import UserAlreadyExists
-from .database import get_async_session
+from .database import get_async_session, get_sync_session
 from . import schemas_and_models as s
 from .schemas_and_models.models import entities as ent
 from .managers import user_manager as um
@@ -404,22 +404,25 @@ async def delete_initiative(
     response_model_exclude_unset=True,
 )
 async def get_initiatives(
-    session: AsyncSession = Depends(get_async_session),
+    async_session: AsyncSession = Depends(get_async_session),
+    sync_session=Depends(get_sync_session),
     optional_user=Depends(optional_login_dep),
+    new_oso=Depends(auth.get_sqlalchemy_adapter),
 ):
-    q = auth.get_authorized_query(optional_user, "read", ent.Initiative)
+    q = auth.get_authorized_query(optional_user, "read", ent.Initiative, new_oso)
     # initiatives_result = await session.execute(
     #     q.options(noload(ent.Initiative.user_roles), noload(ent.Initiative.activities))
     # )
-    initiatives_result = await session.execute(
+    initiatives_result = await async_session.execute(
         q.options(
-            selectinload(ent.Initiative.user_roles),
-            selectinload(ent.Initiative.activities),
+            noload(ent.Initiative.user_roles),
+            noload(ent.Initiative.activities),
+            noload(ent.Initiative.activities),
         )
     )
     initiatives_scalar = initiatives_result.scalars().all()
     filtered_initiatives = [
-        auth.get_authorized_output_fields(optional_user, "read", i)
+        auth.get_authorized_output_fields(optional_user, "read", i, new_oso)
         for i in initiatives_scalar
     ]
     return s.InitiativeReadList(initiatives=filtered_initiatives)

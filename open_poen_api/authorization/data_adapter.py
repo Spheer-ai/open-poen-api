@@ -2,11 +2,17 @@ from functools import reduce
 from sqlalchemy.inspection import inspect
 from sqlalchemy.sql import false, true
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from polar.data.filter import Projection
 from polar.data.adapter import DataAdapter
+from sqlalchemy.orm import Session
 
 
 class SqlAlchemyAdapter(DataAdapter):
+    def __init__(self, session: Session):
+        self.session = session
+
+    @staticmethod
     def build_query(filter):
         types = filter.types
 
@@ -59,10 +65,5 @@ class SqlAlchemyAdapter(DataAdapter):
         else:
             return side
 
-    @classmethod
-    def execute_query(cls, query):
-        # HERE
-        pass
-
-        result = asyncio.run(my_session.execute(query))
-        return result
+    def execute_query(self, query):
+        return self.session.execute(query).scalars().all()

@@ -1,5 +1,5 @@
 import typer
-from .database import engine, get_async_session_context, get_user_db_context
+from .database import asyng_engine, get_async_session_context, get_user_db_context
 from .schemas_and_models import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
