@@ -13,3 +13,7 @@ class UserReadLinked(UserRead):
 
 class InitiativeReadLinked(InitiativeRead):
     initiative_owners: list[UserRead]
+
+    @validator("initiative_owners", pre=True)
+    def apply_operation(cls, v):
+        return list(v)

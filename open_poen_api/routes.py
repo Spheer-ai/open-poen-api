@@ -72,7 +72,7 @@ async def get_initiative(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
 ):
-    user_db = await session.get(ent.User, user_id)
+    user_db = await ent.User.detail_load(session, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
     auth.authorize(optional_user, "read", user_db)
@@ -324,7 +324,9 @@ async def get_initiative(
     optional_user=Depends(optional_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
-    initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
+    initiative_db = await ent.Initiative.detail_load(session, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
     auth.authorize(optional_user, "read", initiative_db)
     return auth.get_authorized_output_fields(optional_user, "read", initiative_db)
 
@@ -367,24 +369,16 @@ async def link_initiative_owners(
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
-    # initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
-    new = await session.execute(
-        select(ent.Initiative).options(
-            selectinload(ent.Initiative.user_roles).selectinload(
-                ent.UserInitiativeRole.user
-            )
-        )
-    )
-    initiative_db = new.scalars().all()[0]
+    initiative_db = await ent.Initiative.detail_load(session, initiative_id)
     auth.authorize(required_user, "edit", initiative_db)
     initiative_db = await initiative_manager.make_users_owner(
         initiative_db, initiative.user_ids, request=request
     )
     await session.refresh(initiative_db)
-    # new = await initiative_manager.fetch_and_verify(initiative_id)
-
     filtered_initiative_owners = [
-        auth.get_authorized_output_fields(required_user, "read", i)
+        auth.get_authorized_output_fields(
+            required_user, "read", i, ignore_fields=ent.User.REL_FIELDS
+        )
         for i in initiative_db.initiative_owners
     ]
     return s.UserReadList(users=filtered_initiative_owners)
@@ -414,13 +408,19 @@ async def get_initiatives(
     optional_user=Depends(optional_login_dep),
 ):
     q = auth.get_authorized_query(optional_user, "read", ent.Initiative)
-    initiative_results = await session.execute(
-        q.options(noload(ent.Initiative.user_roles), noload(ent.Initiative.activities))
+    # initiatives_result = await session.execute(
+    #     q.options(noload(ent.Initiative.user_roles), noload(ent.Initiative.activities))
+    # )
+    initiatives_result = await session.execute(
+        q.options(
+            selectinload(ent.Initiative.user_roles),
+            selectinload(ent.Initiative.activities),
+        )
     )
-    scalar_initiatives = initiative_results.scalars().all()
+    initiatives_scalar = initiatives_result.scalars().all()
     filtered_initiatives = [
         auth.get_authorized_output_fields(optional_user, "read", i)
-        for i in scalar_initiatives
+        for i in initiatives_scalar
     ]
     return s.InitiativeReadList(initiatives=filtered_initiatives)
 

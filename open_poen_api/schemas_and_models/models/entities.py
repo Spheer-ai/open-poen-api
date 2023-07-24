@@ -16,8 +16,16 @@ from sqlalchemy_utils import ChoiceType
 
 # from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import select
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyBaseUserTable
 
 
@@ -80,18 +88,41 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     initiative_roles = relationship(
         "UserInitiativeRole",
         back_populates="user",
-        lazy="selectin",
     )
     initiatives = association_proxy("initiative_roles", "initiative")
     activity_roles = relationship(
         "UserActivityRole",
         back_populates="user",
-        lazy="selectin",
     )
     activities = association_proxy("activity_roles", "activity")
 
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
+
+    @classmethod
+    async def detail_load(cls, session: AsyncSession, id: int):
+        query_result = await session.execute(
+            select(cls)
+            .options(
+                selectinload(cls.bng),
+                selectinload(cls.initiative_roles).selectinload(
+                    UserInitiativeRole.initiative
+                ),
+                selectinload(cls.activity_roles).selectinload(
+                    UserActivityRole.activity
+                ),
+            )
+            .where(cls.id == id)
+        )
+        return query_result.scalars().first()
+
+    REL_FIELDS = [
+        "bng",
+        "initiative_roles",
+        "initiatives",
+        "activity_roles",
+        "activities",
+    ]
 
 
 class BNG(Base):
@@ -150,13 +181,26 @@ class Initiative(Base):
     user_roles = relationship(
         "UserInitiativeRole",
         back_populates="initiative",
-        lazy="immediate",
     )
     initiative_owners = association_proxy("user_roles", "user")
-    activities = relationship("Activity", back_populates="initiative", lazy="selectin")
+    activities = relationship("Activity", back_populates="initiative")
 
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"
+
+    @classmethod
+    async def detail_load(cls, session: AsyncSession, id: int):
+        query_result = await session.execute(
+            select(cls)
+            .options(
+                selectinload(cls.user_roles).selectinload(UserInitiativeRole.user),
+                selectinload(cls.activities),
+            )
+            .where(cls.id == id)
+        )
+        return query_result.scalars().first()
+
+    REL_FIELDS = ["user_roles", "initiative_owners", "activities"]
 
 
 class Activity(Base):

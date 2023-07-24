@@ -166,7 +166,7 @@ async def as_2(as_1):
 async def as_3(as_2):
     # One initiative and one user linked to one another.
     im = await get_initiative_manager(as_2).__anext__()
-    i = await as_2.get(Initiative, 1)
+    i = await Initiative.detail_load(as_2, 1)
     i = await im.make_users_owner(i, [1], request=None)
     return as_2
 

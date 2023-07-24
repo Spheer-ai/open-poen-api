@@ -1,5 +1,5 @@
 import os
-from oso import Oso
+from oso import Oso, Relation
 from oso.exceptions import ForbiddenError, NotFoundError
 from ..schemas_and_models.models import entities as ent
 from fastapi import HTTPException
@@ -19,7 +19,29 @@ OSO.register_class(
         "hidden": bool,
     },
 )
-OSO.register_class(ent.Initiative)
+OSO.register_class(
+    ent.UserInitiativeRole,
+    fields={
+        "initiative": Relation(
+            kind="one",
+            other_type="Initiative",
+            my_field="initiative_id",
+            other_field="id",
+        )
+    },
+)
+OSO.register_class(
+    ent.Initiative,
+    fields={
+        "user_roles": Relation(
+            kind="many",
+            other_type="UserInitiativeRole",
+            my_field="id",
+            other_field="initiative_id",
+        ),
+        "hidden": bool,
+    },
+)
 OSO.register_class(ent.Activity)
 OSO.set_data_filtering_adapter(SqlAlchemyAdapter)
 OSO.load_file("open_poen_api/main.polar")
@@ -66,7 +88,10 @@ def authorize_input_fields(
 
 
 def get_authorized_output_fields(
-    actor: ent.User | None, action: str, resource: ent.Base
+    actor: ent.User | None,
+    action: str,
+    resource: ent.Base,
+    ignore_fields: list[str] = [],
 ):
     """
     Filters the fields of a resource that an actor is authorized to access to give
@@ -80,7 +105,9 @@ def get_authorized_output_fields(
     """
     oso_actor = get_oso_actor(actor)
 
-    degree1_fields = OSO.authorized_fields(oso_actor, action, resource)
+    degree1_fields = OSO.authorized_fields(oso_actor, action, resource) - set(
+        ignore_fields
+    )
     degree2_fields = {}
 
     # TODO: I made a logic error here. The allowed fields are retrieved on a class

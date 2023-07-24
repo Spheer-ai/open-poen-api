@@ -58,3 +58,11 @@ class SqlAlchemyAdapter(DataAdapter):
             return getattr(side, inspect(type(side)).primary_key[0].name)
         else:
             return side
+
+    @classmethod
+    def execute_query(cls, query):
+        # HERE
+        pass
+
+        result = asyncio.run(my_session.execute(query))
+        return result
