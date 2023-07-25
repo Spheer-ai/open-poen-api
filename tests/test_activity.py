@@ -53,18 +53,25 @@ async def test_delete_activity(async_client, as_4, status_code):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+    "get_mock_user, ids, status_code",
+    [
+        (superuser_info, [2], 200),
+        (superuser_info, [], 200),
+        (superuser_info, [2, 999], 404),
+        (superuser_info, [2, 3, 4], 200),
+    ],
+    indirect=["get_mock_user"],
 )
-async def test_add_activity_owner(async_client, as_4, status_code):
+async def test_add_activity_owner(async_client, as_5, ids, status_code):
     initiative_id, activity_id = 1, 1
-    body = {"user_ids": [1]}
+    body = {"user_ids": ids}
     response = await async_client.patch(
         f"/initiative/{initiative_id}/activity/{activity_id}/owners", json=body
     )
     assert response.status_code == status_code
-    db_activity = await Activity.detail_load(as_4, initiative_id, activity_id)
-    assert len(db_activity.activity_owners) == 1
-    assert db_activity.activity_owners[0].email == "existing@user.com"
+    if status_code == 200:
+        db_activity = await Activity.detail_load(as_5, initiative_id, activity_id)
+        assert set([i.id for i in db_activity.activity_owners]) == set(ids)
 
 
 @pytest.mark.asyncio

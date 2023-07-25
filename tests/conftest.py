@@ -8,6 +8,7 @@ from open_poen_api.schemas_and_models.models.entities import (
     User,
     Initiative,
     Role,
+    Activity,
 )
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api.managers import user_manager as um
@@ -190,6 +191,25 @@ async def as_4(as_3):
     s = ActivityCreate(**activity_info)
     a = await am.create(s, 1, request=None)
     return as_3
+
+
+@pytest_asyncio.fixture(scope="function")
+async def as_5(as_4):
+    # One initiative + activity + user and three users that are linked
+    # to the activity.
+    db = await get_user_db(as_4).__anext__()
+    um = await get_user_manager(db).__anext__()
+    am = await get_activity_manager(as_4).__anext__()
+    a = await as_4.get(Activity, 1)
+    ids = []
+    for i in (1, 2, 3):
+        s = UserCreateWithPassword(
+            email=f"extra{i}@user.com", role="user", password="testing"
+        )
+        u = await um.create(s, request=None)
+        ids.append(u.id)
+    await am.make_users_owner(a, ids, request=None)
+    return as_4
 
 
 # @pytest_asyncio.fixture(scope="function")
