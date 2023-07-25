@@ -342,6 +342,7 @@ async def update_initiative(
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
     auth.authorize(required_user, "edit", initiative_db)
@@ -353,7 +354,9 @@ async def update_initiative(
     except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
     await session.refresh(edited_initiative)
-    return auth.get_authorized_output_fields(required_user, "read", edited_initiative)
+    return auth.get_authorized_output_fields(
+        required_user, "read", edited_initiative, oso
+    )
 
 
 @router.patch(

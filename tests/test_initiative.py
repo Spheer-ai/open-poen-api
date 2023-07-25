@@ -57,14 +57,26 @@ async def test_add_initiative_owner(async_client, as_2, status_code):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "get_mock_user, status_code",
-    [(superuser_info, 200), (anon_info, 200)],
+    "get_mock_user, body, status_code",
+    [
+        (superuser_info, {"location": "Groningen"}, 200),
+        (userowner_info, {"location": "Groningen"}, 403),
+        (superuser_info, {"hidden": True}, 200),
+        (userowner_info, {"hidden": True}, 200),
+        (user_info, {"location": "Groningen"}, 403),
+    ],
     indirect=["get_mock_user"],
 )
-async def test_get_linked_initiative_detail(async_client, as_3, status_code):
+async def test_patch_initiative(async_client, as_3, body, status_code):
     initiative_id = 1
-    response = await async_client.get(f"/initiative/{initiative_id}")
+    response = await async_client.patch(f"/initiative/{initiative_id}", json=body)
     assert response.status_code == status_code
+    if status_code == 200:
+        initiative = await as_3.get(Initiative, initiative_id)
+        # Fix this. Apparently the session is not clean on every test invocation.
+        await as_3.refresh(initiative)
+        for key in body:
+            assert getattr(initiative, key) == body[key]
 
 
 @pytest.mark.asyncio
@@ -77,6 +89,18 @@ async def test_get_initiatives_list(async_client, as_3, status_code):
     response = await async_client.get("/initiatives")
     assert response.status_code == status_code
     assert len(response.json()["initiatives"]) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_linked_initiative_detail(async_client, as_3, status_code):
+    initiative_id = 1
+    response = await async_client.get(f"/initiative/{initiative_id}")
+    assert response.status_code == status_code
 
 
 # # from .fixtures import client, created_user
