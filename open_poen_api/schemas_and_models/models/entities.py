@@ -88,11 +88,13 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     initiative_roles = relationship(
         "UserInitiativeRole",
         back_populates="user",
+        lazy="noload",
     )
     initiatives = association_proxy("initiative_roles", "initiative")
     activity_roles = relationship(
         "UserActivityRole",
         back_populates="user",
+        lazy="noload",
     )
     activities = association_proxy("activity_roles", "activity")
 
@@ -181,9 +183,10 @@ class Initiative(Base):
     user_roles = relationship(
         "UserInitiativeRole",
         back_populates="initiative",
+        lazy="noload",
     )
     initiative_owners = association_proxy("user_roles", "user")
-    activities = relationship("Activity", back_populates="initiative")
+    activities = relationship("Activity", back_populates="initiative", lazy="noload")
 
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"

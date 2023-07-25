@@ -49,6 +49,7 @@ async def create_user(
     session: AsyncSession = Depends(get_async_session),
     superuser=Depends(superuser_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     auth.authorize(superuser, "create", ent.User)
     user_with_password = s.UserCreateWithPassword(
@@ -59,7 +60,7 @@ async def create_user(
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
     await session.refresh(user_db)
-    return auth.get_authorized_output_fields(superuser, "read", user_db)
+    return auth.get_authorized_output_fields(superuser, "read", user_db, oso)
 
 
 @router.get(
@@ -71,12 +72,13 @@ async def get_initiative(
     user_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await ent.User.detail_load(session, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
     auth.authorize(optional_user, "read", user_db)
-    return auth.get_authorized_output_fields(optional_user, "read", user_db)
+    return auth.get_authorized_output_fields(optional_user, "read", user_db, oso)
 
 
 @router.patch(
@@ -91,6 +93,7 @@ async def update_user(
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await session.get(ent.User, user_id)
     if not user_db:
@@ -102,7 +105,7 @@ async def update_user(
     except UserAlreadyExists:
         raise HTTPException(status_code=400, detail="Email address already registered")
     await session.refresh(edited_user)
-    return auth.get_authorized_output_fields(required_user, "read", edited_user)
+    return auth.get_authorized_output_fields(required_user, "read", edited_user, oso)
 
 
 @router.delete("/user/{user_id}")
@@ -125,10 +128,11 @@ async def delete_user(
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.User)
+    q = auth.get_authorized_query(optional_user, "read", ent.User, oso)
     users_result = await session.execute(
         q.options(
             noload(ent.User.initiative_roles),
@@ -138,7 +142,7 @@ async def get_users(
     )
     users_scalar = users_result.scalars().all()
     filtered_users = [
-        auth.get_authorized_output_fields(optional_user, "read", i)
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in users_scalar
     ]
     return s.UserReadList(users=filtered_users)
@@ -303,6 +307,7 @@ async def create_initiative(
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     auth.authorize(required_user, "create", ent.Initiative)
     try:
@@ -310,7 +315,7 @@ async def create_initiative(
     except im.InitiativeAlreadyExists:
         raise HTTPException(status_code=400, detail="Name already registered")
     await session.refresh(initiative_db)
-    return auth.get_authorized_output_fields(required_user, "read", initiative_db)
+    return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
 
 @router.get(
@@ -322,13 +327,13 @@ async def get_initiative(
     initiative_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await ent.Initiative.detail_load(session, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
     auth.authorize(optional_user, "read", initiative_db)
-    return auth.get_authorized_output_fields(optional_user, "read", initiative_db)
+    return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
 
 
 @router.patch(
@@ -368,6 +373,7 @@ async def link_initiative_owners(
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await ent.Initiative.detail_load(session, initiative_id)
     auth.authorize(required_user, "edit", initiative_db)
@@ -377,7 +383,7 @@ async def link_initiative_owners(
     await session.refresh(initiative_db)
     filtered_initiative_owners = [
         auth.get_authorized_output_fields(
-            required_user, "read", i, ignore_fields=ent.User.REL_FIELDS
+            required_user, "read", i, oso, ent.User.REL_FIELDS
         )
         for i in initiative_db.initiative_owners
     ]
@@ -388,7 +394,6 @@ async def link_initiative_owners(
 async def delete_initiative(
     initiative_id: int,
     request: Request,
-    session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
 ):
@@ -405,24 +410,20 @@ async def delete_initiative(
 )
 async def get_initiatives(
     async_session: AsyncSession = Depends(get_async_session),
-    sync_session=Depends(get_sync_session),
     optional_user=Depends(optional_login_dep),
-    new_oso=Depends(auth.get_sqlalchemy_adapter),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    q = auth.get_authorized_query(optional_user, "read", ent.Initiative, new_oso)
-    # initiatives_result = await session.execute(
-    #     q.options(noload(ent.Initiative.user_roles), noload(ent.Initiative.activities))
-    # )
+    # TODO: pagination.
+    q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
     initiatives_result = await async_session.execute(
         q.options(
             noload(ent.Initiative.user_roles),
-            noload(ent.Initiative.activities),
             noload(ent.Initiative.activities),
         )
     )
     initiatives_scalar = initiatives_result.scalars().all()
     filtered_initiatives = [
-        auth.get_authorized_output_fields(optional_user, "read", i, new_oso)
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in initiatives_scalar
     ]
     return s.InitiativeReadList(initiatives=filtered_initiatives)

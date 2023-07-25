@@ -26,6 +26,19 @@ async def test_create_initiative(async_client, async_session, status_code):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 204)], indirect=["get_mock_user"]
+)
+async def test_delete_initiative(async_client, as_2, status_code):
+    initiative_id = 1
+    response = await async_client.delete(f"/initiative/{initiative_id}")
+    assert response.status_code == status_code
+    if status_code == 204:
+        initiative = await as_2.get(Initiative, initiative_id)
+        assert initiative is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
 )
 async def test_add_initiative_owner(async_client, as_2, status_code):

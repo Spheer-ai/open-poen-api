@@ -66,4 +66,5 @@ class SqlAlchemyAdapter(DataAdapter):
             return side
 
     def execute_query(self, query):
+        # Throw in threadpool executor to prevent blocking the event loop?
         return self.session.execute(query).scalars().all()

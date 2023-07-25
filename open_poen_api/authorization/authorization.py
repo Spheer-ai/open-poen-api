@@ -6,7 +6,7 @@ from fastapi import HTTPException, Depends
 from ..database import get_sync_session
 from pydantic import BaseModel
 from .data_adapter import SqlAlchemyAdapter
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -45,14 +45,12 @@ OSO.register_class(
     },
 )
 OSO.register_class(ent.Activity)
-# OSO.set_data_filtering_adapter(SqlAlchemyAdapter)
 OSO.load_file("open_poen_api/main.polar")
 
 
-async def get_sqlalchemy_adapter(session: AsyncSession = Depends(get_sync_session)):
+async def set_sqlalchemy_adapter(session: Session = Depends(get_sync_session)):
     # You'll only need this when calling get_authorized_output_fields on a resource
     # that has rules for established relationships.
-    # Throw in threadpool executor to prevent blocking the event loop?
     OSO.set_data_filtering_adapter(SqlAlchemyAdapter(session))
     yield OSO
 
@@ -64,11 +62,11 @@ def get_oso_actor(actor: ent.User | None):
 
 
 def get_authorized_query(
-    actor: ent.User | None, action: str, resource: ent.Base, new_oso
+    actor: ent.User | None, action: str, resource: ent.Base, oso: Oso
 ):
     oso_actor = get_oso_actor(actor)
 
-    return new_oso.authorized_query(oso_actor, action, resource)
+    return oso.authorized_query(oso_actor, action, resource)
 
 
 def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):
@@ -103,7 +101,7 @@ def get_authorized_output_fields(
     actor: ent.User | None,
     action: str,
     resource: ent.Base,
-    new_oso,
+    oso: Oso,
     ignore_fields: list[str] = [],
 ):
     """
@@ -118,7 +116,7 @@ def get_authorized_output_fields(
     """
     oso_actor = get_oso_actor(actor)
 
-    degree1_fields = new_oso.authorized_fields(oso_actor, action, resource) - set(
+    degree1_fields = oso.authorized_fields(oso_actor, action, resource) - set(
         ignore_fields
     )
     degree2_fields = {}
@@ -134,7 +132,7 @@ def get_authorized_output_fields(
             second_degree_rels = set(related_class.__mapper__.relationships.keys())
             related_class_fields = {
                 i
-                for i in new_oso.authorized_fields(oso_actor, action, related_class)
+                for i in oso.authorized_fields(oso_actor, action, related_class)
                 if i not in second_degree_rels
             }
             degree2_fields[rel_name] = related_class_fields
