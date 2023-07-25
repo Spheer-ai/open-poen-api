@@ -218,7 +218,7 @@ class Activity(Base):
     image: Mapped[str | None] = mapped_column(String(length=128))
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    finished_description: Mapped[str] = mapped_column(String(length=512))
+    finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
 
     user_roles = relationship(
         "UserActivityRole",

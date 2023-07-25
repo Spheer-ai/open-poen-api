@@ -432,7 +432,7 @@ async def create_activity(
     initiative_db = await session.get(ent.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
-    auth.authorize(required_user, "create", ent.Activity)
+    auth.authorize(required_user, "create_activity", initiative_db)
     try:
         activity_db = await activity_manager.create(
             activity, initiative_id, request=request
