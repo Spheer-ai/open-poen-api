@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from .mixins import NotNullValidatorMixin
 
 
@@ -53,3 +53,7 @@ class ActivityUpdate(NotNullValidatorMixin):
 
 class ActivityOwnersUpdate(BaseModel):
     user_ids: list[int]
+
+    @validator("user_ids", pre=True)
+    def remove_duplicates(cls, v):
+        return list(set(v))

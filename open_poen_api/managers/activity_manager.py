@@ -2,8 +2,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
 from ..schemas_and_models import ActivityCreate, ActivityUpdate
-from ..schemas_and_models.models.entities import Activity
+from ..schemas_and_models.models.entities import Activity, UserActivityRole, User
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
+from sqlalchemy.orm.exc import NoResultFound
+from fastapi import HTTPException
 
 
 class ActivityAlreadyExists(BaseException):
@@ -48,11 +51,46 @@ class ActivityManager:
             raise ActivityAlreadyExists
         return activity_db
 
-    async def delete():
-        pass
+    async def delete(self, activity: Activity, request: Request | None = None) -> None:
+        await self.session.delete(activity)
+        await self.session.commit()
 
-    async def make_users_owner():
-        pass
+    async def make_users_owner(
+        self, activity: Activity, user_ids: list[int], request: Request | None = None
+    ):
+        existing_roles = await self.session.execute(
+            select(UserActivityRole).where(UserActivityRole.activity_id == activity.id)
+        )
+        existing_roles = existing_roles.scalars().all()
+        existing_role_user_ids = {i.user_id for i in existing_roles}
+
+        existing_users = await self.session.execute(
+            select(User).where(User.id.in_(user_ids))
+        )
+        existing_users = existing_users.scalars().all()
+        existing_user_ids = {i.id for i in existing_users}
+
+        if not len(existing_users) == len(user_ids):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Some user ids were not found: {set(user_ids) - existing_user_ids}",
+            )
+
+        for role in [
+            role for role in existing_roles if role.user_id not in existing_user_ids
+        ]:
+            await self.session.delete(role)
+
+        for user_id in [
+            user_id
+            for user_id in existing_user_ids
+            if user_id not in existing_role_user_ids
+        ]:
+            new_role = UserActivityRole(user_id=user_id, activity_id=activity.id)
+            self.session.add(new_role)
+
+        await self.session.commit()
+        return activity
 
 
 async def get_activity_manager(session: AsyncSession = Depends(get_async_session)):

@@ -49,7 +49,7 @@ async def create_user(
     user_manager: um.UserManager = Depends(um.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(superuser, "create", ent.User)
+    auth.authorize(superuser, "create", ent.User, oso)
     user_with_password = s.UserCreateWithPassword(
         **user.dict(), password=temp_password_generator(16)
     )
@@ -75,7 +75,7 @@ async def get_initiative(
     user_db = await ent.User.detail_load(session, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    auth.authorize(optional_user, "read", user_db)
+    auth.authorize(optional_user, "read", user_db, oso)
     return auth.get_authorized_output_fields(optional_user, "read", user_db, oso)
 
 
@@ -96,7 +96,7 @@ async def update_user(
     user_db = await session.get(ent.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    auth.authorize(required_user, "edit", user_db)
+    auth.authorize(required_user, "edit", user_db, oso)
     auth.authorize_input_fields(required_user, "edit", user_db, user)
     try:
         edited_user = await user_manager.update(user, user_db, request=request)
@@ -113,11 +113,12 @@ async def delete_user(
     session: AsyncSession = Depends(get_async_session),
     superuser=Depends(superuser_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await session.get(ent.User, user_id)
     if not user_db:
         raise HTTPException(status_code=404, detail="User not found")
-    auth.authorize(superuser, "delete", user_db)
+    auth.authorize(superuser, "delete", user_db, oso)
     await user_manager.delete(user_db, request=request)
     return Response(status_code=204)
 
@@ -301,7 +302,7 @@ async def create_initiative(
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(required_user, "create", ent.Initiative)
+    auth.authorize(required_user, "create", ent.Initiative, oso)
     try:
         initiative_db = await initiative_manager.create(initiative, request=request)
     except im.InitiativeAlreadyExists:
@@ -324,7 +325,7 @@ async def get_initiative(
     initiative_db = await ent.Initiative.detail_load(session, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
-    auth.authorize(optional_user, "read", initiative_db)
+    auth.authorize(optional_user, "read", initiative_db, oso)
     return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
 
 
@@ -343,7 +344,7 @@ async def update_initiative(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db)
+    auth.authorize(required_user, "edit", initiative_db, oso)
     auth.authorize_input_fields(required_user, "edit", initiative_db, initiative)
     try:
         edited_initiative = await initiative_manager.update(
@@ -371,7 +372,7 @@ async def link_initiative_owners(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await ent.Initiative.detail_load(session, initiative_id)
-    auth.authorize(required_user, "edit", initiative_db)
+    auth.authorize(required_user, "edit", initiative_db, oso)
     initiative_db = await initiative_manager.make_users_owner(
         initiative_db, initiative.user_ids, request=request
     )
@@ -391,9 +392,10 @@ async def delete_initiative(
     request: Request,
     required_user=Depends(required_login_dep),
     initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.fetch_and_verify(initiative_id)
-    auth.authorize(required_user, "delete", initiative_db)
+    auth.authorize(required_user, "delete", initiative_db, oso)
     await initiative_manager.delete(initiative_db, request=request)
     return Response(status_code=204)
 
@@ -432,7 +434,7 @@ async def create_activity(
     initiative_db = await session.get(ent.Initiative, initiative_id)
     if not initiative_db:
         raise HTTPException(status_code=404, detail="Initiative not found")
-    auth.authorize(required_user, "create_activity", initiative_db)
+    auth.authorize(required_user, "create_activity", initiative_db, oso)
     try:
         activity_db = await activity_manager.create(
             activity, initiative_id, request=request
@@ -458,7 +460,7 @@ async def get_activity(
     activity_db = await ent.Activity.detail_load(session, initiative_id, activity_id)
     if not activity_db:
         raise HTTPException(status_code=404, detail="Activity not found")
-    auth.authorize(optional_user, "read", activity_db)
+    auth.authorize(optional_user, "read", activity_db, oso)
     return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
 
 
@@ -485,7 +487,7 @@ async def update_activity(
     activity_db = executed_q.scalars().first()
     if not activity_db:
         raise HTTPException(status_code=404, detail="Activity not found")
-    auth.authorize(required_user, "edit", activity_db)
+    auth.authorize(required_user, "edit", activity_db, oso)
     try:
         edited_activity = await activity_manager.update(activity, activity_db)
     except am.ActivityAlreadyExists:
@@ -494,6 +496,58 @@ async def update_activity(
     return auth.get_authorized_output_fields(
         required_user, "read", edited_activity, oso
     )
+
+
+@router.patch(
+    "/initiative/{initiative_id}/activity/{activity_id}/owners",
+    response_model=s.UserReadList,
+)
+async def link_activity_owners(
+    initiative_id: int,
+    activity_id: int,
+    activity: s.ActivityOwnersUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(required_login_dep),
+    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    activity_db = await ent.Activity.detail_load(session, initiative_id, activity_id)
+    auth.authorize(required_user, "edit", activity_db, oso)
+    activity_db = await activity_manager.make_users_owner(
+        activity_db, activity.user_ids, request=request
+    )
+    await session.refresh(activity_db)
+    filtered_activity_owners = [
+        auth.get_authorized_output_fields(
+            required_user, "read", i, oso, ent.User.REL_FIELDS
+        )
+        for i in activity_db.activity_owners
+    ]
+    return s.UserReadList(users=filtered_activity_owners)
+
+
+@router.delete("/initiative/{initiative_id}/activity/{activity_id}")
+async def delete_activity(
+    initiative_id: int,
+    activity_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(required_login_dep),
+    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    executed_q = await session.execute(
+        select(ent.Activity).where(
+            and_(ent.Initiative.id == initiative_id, ent.Activity.id == activity_id)
+        )
+    )
+    activity_db = executed_q.scalars().first()
+    if not activity_db:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    auth.authorize(required_user, "delete", activity_db, oso)
+    await activity_manager.delete(activity_db, request=request)
+    return Response(status_code=204)
 
 
 # ROUTES

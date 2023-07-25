@@ -6,7 +6,7 @@ from tests.conftest import (
     anon_info,
     activity_info,
 )
-from open_poen_api.schemas_and_models.models.entities import Activity
+from open_poen_api.schemas_and_models.models.entities import Activity, Initiative
 
 
 @pytest.mark.asyncio
@@ -32,6 +32,39 @@ async def test_create_activity(async_client, as_3, status_code):
         assert db_activity is not None
         activity_data = response.json()
         assert activity_data["name"] == body["name"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 204)], indirect=["get_mock_user"]
+)
+async def test_delete_activity(async_client, as_4, status_code):
+    initiative_id, activity_id = 1, 1
+    response = await async_client.delete(
+        f"/initiative/{initiative_id}/activity/{activity_id}"
+    )
+    assert response.status_code == status_code
+    if status_code == 204:
+        activity = await as_4.get(Activity, activity_id)
+        assert activity is None
+        initiative = await as_4.get(Initiative, initiative_id)
+        assert initiative is not None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+)
+async def test_add_activity_owner(async_client, as_4, status_code):
+    initiative_id, activity_id = 1, 1
+    body = {"user_ids": [1]}
+    response = await async_client.patch(
+        f"/initiative/{initiative_id}/activity/{activity_id}/owners", json=body
+    )
+    assert response.status_code == status_code
+    db_activity = await Activity.detail_load(as_4, initiative_id, activity_id)
+    assert len(db_activity.activity_owners) == 1
+    assert db_activity.activity_owners[0].email == "existing@user.com"
 
 
 @pytest.mark.asyncio
