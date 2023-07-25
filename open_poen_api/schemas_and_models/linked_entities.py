@@ -25,3 +25,7 @@ class InitiativeReadLinked(InitiativeRead):
 class ActivityReadLinked(ActivityRead):
     activity_owners: list[UserRead]
     initiative: InitiativeRead
+
+    @validator("activity_owners", pre=True)
+    def apply_operation(cls, v):
+        return list(v)

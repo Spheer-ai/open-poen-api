@@ -149,18 +149,15 @@ def get_authorized_output_fields(
     )
     degree2_fields = {}
 
-    # TODO: I made a logic error here. The allowed fields are retrieved on a class
-    # basis instead of an instance basis. Then a term like this one will fail:
-    # (user in init_resource.initiative_owners and name = "initiative_owner")
-    # Because initiative_owners is not an iterable.
-
     for rel_name, rel in resource.__mapper__.relationships.items():
         if rel_name in degree1_fields:
             related_class = rel.mapper.class_
             second_degree_rels = set(related_class.__mapper__.relationships.keys())
             related_class_fields = {
                 i
-                for i in oso.authorized_fields(oso_actor, action, related_class)
+                for i in oso.authorized_fields(
+                    oso_actor, action, getattr(resource, rel_name)
+                )
                 if i not in second_degree_rels
             }
             degree2_fields[rel_name] = related_class_fields
