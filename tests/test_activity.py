@@ -56,6 +56,20 @@ async def test_patch_activity(async_client, as_4, body, status_code):
             assert getattr(activity, key) == body[key]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_activity_detail(async_client, as_4, status_code):
+    initiative_id, activity_id = 1, 1
+    response = await async_client.get(
+        f"/initiative/{initiative_id}/activity/{activity_id}"
+    )
+    assert response.status_code == status_code
+
+
 # import pytest
 # from sqlmodel import select, and_
 # from open_poen_api.schemas_and_models.models import entities as ent

@@ -16,7 +16,7 @@ from sqlalchemy_utils import ChoiceType
 
 # from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -233,14 +233,16 @@ class Activity(Base):
         return f"Activity(id={self.id}, name='{self.name}')"
 
     @classmethod
-    async def detail_load(cls, session: AsyncSession, id: int):
+    async def detail_load(
+        cls, session: AsyncSession, initiative_id: int, activity_id: int
+    ):
         query_result = await session.execute(
             select(cls)
             .options(
                 selectinload(cls.user_roles).selectinload(UserActivityRole.user),
                 selectinload(cls.initiative),
             )
-            .where(cls.id == id)
+            .where(and_(Initiative.id == initiative_id, cls.id == activity_id))
         )
         return query_result.scalars().first()
 

@@ -443,8 +443,29 @@ async def create_activity(
     return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
 
 
+@router.get(
+    "/initiative/{initiative_id}/activity/{activity_id}",
+    response_model=s.ActivityReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_activity(
+    initiative_id: int,
+    activity_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    activity_db = await ent.Activity.detail_load(session, initiative_id, activity_id)
+    if not activity_db:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    auth.authorize(optional_user, "read", activity_db)
+    return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
+
+
 @router.patch(
-    "/initiative/{initiative_id}/activity/{activity_id}", response_model=s.ActivityRead
+    "/initiative/{initiative_id}/activity/{activity_id}",
+    response_model=s.ActivityRead,
+    response_model_exclude_unset=True,
 )
 async def update_activity(
     initiative_id: int,
