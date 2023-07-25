@@ -20,7 +20,12 @@ import urllib.parse
 from open_poen_api.managers.user_manager import get_user_manager
 from open_poen_api.database import get_user_db
 from open_poen_api.managers.initiative_manager import get_initiative_manager
-from open_poen_api.schemas_and_models import UserCreateWithPassword, InitiativeCreate
+from open_poen_api.managers.activity_manager import get_activity_manager
+from open_poen_api.schemas_and_models import (
+    UserCreateWithPassword,
+    InitiativeCreate,
+    ActivityCreate,
+)
 
 
 superuser_info = {
@@ -176,6 +181,15 @@ async def as_3(as_2):
     i = await Initiative.detail_load(as_2, 1)
     i = await im.make_users_owner(i, [1], request=None)
     return as_2
+
+
+@pytest_asyncio.fixture(scope="function")
+async def as_4(as_3):
+    # One initiative + activity and one user linked to one another.
+    am = await get_activity_manager(as_3).__anext__()
+    s = ActivityCreate(**activity_info)
+    a = await am.create(s, 1, request=None)
+    return as_3
 
 
 # @pytest_asyncio.fixture(scope="function")

@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
-from ..schemas_and_models import ActivityCreate
+from ..schemas_and_models import ActivityCreate, ActivityUpdate
 from ..schemas_and_models.models.entities import Activity
 from sqlalchemy.exc import IntegrityError
 
@@ -32,8 +32,21 @@ class ActivityManager:
             raise ActivityAlreadyExists
         return activity
 
-    async def update():
-        pass
+    async def update(
+        self,
+        activity_update: ActivityUpdate,
+        activity_db: Activity,
+        request: Request | None = None,
+    ) -> Activity:
+        for key, value in activity_update.dict(exclude_unset=True).items():
+            setattr(activity_db, key, value)
+        self.session.add(activity_db)
+        try:
+            await self.session.commit()
+        except IntegrityError:
+            self.session.rollback()
+            raise ActivityAlreadyExists
+        return activity_db
 
     async def delete():
         pass

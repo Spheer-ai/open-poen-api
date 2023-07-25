@@ -31,7 +31,7 @@ class ActivityCreate(BaseModel):
     hidden: bool = Field(default=False)
 
 
-class InitiativeUpdate(NotNullValidatorMixin):
+class ActivityUpdate(NotNullValidatorMixin):
     NOT_NULL_FIELDS = [
         "name",
         "description",

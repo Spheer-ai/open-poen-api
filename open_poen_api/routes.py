@@ -22,7 +22,7 @@ from .bng import get_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
@@ -441,6 +441,38 @@ async def create_activity(
         raise HTTPException(status_code=400, detail="Name already registered")
     await session.refresh(activity_db)
     return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
+
+
+@router.patch(
+    "/initiative/{initiative_id}/activity/{activity_id}", response_model=s.ActivityRead
+)
+async def update_activity(
+    initiative_id: int,
+    activity_id: int,
+    activity: s.ActivityUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(required_login_dep),
+    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    executed_q = await session.execute(
+        select(ent.Activity).where(
+            and_(ent.Initiative.id == initiative_id, ent.Activity.id == activity_id)
+        )
+    )
+    activity_db = executed_q.scalars().first()
+    if not activity_db:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    auth.authorize(required_user, "edit", activity_db)
+    try:
+        edited_activity = await activity_manager.update(activity, activity_db)
+    except am.ActivityAlreadyExists:
+        raise HTTPException(status_code=400, detail="Name is already registered")
+    await session.refresh(edited_activity)
+    return auth.get_authorized_output_fields(
+        required_user, "read", edited_activity, oso
+    )
 
 
 # ROUTES

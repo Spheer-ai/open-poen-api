@@ -34,6 +34,28 @@ async def test_create_activity(async_client, as_3, status_code):
         assert activity_data["name"] == body["name"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, body, status_code",
+    [
+        (superuser_info, {"hidden": True}, 200),
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_patch_activity(async_client, as_4, body, status_code):
+    initiative_id, activity_id = 1, 1
+    response = await async_client.patch(
+        f"/initiative/{initiative_id}/activity/{activity_id}", json=body
+    )
+    assert response.status_code == status_code
+    if status_code == 200:
+        activity = await as_4.get(Activity, activity_id)
+        # Fix this. Apparently the session is not clean on every test invocation.
+        await as_4.refresh(activity)
+        for key in body:
+            assert getattr(activity, key) == body[key]
+
+
 # import pytest
 # from sqlmodel import select, and_
 # from open_poen_api.schemas_and_models.models import entities as ent
