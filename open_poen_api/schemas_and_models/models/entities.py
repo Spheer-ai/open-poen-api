@@ -84,7 +84,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    bng = relationship("BNG", uselist=False, back_populates="user", lazy="selectin")
+    bng = relationship("BNG", uselist=False, back_populates="user", lazy="noload")
     initiative_roles = relationship(
         "UserInitiativeRole",
         back_populates="user",

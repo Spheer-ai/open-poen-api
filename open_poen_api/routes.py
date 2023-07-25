@@ -133,13 +133,7 @@ async def get_users(
     # TODO: Enable searching by email.
     # TODO: pagination.
     q = auth.get_authorized_query(optional_user, "read", ent.User, oso)
-    users_result = await session.execute(
-        q.options(
-            noload(ent.User.initiative_roles),
-            noload(ent.User.activity_roles),
-            noload(ent.User.bng),
-        )
-    )
+    users_result = await session.execute(q)
     users_scalar = users_result.scalars().all()
     filtered_users = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
@@ -415,12 +409,7 @@ async def get_initiatives(
 ):
     # TODO: pagination.
     q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
-    initiatives_result = await async_session.execute(
-        q.options(
-            noload(ent.Initiative.user_roles),
-            noload(ent.Initiative.activities),
-        )
-    )
+    initiatives_result = await async_session.execute(q)
     initiatives_scalar = initiatives_result.scalars().all()
     filtered_initiatives = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
