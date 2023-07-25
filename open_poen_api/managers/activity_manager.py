@@ -1,6 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends
+from fastapi import Depends, Request
 from ..database import get_async_session
+from ..schemas_and_models import ActivityCreate
+from ..schemas_and_models.models.entities import Activity
+from sqlalchemy.exc import IntegrityError
 
 
 class ActivityAlreadyExists(BaseException):
@@ -14,8 +17,20 @@ class ActivityManager:
     async def fetch_and_verify():
         pass
 
-    async def create():
-        pass
+    async def create(
+        self,
+        activity_create: ActivityCreate,
+        initiative_id: int,
+        request: Request | None = None,
+    ) -> Activity:
+        activity = Activity(initiative_id=initiative_id, **activity_create.dict())
+        self.session.add(activity)
+        try:
+            await self.session.commit()
+        except IntegrityError:
+            self.session.rollback()
+            raise ActivityAlreadyExists
+        return activity
 
     async def update():
         pass

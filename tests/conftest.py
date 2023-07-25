@@ -53,6 +53,13 @@ initiative_info = {
     "location": "Amsterdam",
 }
 
+activity_info = {
+    "name": "Zomer Picnic",
+    "description": "Een fantastische picnic in het park.",
+    "purpose": "Bevorderen buurtgevoel.",
+    "target_audience": "Mensen uit buurt De Florijn",
+}
+
 
 async def retrieve_token_from_last_sent_email():
     """Gets the last send email from Mailhog, assumes it's an email reply to a password

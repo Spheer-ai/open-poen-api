@@ -44,7 +44,35 @@ OSO.register_class(
         "hidden": bool,
     },
 )
-OSO.register_class(ent.Activity)
+OSO.register_class(
+    ent.UserActivityRole,
+    fields={
+        "activity": Relation(
+            kind="one",
+            other_type="Activity",
+            my_field="activity_id",
+            other_field="id",
+        )
+    },
+)
+OSO.register_class(
+    ent.Activity,
+    fields={
+        "user_roles": Relation(
+            kind="many",
+            other_type="UserActivityRole",
+            my_field="id",
+            other_field="activity_id",
+        ),
+        "hidden": bool,
+        "initiative": Relation(
+            kind="one",
+            other_type="Initiative",
+            my_field="initiative_id",
+            other_field="id",
+        ),
+    },
+)
 OSO.load_file("open_poen_api/main.polar")
 
 

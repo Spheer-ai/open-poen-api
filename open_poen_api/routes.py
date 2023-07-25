@@ -9,11 +9,12 @@ from fastapi import (
 )
 from fastapi.responses import RedirectResponse
 from fastapi_users.exceptions import UserAlreadyExists
-from .database import get_async_session, get_sync_session
+from .database import get_async_session
 from . import schemas_and_models as s
 from .schemas_and_models.models import entities as ent
 from .managers import user_manager as um
 from .managers import initiative_manager as im
+from .managers import activity_manager as am
 from .utils.utils import temp_password_generator, get_requester_ip
 import os
 from .bng.api import create_consent
@@ -22,13 +23,10 @@ from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import noload, selectinload
 from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
 import pytz
-from typing import Set, Any
-from oso import exceptions
 from .authorization.authorization import SECRET_KEY, ALGORITHM
 from .authorization import authorization as auth
 
@@ -419,6 +417,30 @@ async def get_initiatives(
         for i in initiatives_scalar
     ]
     return s.InitiativeReadList(initiatives=filtered_initiatives)
+
+
+@router.post("/initiative/{initiative_id}/activity", response_model=s.ActivityRead)
+async def create_activity(
+    initiative_id: int,
+    activity: s.ActivityCreate,
+    request: Request,
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(required_login_dep),
+    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    initiative_db = await session.get(ent.Initiative, initiative_id)
+    if not initiative_db:
+        raise HTTPException(status_code=404, detail="Initiative not found")
+    auth.authorize(required_user, "create", ent.Activity)
+    try:
+        activity_db = await activity_manager.create(
+            activity, initiative_id, request=request
+        )
+    except am.ActivityAlreadyExists:
+        raise HTTPException(status_code=400, detail="Name already registered")
+    await session.refresh(activity_db)
+    return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
 
 
 # ROUTES

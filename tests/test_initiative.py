@@ -4,8 +4,8 @@ from tests.conftest import (
     superuser_info,
     userowner_info,
     user_info,
-    initiative_info,
     anon_info,
+    initiative_info,
 )
 from open_poen_api.schemas_and_models.models.entities import Initiative
 

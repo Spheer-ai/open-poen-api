@@ -223,16 +223,26 @@ class Activity(Base):
     user_roles = relationship(
         "UserActivityRole",
         back_populates="activity",
-        lazy="selectin",
+        lazy="noload",
     )
     activity_owners = association_proxy("user_roles", "user")
     initiative_id: Mapped[int] = mapped_column(Integer, ForeignKey("initiative.id"))
-    initiative = relationship(
-        "Initiative", back_populates="activities", lazy="selectin"
-    )
+    initiative = relationship("Initiative", back_populates="activities", lazy="noload")
 
     def __repr__(self):
         return f"Activity(id={self.id}, name='{self.name}')"
+
+    @classmethod
+    async def detail_load(cls, session: AsyncSession, id: int):
+        query_result = await session.execute(
+            select(cls)
+            .options(
+                selectinload(cls.user_roles).selectinload(UserActivityRole.user),
+                selectinload(cls.initiative),
+            )
+            .where(cls.id == id)
+        )
+        return query_result.scalars().first()
 
 
 # class UserBase(SQLModel, HiddenMixin):

@@ -1,4 +1,5 @@
-# from .activity import *
+from .activity import *
+
 # from .authorization import *
 from .initiative import *
 

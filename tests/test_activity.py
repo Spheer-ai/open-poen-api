@@ -1,3 +1,39 @@
+import pytest
+from tests.conftest import (
+    superuser_info,
+    userowner_info,
+    user_info,
+    anon_info,
+    activity_info,
+)
+from open_poen_api.schemas_and_models.models.entities import Activity
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [
+        (superuser_info, 200),
+        (userowner_info, 200),
+        (user_info, 403),
+        (anon_info, 403),
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_create_activity(async_client, as_3, status_code):
+    body = activity_info
+    initiative_id = 1
+    response = await async_client.post(
+        f"/initiative/{initiative_id}/activity", json=body
+    )
+    assert response.status_code == status_code
+    if status_code == 200:
+        db_activity = as_3.get(Activity, response.json()["id"])
+        assert db_activity is not None
+        activity_data = response.json()
+        assert activity_data["name"] == body["name"]
+
+
 # import pytest
 # from sqlmodel import select, and_
 # from open_poen_api.schemas_and_models.models import entities as ent
