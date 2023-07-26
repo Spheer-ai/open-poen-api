@@ -9,6 +9,7 @@ from sqlalchemy import (
     Boolean,
     Table,
     UniqueConstraint,
+    DECIMAL,
 )
 from datetime import datetime
 from enum import Enum
@@ -27,6 +28,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyBaseUserTable
+from decimal import Decimal
 
 
 class Base(DeclarativeBase):
@@ -202,6 +204,88 @@ class Activity(Base):
         return f"Activity(id={self.id}, name='{self.name}')"
 
 
+class Route(str, Enum):
+    """We need to distinguish between incoming and outcoming funds, so that
+    we can take corrective payments into account in the calculation rules, such
+    as refunds."""
+
+    INCOME = "income"
+    EXPENSES = "expenses"
+
+
+class PaymentType(str, Enum):
+    BNG = "BNG"
+    NORDIGEN = "NORDIGEN"
+    MANUAL = "MANUAL"
+
+
+class Payment(Base):
+    __tablename__ = "payment"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    transaction_id: Mapped[str] = mapped_column(String(length=64), unique=True)
+    entry_reference: Mapped[str] = mapped_column(String(length=128))
+    end_to_end_id: Mapped[str] = mapped_column(String(length=128))
+    booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    creditor_name: Mapped[str] = mapped_column(String(length=128))
+    creditor_account: Mapped[str] = mapped_column(String(length=128))
+    debtor_name: Mapped[str] = mapped_column(String(length=128))
+    debtor_account: Mapped[str] = mapped_column(String(length=128))
+    route: Mapped[Route] = mapped_column(ChoiceType(Route, impl=VARCHAR(length=32)))
+    type: Mapped[PaymentType] = mapped_column(
+        ChoiceType(PaymentType, impl=VARCHAR(length=32))
+    )
+    remittance_information_unstructured: Mapped[str] = mapped_column(String(length=256))
+    remittance_information_structured: Mapped[str] = mapped_column(String(length=256))
+    short_user_description: Mapped[str] = mapped_column(String(length=512))
+    long_user_description: Mapped[str] = mapped_column(String(length=128))
+
+
+# class PaymentBase(SQLModel, HiddenMixin):
+#     booking_date: datetime = Field(sa_column=Column(DateTime(timezone=True)))
+#     transaction_amount: Money
+#     creditor_name: str
+#     creditor_account: str
+#     debtor_name: str
+#     debtor_account: str
+#     route: Route = Field(
+#         sa_column=Column(ChoiceType(Route, impl=VARCHAR(length=32))),
+#         nullable=False,
+#     )
+#     short_user_description: str | None
+#     long_user_description: str | None
+
+
+# class Payment(PaymentBase, TimeStampMixin, table=True):
+#     id: int | None = Field(default=None, primary_key=True)
+#     transaction_id: str | None
+#     entry_reference: str | None
+#     end_to_end_id: str | None
+#     remittance_information_unstructured: str | None
+#     remittance_information_structured: str | None
+#     type: PaymentType = Field(
+#         sa_column=Column(
+#             ChoiceType(PaymentType, impl=VARCHAR(length=32)), default=PaymentType.MANUAL
+#         ),
+#         nullable=False,
+#     )
+#     # TODO: How should these cascades work?
+#     initiative_id: int = Field(
+#         sa_column=Column(Integer, ForeignKey("initiative.id", ondelete="CASCADE"))
+#     )
+#     initiative: Initiative = Relationship(back_populates="payments")
+#     # TODO: How should these cascades work?
+#     activity_id: int = Field(
+#         sa_column=Column(Integer, ForeignKey("activity.id", ondelete="CASCADE"))
+#     )
+#     activity: Activity = Relationship(back_populates="payments")
+#     debit_card_id: int | None = Field(
+#         sa_column=Column(Integer, ForeignKey("debitcard.id"), nullable=True)
+#     )
+#     debit_card: "DebitCard" = Relationship(back_populates="payments")
+
+
 # class UserBase(SQLModel, HiddenMixin):
 #     email: EmailStr = Field(
 #         sa_column=Column("email", VARCHAR, unique=True, index=True, nullable=False)
@@ -288,65 +372,6 @@ class Activity(Base):
 #     __table_args__ = (
 #         UniqueConstraint("name", "initiative_id", name="unique_activity_name"),
 #     )
-
-
-# class Route(str, Enum):
-#     """We need to distinguish between incoming and outcoming funds, so that
-#     we can take corrective payments into account in the calculation rules, such
-#     as refunds."""
-
-#     INCOME = "income"
-#     EXPENSES = "expenses"
-
-
-# class PaymentType(str, Enum):
-#     BNG = "BNG"
-#     NORDIGEN = "NORDIGEN"
-#     MANUAL = "MANUAL"
-
-
-# class PaymentBase(SQLModel, HiddenMixin):
-#     booking_date: datetime = Field(sa_column=Column(DateTime(timezone=True)))
-#     transaction_amount: Money
-#     creditor_name: str
-#     creditor_account: str
-#     debtor_name: str
-#     debtor_account: str
-#     route: Route = Field(
-#         sa_column=Column(ChoiceType(Route, impl=VARCHAR(length=32))),
-#         nullable=False,
-#     )
-#     short_user_description: str | None
-#     long_user_description: str | None
-
-
-# class Payment(PaymentBase, TimeStampMixin, table=True):
-#     id: int | None = Field(default=None, primary_key=True)
-#     transaction_id: str | None
-#     entry_reference: str | None
-#     end_to_end_id: str | None
-#     remittance_information_unstructured: str | None
-#     remittance_information_structured: str | None
-#     type: PaymentType = Field(
-#         sa_column=Column(
-#             ChoiceType(PaymentType, impl=VARCHAR(length=32)), default=PaymentType.MANUAL
-#         ),
-#         nullable=False,
-#     )
-#     # TODO: How should these cascades work?
-#     initiative_id: int = Field(
-#         sa_column=Column(Integer, ForeignKey("initiative.id", ondelete="CASCADE"))
-#     )
-#     initiative: Initiative = Relationship(back_populates="payments")
-#     # TODO: How should these cascades work?
-#     activity_id: int = Field(
-#         sa_column=Column(Integer, ForeignKey("activity.id", ondelete="CASCADE"))
-#     )
-#     activity: Activity = Relationship(back_populates="payments")
-#     debit_card_id: int | None = Field(
-#         sa_column=Column(Integer, ForeignKey("debitcard.id"), nullable=True)
-#     )
-#     debit_card: "DebitCard" = Relationship(back_populates="payments")
 
 
 # class DebitCardBase(SQLModel):
