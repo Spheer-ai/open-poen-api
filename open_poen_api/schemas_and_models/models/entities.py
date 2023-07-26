@@ -16,7 +16,16 @@ from sqlalchemy_utils import ChoiceType
 
 # from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import select, and_
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    selectinload,
+)
+from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyBaseUserTable
 
 
@@ -24,12 +33,36 @@ class Base(DeclarativeBase):
     pass
 
 
-user_initiative = Table(
-    "user_initiative",
-    Base.metadata,
-    Column("user_id", Integer, ForeignKey("user.id")),
-    Column("initiative_id", Integer, ForeignKey("initiative.id")),
-)
+# user_initiative = Table(
+#     "user_initiative",
+#     Base.metadata,
+#     Column("user_id", Integer, ForeignKey("user.id")),
+#     Column("initiative_id", Integer, ForeignKey("initiative.id")),
+# )
+
+
+class UserInitiativeRole(Base):
+    __tablename__ = "user_initiative_roles"
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    initiative_id = Column(Integer, ForeignKey("initiative.id"), primary_key=True)
+    user = relationship("User", back_populates="initiative_roles")
+    initiative = relationship("Initiative", back_populates="user_roles")
+
+
+# user_activity = Table(
+#     "user_activity",
+#     Base.metadata,
+#     Column("user_id", Integer, ForeignKey("user.id")),
+#     Column("activity_id", Integer, ForeignKey("activity.id")),
+# )
+
+
+class UserActivityRole(Base):
+    __tablename__ = "user_activity_roles"
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    activity_id = Column(Integer, ForeignKey("activity.id"), primary_key=True)
+    user = relationship("User", back_populates="activity_roles")
+    activity = relationship("Activity", back_populates="user_roles")
 
 
 class Role(str, Enum):
@@ -51,16 +84,30 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    bng = relationship("BNG", uselist=False, back_populates="user", lazy="selectin")
-    initiatives = relationship(
-        "Initiative",
-        secondary=user_initiative,
-        back_populates="initiative_owners",
-        lazy="selectin",
+    bng = relationship("BNG", uselist=False, back_populates="user", lazy="noload")
+    initiative_roles = relationship(
+        "UserInitiativeRole",
+        back_populates="user",
+        lazy="noload",
     )
+    initiatives = association_proxy("initiative_roles", "initiative")
+    activity_roles = relationship(
+        "UserActivityRole",
+        back_populates="user",
+        lazy="noload",
+    )
+    activities = association_proxy("activity_roles", "activity")
 
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
+
+    REL_FIELDS = [
+        "bng",
+        "initiative_roles",
+        "initiatives",
+        "activity_roles",
+        "activities",
+    ]
 
 
 class BNG(Base):
@@ -116,15 +163,43 @@ class Initiative(Base):
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    initiative_owners = relationship(
-        "User",
-        secondary=user_initiative,
-        back_populates="initiatives",
-        lazy="selectin",
+    user_roles = relationship(
+        "UserInitiativeRole",
+        back_populates="initiative",
+        lazy="noload",
     )
+    initiative_owners = association_proxy("user_roles", "user")
+    activities = relationship("Activity", back_populates="initiative", lazy="noload")
 
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"
+
+
+class Activity(Base):
+    __tablename__ = "activity"
+    __table_args__ = (UniqueConstraint("name", "initiative_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    description: Mapped[str] = mapped_column(String(length=512), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    target_audience: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    image: Mapped[str | None] = mapped_column(String(length=128))
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
+
+    user_roles = relationship(
+        "UserActivityRole",
+        back_populates="activity",
+        lazy="noload",
+    )
+    activity_owners = association_proxy("user_roles", "user")
+    initiative_id: Mapped[int] = mapped_column(Integer, ForeignKey("initiative.id"))
+    initiative = relationship("Initiative", back_populates="activities", lazy="noload")
+
+    def __repr__(self):
+        return f"Activity(id={self.id}, name='{self.name}')"
 
 
 # class UserBase(SQLModel, HiddenMixin):

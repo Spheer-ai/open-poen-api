@@ -2,11 +2,17 @@ from functools import reduce
 from sqlalchemy.inspection import inspect
 from sqlalchemy.sql import false, true
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from polar.data.filter import Projection
 from polar.data.adapter import DataAdapter
+from sqlalchemy.orm import Session
 
 
 class SqlAlchemyAdapter(DataAdapter):
+    def __init__(self, session: Session):
+        self.session = session
+
+    @staticmethod
     def build_query(filter):
         types = filter.types
 
@@ -58,3 +64,7 @@ class SqlAlchemyAdapter(DataAdapter):
             return getattr(side, inspect(type(side)).primary_key[0].name)
         else:
             return side
+
+    def execute_query(self, query):
+        # Throw in threadpool executor to prevent blocking the event loop?
+        return self.session.execute(query).scalars().all()

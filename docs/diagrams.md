@@ -1,12 +1,13 @@
 ### ER-Diagram
 
-```mermaid
 erDiagram
     INITIATIVE ||--o{ ACTIVITY : contains
-    INITIATIVE }o--o{ USER : owned_by
+    INITIATIVE ||--o{ INITIATIVE_ROLES : gives_access
     %% We import payments from BNG without necessarily assigning them to an initiative.
     INITIATIVE |o--o{ PAYMENT : linked_to
-    ACTIVITY }o--o{ USER : owned_by
+    ACTIVITY ||--o{ ACTIVITY_ROLES : gives_access
+    USER ||--o{ ACTIVITY_ROLES : has
+    USER ||--o{ INITIATIVE_ROLES : has
     %% We import payments from BNG without necessarily assigning them to an initiative.
     ACTIVITY |o--o{ PAYMENT : linked_to
     ATTACHMENT }o--|| PAYMENT : attached_to
@@ -26,7 +27,6 @@ erDiagram
     %% What type of relationship should this be?
     GRANT }|--o{ INITIATIVE : part_of
     ACCOUNTABILITY_REPORT |o--|| GRANT : reports_on
-    PAYMENT_IMPORT |o--|{ PAYMENT : part_of
     USER ||--o{ PAYMENT_IMPORT : done_by
 
     
@@ -35,6 +35,16 @@ erDiagram
         int grant_id
         %% subsidy_officer, policy_officer or overseer
         str role
+    }
+
+    INITIATIVE_ROLES {
+        int user_id
+        int initiative_id
+    }
+
+    ACTIVITY_ROLES {
+        int user_id
+        int activity_id
     }
 
     MUTATION_LOGS {

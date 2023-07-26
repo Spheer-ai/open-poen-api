@@ -4,10 +4,11 @@ from tests.conftest import (
     superuser_info,
     userowner_info,
     user_info,
-    initiative_info,
     anon_info,
+    initiative_info,
 )
 from open_poen_api.schemas_and_models.models.entities import Initiative
+from open_poen_api.managers.initiative_manager import get_initiative_manager
 
 
 @pytest.mark.asyncio
@@ -26,6 +27,19 @@ async def test_create_initiative(async_client, async_session, status_code):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 204)], indirect=["get_mock_user"]
+)
+async def test_delete_initiative(async_client, as_2, status_code):
+    initiative_id = 1
+    response = await async_client.delete(f"/initiative/{initiative_id}")
+    assert response.status_code == status_code
+    if status_code == 204:
+        initiative = await as_2.get(Initiative, initiative_id)
+        assert initiative is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
 )
 async def test_add_initiative_owner(async_client, as_2, status_code):
@@ -35,21 +49,35 @@ async def test_add_initiative_owner(async_client, as_2, status_code):
         f"/initiative/{initiative_id}/owners", json=body
     )
     assert response.status_code == status_code
-    db_initiative = await as_2.get(Initiative, response.json()["users"][0]["id"])
+    im = await get_initiative_manager(as_2).__anext__()
+    db_initiative = await im.detail_load(initiative_id)
     assert len(db_initiative.initiative_owners) == 1
     assert db_initiative.initiative_owners[0].email == "existing@user.com"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "get_mock_user, status_code",
-    [(superuser_info, 200), (anon_info, 200)],
+    "get_mock_user, body, status_code",
+    [
+        (superuser_info, {"location": "Groningen"}, 200),
+        (userowner_info, {"location": "Groningen"}, 403),
+        (superuser_info, {"hidden": True}, 200),
+        (userowner_info, {"hidden": True}, 200),
+        (user_info, {"location": "Groningen"}, 403),
+        (superuser_info, {"name": "Piets Buurtbarbeque2"}, 400),
+    ],
     indirect=["get_mock_user"],
 )
-async def test_get_linked_initiative_detail(async_client, as_3, status_code):
+async def test_patch_initiative(async_client, as_3, body, status_code):
     initiative_id = 1
-    response = await async_client.get(f"/initiative/{initiative_id}")
+    response = await async_client.patch(f"/initiative/{initiative_id}", json=body)
     assert response.status_code == status_code
+    if status_code == 200:
+        initiative = await as_3.get(Initiative, initiative_id)
+        # Fix this. Apparently the session is not clean on every test invocation.
+        await as_3.refresh(initiative)
+        for key in body:
+            assert getattr(initiative, key) == body[key]
 
 
 @pytest.mark.asyncio
@@ -62,6 +90,18 @@ async def test_get_initiatives_list(async_client, as_3, status_code):
     response = await async_client.get("/initiatives")
     assert response.status_code == status_code
     assert len(response.json()["initiatives"]) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_linked_initiative_detail(async_client, as_3, status_code):
+    initiative_id = 1
+    response = await async_client.get(f"/initiative/{initiative_id}")
+    assert response.status_code == status_code
 
 
 # # from .fixtures import client, created_user

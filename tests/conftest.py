@@ -1,6 +1,6 @@
 from open_poen_api.database import (
     async_session_maker,
-    engine,
+    asyng_engine,
 )
 from open_poen_api.app import app
 from open_poen_api.schemas_and_models.models.entities import (
@@ -8,19 +8,25 @@ from open_poen_api.schemas_and_models.models.entities import (
     User,
     Initiative,
     Role,
+    Activity,
 )
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
-from open_poen_api import user_manager as um
+from open_poen_api.managers import user_manager as um
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest_asyncio
 import base64
 import urllib.parse
-from open_poen_api.user_manager import get_user_manager
+from open_poen_api.managers.user_manager import get_user_manager
 from open_poen_api.database import get_user_db
-from open_poen_api.initiative_manager import get_initiative_manager
-from open_poen_api.schemas_and_models import UserCreateWithPassword, InitiativeCreate
+from open_poen_api.managers.initiative_manager import get_initiative_manager
+from open_poen_api.managers.activity_manager import get_activity_manager
+from open_poen_api.schemas_and_models import (
+    UserCreateWithPassword,
+    InitiativeCreate,
+    ActivityCreate,
+)
 
 
 superuser_info = {
@@ -51,6 +57,13 @@ initiative_info = {
     "address_applicant": "Het stoepje 42, Assen, 9408DT, Nederland",
     "kvk_registration": "12345678",
     "location": "Amsterdam",
+}
+
+activity_info = {
+    "name": "Zomer Picnic",
+    "description": "Een fantastische picnic in het park.",
+    "purpose": "Bevorderen buurtgevoel.",
+    "target_audience": "Mensen uit buurt De Florijn",
 }
 
 
@@ -129,16 +142,16 @@ async def clean_async_client(event_loop):
 @pytest_asyncio.fixture(scope="function")
 async def async_session(event_loop) -> AsyncSession:
     async with async_session_maker() as s:
-        async with engine.begin() as conn:
+        async with asyng_engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
         yield s
 
-    async with engine.begin() as conn:
+    async with asyng_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-    await engine.dispose()
+    await asyng_engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -157,8 +170,12 @@ async def as_1(async_session):
 async def as_2(as_1):
     # One initiative and one user.
     im = await get_initiative_manager(as_1).__anext__()
-    s = InitiativeCreate(**initiative_info)
-    i = await im.create(s, request=None)
+    for i in (1, 2, 3):
+        info = initiative_info.copy()
+        if i > 1:
+            info.update({"name": info["name"] + str(i)})
+        s = InitiativeCreate(**info)
+        i = await im.create(s, request=None)
     return as_1
 
 
@@ -166,9 +183,37 @@ async def as_2(as_1):
 async def as_3(as_2):
     # One initiative and one user linked to one another.
     im = await get_initiative_manager(as_2).__anext__()
-    i = await as_2.get(Initiative, 1)
+    i = await im.detail_load(1)
     i = await im.make_users_owner(i, [1], request=None)
     return as_2
+
+
+@pytest_asyncio.fixture(scope="function")
+async def as_4(as_3):
+    # One initiative + activity and one user linked to one another.
+    am = await get_activity_manager(as_3).__anext__()
+    s = ActivityCreate(**activity_info)
+    a = await am.create(s, 1, request=None)
+    return as_3
+
+
+@pytest_asyncio.fixture(scope="function")
+async def as_5(as_4):
+    # One initiative + activity + user and three users that are linked
+    # to the activity.
+    db = await get_user_db(as_4).__anext__()
+    um = await get_user_manager(db).__anext__()
+    am = await get_activity_manager(as_4).__anext__()
+    a = await as_4.get(Activity, 1)
+    ids = []
+    for i in (1, 2, 3):
+        s = UserCreateWithPassword(
+            email=f"extra{i}@user.com", role="user", password="testing"
+        )
+        u = await um.create(s, request=None)
+        ids.append(u.id)
+    await am.make_users_owner(a, ids, request=None)
+    return as_4
 
 
 # @pytest_asyncio.fixture(scope="function")

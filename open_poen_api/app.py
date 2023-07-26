@@ -1,8 +1,11 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Request, Depends
+from fastapi.responses import JSONResponse
 from .utils.load_env import load_env_vars
-from .user_manager import fastapi_users, auth_backend
-from .database import create_db_and_tables
+from .managers.user_manager import fastapi_users, auth_backend
+from .managers import CustomException
+from .database import create_db_and_tables, get_async_session
 from .routes import router
+from sqlalchemy.ext.asyncio import AsyncSession
 
 load_env_vars()
 
@@ -16,6 +19,11 @@ app.include_router(
 )
 
 app.include_router(router)
+
+
+@app.exception_handler(CustomException)
+async def custom_exception_handler(request: Request, exc: CustomException):
+    return JSONResponse(status_code=exc.status_code, content=str(exc))
 
 
 @app.on_event("startup")

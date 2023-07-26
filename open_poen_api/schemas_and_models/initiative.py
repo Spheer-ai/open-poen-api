@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from .models.entities import LegalEntity
 from .mixins import NotNullValidatorMixin
 
@@ -7,6 +7,7 @@ class InitiativeRead(BaseModel):
     id: int
     name: str
     description: str
+    purpose: str
     target_audience: str
     owner: str | None
     owner_email: str | None
@@ -73,3 +74,7 @@ class InitiativeUpdate(NotNullValidatorMixin):
 
 class InitiativeOwnersUpdate(BaseModel):
     user_ids: list[int]
+
+    @validator("user_ids", pre=True)
+    def remove_duplicates(cls, v):
+        return list(set(v))

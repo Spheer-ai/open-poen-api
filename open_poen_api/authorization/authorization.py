@@ -1,10 +1,12 @@
 import os
-from oso import Oso
+from oso import Oso, Relation
 from oso.exceptions import ForbiddenError, NotFoundError
 from ..schemas_and_models.models import entities as ent
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
+from ..database import get_sync_session
 from pydantic import BaseModel
 from .data_adapter import SqlAlchemyAdapter
+from sqlalchemy.orm import Session
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -19,9 +21,66 @@ OSO.register_class(
         "hidden": bool,
     },
 )
-OSO.register_class(ent.Initiative)
-OSO.set_data_filtering_adapter(SqlAlchemyAdapter)
+OSO.register_class(
+    ent.UserInitiativeRole,
+    fields={
+        "initiative": Relation(
+            kind="one",
+            other_type="Initiative",
+            my_field="initiative_id",
+            other_field="id",
+        )
+    },
+)
+OSO.register_class(
+    ent.Initiative,
+    fields={
+        "user_roles": Relation(
+            kind="many",
+            other_type="UserInitiativeRole",
+            my_field="id",
+            other_field="initiative_id",
+        ),
+        "hidden": bool,
+    },
+)
+OSO.register_class(
+    ent.UserActivityRole,
+    fields={
+        "activity": Relation(
+            kind="one",
+            other_type="Activity",
+            my_field="activity_id",
+            other_field="id",
+        )
+    },
+)
+OSO.register_class(
+    ent.Activity,
+    fields={
+        "user_roles": Relation(
+            kind="many",
+            other_type="UserActivityRole",
+            my_field="id",
+            other_field="activity_id",
+        ),
+        "hidden": bool,
+        "initiative": Relation(
+            kind="one",
+            other_type="Initiative",
+            my_field="initiative_id",
+            other_field="id",
+        ),
+    },
+)
 OSO.load_file("open_poen_api/main.polar")
+
+
+async def set_sqlalchemy_adapter(session: Session = Depends(get_sync_session)):
+    # You'll only need this when calling get_authorized_output_fields on a resource
+    # that has rules for established relationships.
+    OSO.set_data_filtering_adapter(SqlAlchemyAdapter(session))
+    yield OSO
 
 
 def get_oso_actor(actor: ent.User | None):
@@ -30,10 +89,12 @@ def get_oso_actor(actor: ent.User | None):
     return anon if actor is None else actor
 
 
-def get_authorized_query(actor: ent.User | None, action: str, resource: ent.Base):
+def get_authorized_query(
+    actor: ent.User | None, action: str, resource: ent.Base, oso: Oso
+):
     oso_actor = get_oso_actor(actor)
 
-    return OSO.authorized_query(oso_actor, action, resource)
+    return oso.authorized_query(oso_actor, action, resource)
 
 
 def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):
@@ -42,7 +103,7 @@ def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):
     return OSO.is_allowed(oso_actor, action, resource)
 
 
-def authorize(actor: ent.User | None, action: str, resource: ent.Base):
+def authorize(actor: ent.User | None, action: str, resource: ent.Base, oso: Oso):
     """
     Authorizes a given user (actor) to perform an action on a resource
     if allowed by Oso's policies.
@@ -65,7 +126,11 @@ def authorize_input_fields(
 
 
 def get_authorized_output_fields(
-    actor: ent.User | None, action: str, resource: ent.Base
+    actor: ent.User | None,
+    action: str,
+    resource: ent.Base,
+    oso: Oso,
+    ignore_fields: list[str] = [],
 ):
     """
     Filters the fields of a resource that an actor is authorized to access to give
@@ -79,7 +144,9 @@ def get_authorized_output_fields(
     """
     oso_actor = get_oso_actor(actor)
 
-    degree1_fields = OSO.authorized_fields(oso_actor, action, resource)
+    degree1_fields = oso.authorized_fields(oso_actor, action, resource) - set(
+        ignore_fields
+    )
     degree2_fields = {}
 
     for rel_name, rel in resource.__mapper__.relationships.items():
@@ -88,7 +155,9 @@ def get_authorized_output_fields(
             second_degree_rels = set(related_class.__mapper__.relationships.keys())
             related_class_fields = {
                 i
-                for i in OSO.authorized_fields(oso_actor, action, related_class)
+                for i in oso.authorized_fields(
+                    oso_actor, action, getattr(resource, rel_name)
+                )
                 if i not in second_degree_rels
             }
             degree2_fields[rel_name] = related_class_fields

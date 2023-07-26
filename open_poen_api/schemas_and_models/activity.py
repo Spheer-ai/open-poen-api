@@ -1,86 +1,59 @@
-from pydantic import BaseModel, Extra, validator
-from .mixins import TimeStampMixin, HiddenMixin, NotNullValidatorMixin
-from .models.entities import ActivityBase
+from pydantic import BaseModel, Field, validator
+from .mixins import NotNullValidatorMixin
 
 
-class ActivityCreateInitiativeOwner(ActivityBase):
-    activity_owner_ids: list[int] | None
-
-    class Config:
-        title = "ActivityCreate"
-        extra = Extra.forbid
-
-
-class ActivityUpdateInitiativeOwner(HiddenMixin, NotNullValidatorMixin):
-    name: str | None
-    description: str | None
-    purpose: str | None
-    target_audience: str | None
-    image: str | None
-    # NOTE: Purposefully leaving out fields related to finishing.
-    # I'll probably make a separate endpoint for this.
-    activity_owner_ids: list[int] | None
-
-    class Config:
-        title = "ActivityUpdate"
-        extra = Extra.forbid
-
-    @validator("name", "description", "purpose", "target_audience", "image", "hidden")
-    def val_fields(cls, value, field):
-        return cls.not_null(value, field)
-
-
-class ActivityOutputGuest(BaseModel):
+class ActivityRead(BaseModel):
     id: int
     name: str
     description: str
     purpose: str
     target_audience: str
-    image: str | None
-    finished_description: str | None
+    hidden: bool | None
     finished: bool
-
-
-class ActivityOutputUser(ActivityOutputGuest):
-    pass
-
-
-class ActivityOutputUserOwner(ActivityOutputUser):
-    pass
-
-
-class ActivityOutputActivityOwner(ActivityOutputUserOwner):
-    pass
-
-
-class ActivityOutputInitiativeOwner(ActivityOutputActivityOwner, HiddenMixin):
-    pass
-
-
-class ActivityOutputAdmin(ActivityOutputInitiativeOwner, TimeStampMixin):
-    pass
-
-    class Config:
-        title = "ActivityOutput"
-
-
-class ActivityOutputGuestList(BaseModel):
-    activities: list[ActivityOutputGuest]
+    finished_description: str | None
 
     class Config:
         orm_mode = True
 
 
-class ActivityOutputInitiativeOwnerList(BaseModel):
-    activities: list[ActivityOutputInitiativeOwner]
+class ActivityReadList(BaseModel):
+    activities: list[ActivityRead]
 
     class Config:
         orm_mode = True
 
 
-class ActivityOutputAdminList(BaseModel):
-    activities: list[ActivityOutputAdmin]
+class ActivityCreate(BaseModel):
+    name: str
+    description: str
+    purpose: str
+    target_audience: str
+    hidden: bool = Field(default=False)
 
-    class Config:
-        title = "ActivityOutputList"
-        orm_mode = True
+
+class ActivityUpdate(NotNullValidatorMixin):
+    NOT_NULL_FIELDS = [
+        "name",
+        "description",
+        "purpose",
+        "target_audience",
+        "hidden",
+        "finished",
+        "finished_description",
+    ]
+
+    name: str | None
+    description: str | None
+    purpose: str | None
+    target_audience: str | None
+    hidden: bool | None
+    finished: bool | None
+    finished_description: bool | None
+
+
+class ActivityOwnersUpdate(BaseModel):
+    user_ids: list[int]
+
+    @validator("user_ids", pre=True)
+    def remove_duplicates(cls, v):
+        return list(set(v))
