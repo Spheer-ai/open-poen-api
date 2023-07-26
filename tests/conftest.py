@@ -170,8 +170,12 @@ async def as_1(async_session):
 async def as_2(as_1):
     # One initiative and one user.
     im = await get_initiative_manager(as_1).__anext__()
-    s = InitiativeCreate(**initiative_info)
-    i = await im.create(s, request=None)
+    for i in (1, 2, 3):
+        info = initiative_info.copy()
+        if i > 1:
+            info.update({"name": info["name"] + str(i)})
+        s = InitiativeCreate(**info)
+        i = await im.create(s, request=None)
     return as_1
 
 
@@ -179,7 +183,7 @@ async def as_2(as_1):
 async def as_3(as_2):
     # One initiative and one user linked to one another.
     im = await get_initiative_manager(as_2).__anext__()
-    i = await Initiative.detail_load(as_2, 1)
+    i = await im.detail_load(1)
     i = await im.make_users_owner(i, [1], request=None)
     return as_2
 

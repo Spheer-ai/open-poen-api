@@ -2,23 +2,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
 from ..schemas_and_models import ActivityCreate, ActivityUpdate
-from ..schemas_and_models.models.entities import Activity, UserActivityRole, User
+from ..schemas_and_models.models.entities import (
+    Activity,
+    UserActivityRole,
+    User,
+    Initiative,
+)
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
-from sqlalchemy.orm.exc import NoResultFound
-from fastapi import HTTPException
-
-
-class ActivityAlreadyExists(BaseException):
-    pass
+from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
+from .exc import EntityNotFound
+from .exc import EntityAlreadyExists, EntityNotFound
 
 
 class ActivityManager:
     def __init__(self, session: AsyncSession):
         self.session = session
-
-    async def fetch_and_verify():
-        pass
 
     async def create(
         self,
@@ -32,7 +31,7 @@ class ActivityManager:
             await self.session.commit()
         except IntegrityError:
             self.session.rollback()
-            raise ActivityAlreadyExists
+            raise EntityAlreadyExists(message="Name is already in use")
         return activity
 
     async def update(
@@ -48,7 +47,7 @@ class ActivityManager:
             await self.session.commit()
         except IntegrityError:
             self.session.rollback()
-            raise ActivityAlreadyExists
+            raise EntityAlreadyExists("Name is already in use")
         return activity_db
 
     async def delete(self, activity: Activity, request: Request | None = None) -> None:
@@ -71,9 +70,8 @@ class ActivityManager:
         existing_user_ids = {i.id for i in existing_users}
 
         if not len(existing_users) == len(user_ids):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Some user ids were not found: {set(user_ids) - existing_user_ids}",
+            raise EntityNotFound(
+                message=f"There exist no Users with id's: {set(user_ids) - existing_user_ids}"
             )
 
         for role in [
@@ -91,6 +89,31 @@ class ActivityManager:
 
         await self.session.commit()
         return activity
+
+    async def detail_load(self, initiative_id: int, activity_id: int):
+        query_result = await self.session.execute(
+            select(Activity)
+            .options(
+                selectinload(Activity.user_roles).selectinload(UserActivityRole.user),
+                selectinload(Activity.initiative),
+            )
+            .where(and_(Initiative.id == initiative_id, Activity.id == activity_id))
+        )
+        query_result = query_result.scalars().first()
+        if query_result is None:
+            raise EntityNotFound(message="Activity not found")
+        return query_result
+
+    async def min_load(self, initiative_id: int, activity_id: int):
+        query_result = await self.session.execute(
+            select(Activity).where(
+                and_(Initiative.id == initiative_id, Activity.id == activity_id)
+            )
+        )
+        query_result = query_result.scalars().first()
+        if query_result is None:
+            raise EntityNotFound(message="Activity not found")
+        return query_result
 
 
 async def get_activity_manager(session: AsyncSession = Depends(get_async_session)):

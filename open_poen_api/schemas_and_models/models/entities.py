@@ -101,23 +101,6 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
 
-    @classmethod
-    async def detail_load(cls, session: AsyncSession, id: int):
-        query_result = await session.execute(
-            select(cls)
-            .options(
-                selectinload(cls.bng),
-                selectinload(cls.initiative_roles).selectinload(
-                    UserInitiativeRole.initiative
-                ),
-                selectinload(cls.activity_roles).selectinload(
-                    UserActivityRole.activity
-                ),
-            )
-            .where(cls.id == id)
-        )
-        return query_result.scalars().first()
-
     REL_FIELDS = [
         "bng",
         "initiative_roles",
@@ -191,20 +174,6 @@ class Initiative(Base):
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"
 
-    @classmethod
-    async def detail_load(cls, session: AsyncSession, id: int):
-        query_result = await session.execute(
-            select(cls)
-            .options(
-                selectinload(cls.user_roles).selectinload(UserInitiativeRole.user),
-                selectinload(cls.activities),
-            )
-            .where(cls.id == id)
-        )
-        return query_result.scalars().first()
-
-    REL_FIELDS = ["user_roles", "initiative_owners", "activities"]
-
 
 class Activity(Base):
     __tablename__ = "activity"
@@ -231,20 +200,6 @@ class Activity(Base):
 
     def __repr__(self):
         return f"Activity(id={self.id}, name='{self.name}')"
-
-    @classmethod
-    async def detail_load(
-        cls, session: AsyncSession, initiative_id: int, activity_id: int
-    ):
-        query_result = await session.execute(
-            select(cls)
-            .options(
-                selectinload(cls.user_roles).selectinload(UserActivityRole.user),
-                selectinload(cls.initiative),
-            )
-            .where(and_(Initiative.id == initiative_id, cls.id == activity_id))
-        )
-        return query_result.scalars().first()
 
 
 # class UserBase(SQLModel, HiddenMixin):

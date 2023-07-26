@@ -8,6 +8,7 @@ from tests.conftest import (
     initiative_info,
 )
 from open_poen_api.schemas_and_models.models.entities import Initiative
+from open_poen_api.managers.initiative_manager import get_initiative_manager
 
 
 @pytest.mark.asyncio
@@ -48,7 +49,8 @@ async def test_add_initiative_owner(async_client, as_2, status_code):
         f"/initiative/{initiative_id}/owners", json=body
     )
     assert response.status_code == status_code
-    db_initiative = await Initiative.detail_load(as_2, id=initiative_id)
+    im = await get_initiative_manager(as_2).__anext__()
+    db_initiative = await im.detail_load(initiative_id)
     assert len(db_initiative.initiative_owners) == 1
     assert db_initiative.initiative_owners[0].email == "existing@user.com"
 
@@ -62,6 +64,7 @@ async def test_add_initiative_owner(async_client, as_2, status_code):
         (superuser_info, {"hidden": True}, 200),
         (userowner_info, {"hidden": True}, 200),
         (user_info, {"location": "Groningen"}, 403),
+        (superuser_info, {"name": "Piets Buurtbarbeque2"}, 400),
     ],
     indirect=["get_mock_user"],
 )

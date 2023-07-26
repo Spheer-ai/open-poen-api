@@ -7,6 +7,7 @@ from tests.conftest import (
     activity_info,
 )
 from open_poen_api.schemas_and_models.models.entities import Activity, Initiative
+from open_poen_api.managers.activity_manager import get_activity_manager
 
 
 @pytest.mark.asyncio
@@ -70,7 +71,8 @@ async def test_add_activity_owner(async_client, as_5, ids, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        db_activity = await Activity.detail_load(as_5, initiative_id, activity_id)
+        am = await get_activity_manager(as_5).__anext__()
+        db_activity = await am.detail_load(initiative_id, activity_id)
         assert set([i.id for i in db_activity.activity_owners]) == set(ids)
 
 
