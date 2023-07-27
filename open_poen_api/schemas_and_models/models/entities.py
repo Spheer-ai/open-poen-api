@@ -35,28 +35,12 @@ class Base(DeclarativeBase):
     pass
 
 
-# user_initiative = Table(
-#     "user_initiative",
-#     Base.metadata,
-#     Column("user_id", Integer, ForeignKey("user.id")),
-#     Column("initiative_id", Integer, ForeignKey("initiative.id")),
-# )
-
-
 class UserInitiativeRole(Base):
     __tablename__ = "user_initiative_roles"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     initiative_id = Column(Integer, ForeignKey("initiative.id"), primary_key=True)
     user = relationship("User", back_populates="initiative_roles")
     initiative = relationship("Initiative", back_populates="user_roles")
-
-
-# user_activity = Table(
-#     "user_activity",
-#     Base.metadata,
-#     Column("user_id", Integer, ForeignKey("user.id")),
-#     Column("activity_id", Integer, ForeignKey("activity.id")),
-# )
 
 
 class UserActivityRole(Base):
@@ -147,7 +131,7 @@ class Initiative(Base):
     __table_args__ = (UniqueConstraint("name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    name: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(length=512), nullable=False)
     purpose: Mapped[str] = mapped_column(String(length=64), nullable=False)
     target_audience: Mapped[str] = mapped_column(String(length=64), nullable=False)
@@ -227,7 +211,7 @@ class Payment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     transaction_id: Mapped[str] = mapped_column(
-        String(length=64), unique=True, nullable=False
+        String(length=64), unique=True, nullable=False, index=True
     )
     entry_reference: Mapped[str] = mapped_column(String(length=128))
     end_to_end_id: Mapped[str] = mapped_column(String(length=128))

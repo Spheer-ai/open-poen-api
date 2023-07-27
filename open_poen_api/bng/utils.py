@@ -28,9 +28,8 @@ def _flatten(d, parent_key="", sep="_"):
     return dict(items)
 
 
-def _parse_and_save_payments(session: AsyncSession, payments):
+async def _parse_and_save_payments(session: AsyncSession, payments):
     for payment in payments:
-        # Flatten the nested dictionary. Otherwise we won't be able to save it in the database.
         payment = _flatten(payment)
         # Convert from camel case to snake case to match the column names in the database.
         payment = {
@@ -42,37 +41,51 @@ def _parse_and_save_payments(session: AsyncSession, payments):
         if diff.days < 1:
             continue
         payment["transaction_amount"] = Decimal(payment["transaction_amount"])
-        if payment["transaction_amount"] > 0:
-            route = "inkomsten"
-        else:
-            route = "uitgaven"
+        route = (
+            ent.Route.INCOME
+            if payment["transaction_amount"] > 0
+            else ent.Route.EXPENSES
+        )
         # Parse the debit card, if any, in the payment information field.
         found = re.search("6731924\d*", payment["remittance_information_unstructured"])
         card_number = found.group(0) if found is not None else None
         # Ensure we save empty strings as NULL.
         payment = {k: (v if v != "" else None) for (k, v) in payment.items()}
 
+        # Skip payments that are already in the database.
+        payment_db_q = await session.execute(
+            select(ent.Payment).where(
+                ent.Payment.transaction_id == payment["transaction_id"]
+            )
+        )
+        if payment_db_q.scalars().first():
+            continue
+
+        # card_id should be None if it's not a debit card payment. It should be the
+        # id of the debit card in the database if the debit card used for the payment
+        # is already in the database. It should be the id of a newly created debit card
+        # if this payment is the first payment that we encounter with this debit card.
         if card_number is None:
             card_id = None
-        elif (
-            debit_card := session.exec(
-                select(ent.DebitCard).where(ent.DebitCard.card_number == card_number)
-            ).first()
-        ) is not None:
-            card_id = debit_card.id
         else:
-            debit_card = ent.DebitCard(card_number=card_number)
-            session.add(debit_card)
-            session.commit()
-            session.refresh(debit_card)
-            card_id = debit_card.id
+            debit_card_q = await session.execute(
+                select(ent.DebitCard).where(ent.DebitCard.card_number == card_number)
+            )
+            debit_card = debit_card_q.scalars().first()
+            if debit_card:
+                card_id = debit_card.id
+            else:
+                debit_card = ent.DebitCard(card_number=card_number)
+                session.add(debit_card)
+                await session.commit()
+                await session.refresh(debit_card)
+                card_id = debit_card.id
 
-        payment = ent.Payment(**payment, route=route, type="BNG", debit_card_id=card_id)
-        try:
-            session.add(payment)
-            session.commit()
-        except IntegrityError:
-            session.rollback()
+        payment = ent.Payment(
+            **payment, route=route, type=ent.PaymentType.BNG, debit_card_id=card_id
+        )
+        session.add(payment)
+        await session.commit()
 
 
 async def get_bng_payments(
@@ -110,8 +123,8 @@ async def get_bng_payments(
             payments = json.load(f)
             payments = payments["transactions"]["booked"]
 
-    _parse_and_save_payments(session, payments)
+    await _parse_and_save_payments(session, payments)
 
     bng_account.last_import_on = datetime.now(pytz.timezone("Europe/Amsterdam"))
     session.add(bng_account)
-    session.commit()
+    await session.commit()
