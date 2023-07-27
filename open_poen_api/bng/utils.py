@@ -1,19 +1,17 @@
 from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
-import os
-import collections
 import re
-from tempfile import TemporaryDirectory
 import zipfile
 import json
 from dateutil.parser import parse
 import pytz
-from fastapi import Request
 from .api import read_account_information, read_transaction_list
 from ..schemas_and_models.models import entities as ent
 from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal
 from sqlalchemy import select
+from io import BytesIO
+from collections.abc import MutableMapping
 
 
 CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
@@ -23,7 +21,7 @@ def _flatten(d, parent_key="", sep="_"):
     items = []
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
-        if isinstance(v, collections.MutableMapping):
+        if isinstance(v, MutableMapping):
             items.extend(_flatten(v, new_key, sep=sep).items())
         else:
             items.append((new_key, v))
@@ -77,10 +75,11 @@ def _parse_and_save_payments(session: AsyncSession, payments):
             session.rollback()
 
 
-def get_bng_payments(
+async def get_bng_payments(
     session: AsyncSession, date_from: datetime = datetime.today() - timedelta(days=31)
 ):
-    bng_account = session.exec(select(ent.BNG)).first()
+    bng_account_q = await session.execute(select(ent.BNG))
+    bng_account = bng_account_q.scalars().first()
     if not bng_account:
         # TODO: Log.
         return
@@ -89,26 +88,25 @@ def get_bng_payments(
         bng_account.consent_id, bng_account.access_token
     )
     if not len(account_info["accounts"]) == 1:
-        raise ValueError("There are either multiple accounts, or none.")
+        raise NotImplementedError("Only one BNG account at a time is supported.")
 
-    transaction_list = read_transaction_list(
-        bng_account.consent_id,
-        bng_account.access_token,
-        account_info["accounts"][0]["resourceId"],
-        date_from.strftime("%Y-%m-%d"),
+    transaction_data = BytesIO(
+        read_transaction_list(
+            bng_account.consent_id,
+            bng_account.access_token,
+            account_info["accounts"][0]["resourceId"],
+            date_from.strftime("%Y-%m-%d"),
+        )
     )
 
-    with TemporaryDirectory() as d:
-        with open(os.path.join(d, "transaction_list.zip"), "wb") as f:
-            f.write(transaction_list)
-        with zipfile.ZipFile(os.path.join(d, "transaction_list.zip")) as z:
-            z.extractall(d)
-        payment_json_files = [x for x in os.listdir(d) if x.endswith(".json")]
+    with zipfile.ZipFile(transaction_data, "r") as z:
+        file_list = z.namelist()
+        payment_json_files = [x for x in file_list if x.endswith(".json")]
         if len(payment_json_files) != 1:
-            raise TypeError(
-                "The downloaded transaction zip does not contain a json file."
+            raise ValueError(
+                "The downloaded transaction zip does not contain a single JSON file."
             )
-        with open(os.path.join(d, payment_json_files[0])) as f:
+        with z.open(payment_json_files[0]) as f:
             payments = json.load(f)
             payments = payments["transactions"]["booked"]
 

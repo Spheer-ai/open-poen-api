@@ -37,7 +37,7 @@ async def async_add_user(
 
 @app.command()
 def add_user(
-    email: str,
+    email: EmailStr,
     superuser: bool = False,
     role: str = "user",
 ):

@@ -31,11 +31,11 @@ class UserCreate(schemas.CreateUpdateDictModel):
     # is a required field there. We add users by invite only, where they get
     # a random password assigned and a password reset link to change it.
     email: EmailStr
-    first_name: str | None
-    last_name: str | None
-    biography: str | None
+    first_name: str | None = None
+    last_name: str | None = None
+    biography: str | None = None
     role: Role = Field(default=Role.USER)
-    image: str | None
+    image: str | None = None
     is_active: bool | None = True
     is_superuser: bool | None = False
     is_verified: bool | None = True

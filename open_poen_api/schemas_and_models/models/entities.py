@@ -125,7 +125,7 @@ class BNG(Base):
     )
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
-    user = relationship("User", back_populates="bng", lazy="selectin")
+    user = relationship("User", back_populates="bng", lazy="noload")
 
     def __repr__(self):
         return f"BNG(id={self.id}, iban='{self.iban}', expires_on='{self.expires_on}')"
@@ -226,7 +226,9 @@ class Payment(Base):
     __tablename__ = "payment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    transaction_id: Mapped[str] = mapped_column(String(length=64), unique=True)
+    transaction_id: Mapped[str] = mapped_column(
+        String(length=64), unique=True, nullable=False
+    )
     entry_reference: Mapped[str] = mapped_column(String(length=128))
     end_to_end_id: Mapped[str] = mapped_column(String(length=128))
     booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))

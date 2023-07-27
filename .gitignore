@@ -162,3 +162,4 @@ cython_debug/
 auth/
 *.env
 .vscode/
+tests/bng/bng_data.json
