@@ -57,11 +57,7 @@ class ActivityManager:
     async def make_users_owner(
         self, activity: Activity, user_ids: list[int], request: Request | None = None
     ):
-        existing_roles = await self.session.execute(
-            select(UserActivityRole).where(UserActivityRole.activity_id == activity.id)
-        )
-        existing_roles = existing_roles.scalars().all()
-        existing_role_user_ids = {i.user_id for i in existing_roles}
+        existing_role_user_ids = {i.user_id for i in activity.user_roles}
 
         existing_users = await self.session.execute(
             select(User).where(User.id.in_(user_ids))
@@ -75,7 +71,9 @@ class ActivityManager:
             )
 
         for role in [
-            role for role in existing_roles if role.user_id not in existing_user_ids
+            role
+            for role in activity.user_roles
+            if role.user_id not in existing_user_ids
         ]:
             await self.session.delete(role)
 
