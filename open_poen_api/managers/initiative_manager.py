@@ -152,17 +152,18 @@ class InitiativeManager:
         return initiative
 
     async def detail_load(self, id: int):
-        query_result = await self.session.execute(
+        query_result_q = await self.session.execute(
             select(Initiative)
             .options(
                 selectinload(Initiative.user_roles).selectinload(
                     UserInitiativeRole.user
                 ),
                 selectinload(Initiative.activities),
+                selectinload(Initiative.debit_cards),
             )
             .where(Initiative.id == id)
         )
-        query_result = query_result.scalars().first()
+        query_result = query_result_q.scalars().first()
         if query_result is None:
             raise EntityNotFound(message="Initiative not found")
         return query_result

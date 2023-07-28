@@ -518,10 +518,8 @@ async def link_initiative_debit_cards(
     # Important for up to date relations. Has to be in this async context.
     await initiative_manager.session.refresh(initiative_db)
     filtered_debit_cards = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.DebitCard.REL_FIELDS
-        )
-        for i in initiative_db.initiative_owners
+        auth.get_authorized_output_fields(required_user, "read", i, oso)
+        for i in initiative_db.debit_cards
     ]
     return s.DebitCardReadList(debit_cards=filtered_debit_cards)
 

@@ -90,6 +90,7 @@ class InitiativeDebitCardsUpdate(BaseModel):
 
     @validator("card_numbers", each_item=True, pre=True)
     def remove_whitespace(cls, v):
+        v = str(v)
         return v.replace(" ", "")
 
     @validator("card_numbers", each_item=True)

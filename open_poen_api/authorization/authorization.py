@@ -73,6 +73,17 @@ OSO.register_class(
         ),
     },
 )
+OSO.register_class(
+    ent.DebitCard,
+    fields={
+        "initiative": Relation(
+            kind="one",
+            other_type="Initiative",
+            my_field="initiative_id",
+            other_field="id",
+        )
+    },
+)
 OSO.load_file("open_poen_api/main.polar")
 
 
