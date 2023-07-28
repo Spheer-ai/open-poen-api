@@ -5,8 +5,6 @@ import pytz
 from fastapi import Query, HTTPException
 from datetime import date
 
-# from .mixins import TimeStampMixin
-
 
 def validate_expires_on(expires_on: date = Query(...)):
     amsterdam_tz = pytz.timezone("Europe/Amsterdam")
@@ -25,17 +23,3 @@ def validate_expires_on(expires_on: date = Query(...)):
 
 class BNGInitiate(BaseModel):
     url: str
-
-
-# class BNGCreateAdmin(BNGBase):
-#     pass
-
-
-# class BNGOutputUser(BaseModel):
-#     id: int
-#     expires_on: datetime
-#     last_import_on: datetime | None
-
-
-# class BNGOutputAdmin(BNGOutputUser, TimeStampMixin):
-#     iban: str

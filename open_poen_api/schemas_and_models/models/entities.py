@@ -29,6 +29,8 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
+from sqlalchemy.dialects import postgresql as pg
+import uuid
 
 
 class Base(DeclarativeBase):
@@ -83,6 +85,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         lazy="noload",
     )
     activities = association_proxy("activity_roles", "activity")
+    requisitions = relationship("Requisition", back_populates="user", lazy="noload")
 
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
@@ -263,6 +266,18 @@ class DebitCard(Base):
     )
     initiative = relationship("Initiative", back_populates="debit_cards", lazy="noload")
     payments = relationship("Payment", back_populates="debit_card", lazy="noload")
+
+
+class Requisition(Base):
+    __tablename__ = "requisition"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    institution_id: Mapped[str] = mapped_column(String(length=32), nullable=False)
+    api_requisition_id: Mapped[str] = mapped_column(String(length=128), nullable=False)
+    reference_id: Mapped[str] = mapped_column(String(length=36), nullable=False)
+
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
+    user = relationship("User", back_populates="requisitions", lazy="noload")
 
 
 # class Requisition(SQLModel, TimeStampMixin, table=True):

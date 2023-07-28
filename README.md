@@ -16,3 +16,14 @@ Stop and wipe DB.
 ```
 docker compose down -v
 ```
+
+Login and save bearer token as a variable (Fish).
+```
+set token (http --form POST ":8000/auth/jwt/login" username=mark@gmail.com password=test | jq -r '.access_token')
+```
+
+Initiate Gocardless.
+```
+http GET ":8000/users/1/gocardless-initiate?institution_id=ING_INGBNL2A" "Authorization: Bearer $token"
+```
+

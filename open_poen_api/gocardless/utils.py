@@ -48,3 +48,16 @@ async def refresh_tokens():
                     seconds=token_data["refresh_expires"]
                 )
         client.token = access_token
+
+
+# TODO: This should probably not be hard coded, but retrieved dynamically.
+INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS = {
+    "ABNAMRO_ABNANL2A": 540,
+    "ASN_BANK_ASNBNL21": 730,
+    "ING_INGBNL2A": 730,
+    "KNAB_KNABNL2H": 730,
+    "RABOBANK_RABONL2U": 730,
+    "REGIOBANK_RBRBNL21": 730,
+    "SNS_BANK_SNSBNL2A": 730,
+    "TRIODOS_TRIONL2U": 730,
+}
