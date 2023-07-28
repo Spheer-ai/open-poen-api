@@ -347,7 +347,7 @@ async def link_initiative_owners(
         initiative_db, initiative.user_ids, request=request
     )
     # Important for up to date relations. Has to be in this async context.
-    initiative_manager.session.refresh(initiative_db)
+    await initiative_manager.session.refresh(initiative_db)
     filtered_initiative_owners = [
         auth.get_authorized_output_fields(
             required_user, "read", i, oso, ent.User.REL_FIELDS
@@ -493,6 +493,37 @@ async def delete_activity(
     auth.authorize(required_user, "delete", activity_db, oso)
     await activity_manager.delete(activity_db, request=request)
     return Response(status_code=204)
+
+
+@router.patch(
+    "/initiative/{initiative_id}/debit-cards",
+    response_model=s.DebitCardReadList,
+)
+async def link_initiative_debit_cards(
+    initiative_id: int,
+    initiative: s.InitiativeDebitCardsUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    initiative_db = await initiative_manager.detail_load(initiative_id)
+    auth.authorize(required_user, "edit", initiative_db, oso)
+    initiative_db = await initiative_manager.link_debit_cards(
+        initiative_db,
+        initiative.card_numbers,
+        request=request,
+        ignore_already_linked=initiative.ignore_already_linked,
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await initiative_manager.session.refresh(initiative_db)
+    filtered_debit_cards = [
+        auth.get_authorized_output_fields(
+            required_user, "read", i, oso, ent.DebitCard.REL_FIELDS
+        )
+        for i in initiative_db.initiative_owners
+    ]
+    return s.DebitCardReadList(debit_cards=filtered_debit_cards)
 
 
 # ROUTES

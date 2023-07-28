@@ -57,31 +57,30 @@ class ActivityManager:
     async def make_users_owner(
         self, activity: Activity, user_ids: list[int], request: Request | None = None
     ):
-        existing_role_user_ids = {i.user_id for i in activity.user_roles}
+        linked_user_ids = {role.user_id for role in activity.user_roles}
 
-        existing_users = await self.session.execute(
+        matched_users_q = await self.session.execute(
             select(User).where(User.id.in_(user_ids))
         )
-        existing_users = existing_users.scalars().all()
-        existing_user_ids = {i.id for i in existing_users}
+        matched_users = matched_users_q.scalars().all()
+        matched_user_ids = {user.id for user in matched_users}
 
-        if not len(existing_users) == len(user_ids):
+        if not len(matched_users) == len(user_ids):
             raise EntityNotFound(
-                message=f"There exist no Users with id's: {set(user_ids) - existing_user_ids}"
+                message=f"There exist no Users with id's: {set(user_ids) - matched_user_ids}"
             )
 
+        # TODO: Log this.
+        stay_linked_user_ids = linked_user_ids.intersection(matched_user_ids)
+        unlink_user_ids = linked_user_ids - matched_user_ids
+        link_user_ids = matched_user_ids - linked_user_ids
+
         for role in [
-            role
-            for role in activity.user_roles
-            if role.user_id not in existing_user_ids
+            role for role in activity.user_roles if role.user_id in unlink_user_ids
         ]:
             await self.session.delete(role)
 
-        for user_id in [
-            user_id
-            for user_id in existing_user_ids
-            if user_id not in existing_role_user_ids
-        ]:
+        for user_id in link_user_ids:
             new_role = UserActivityRole(user_id=user_id, activity_id=activity.id)
             self.session.add(new_role)
 

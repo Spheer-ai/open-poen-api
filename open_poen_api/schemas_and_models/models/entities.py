@@ -157,7 +157,9 @@ class Initiative(Base):
     initiative_owners = association_proxy("user_roles", "user")
     activities = relationship("Activity", back_populates="initiative", lazy="noload")
     payments = relationship("Payment", back_populates="initiative", lazy="noload")
-    debit_cards = relationship("DebitCard", back_populates="initiative", lazy="noload")
+    debit_cards: Mapped[list["DebitCard"]] = relationship(
+        "DebitCard", back_populates="initiative", lazy="noload"
+    )
 
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"
@@ -246,7 +248,9 @@ class DebitCard(Base):
         String(length=64), unique=True, nullable=False
     )
 
-    initiative_id: Mapped[int] = mapped_column(Integer, ForeignKey("initiative.id"))
+    initiative_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("initiative.id")
+    )
     initiative = relationship("Initiative", back_populates="debit_cards", lazy="noload")
     payments = relationship("Payment", back_populates="debit_card", lazy="noload")
 
