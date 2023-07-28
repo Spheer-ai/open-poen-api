@@ -12,6 +12,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from io import BytesIO
 from collections.abc import MutableMapping
+import os
 
 
 CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
@@ -97,20 +98,24 @@ async def get_bng_payments(
         # TODO: Log.
         return
 
-    account_info = read_account_information(
-        bng_account.consent_id, bng_account.access_token
-    )
-    if not len(account_info["accounts"]) == 1:
-        raise NotImplementedError("Only one BNG account at a time is supported.")
-
-    transaction_data = BytesIO(
-        read_transaction_list(
-            bng_account.consent_id,
-            bng_account.access_token,
-            account_info["accounts"][0]["resourceId"],
-            date_from.strftime("%Y-%m-%d"),
+    if os.environ["ENVIRONMENT"] == "debug":
+        with open("./tests/bng/bng_import", "rb") as f:
+            transaction_data = BytesIO(f.read())
+    else:
+        account_info = read_account_information(
+            bng_account.consent_id, bng_account.access_token
         )
-    )
+        if not len(account_info["accounts"]) == 1:
+            raise NotImplementedError("Only one BNG account at a time is supported.")
+
+        transaction_data = BytesIO(
+            read_transaction_list(
+                bng_account.consent_id,
+                bng_account.access_token,
+                account_info["accounts"][0]["resourceId"],
+                date_from.strftime("%Y-%m-%d"),
+            )
+        )
 
     with zipfile.ZipFile(transaction_data, "r") as z:
         file_list = z.namelist()

@@ -69,7 +69,7 @@ async def test_add_debit_cards(async_client, as_2, status_code):
     im = await get_initiative_manager(as_2).__anext__()
     db_initiative = await im.detail_load(initiative_id)
     assert len(db_initiative.debit_cards) == 1
-    assert db_initiative.debit_cards[0].card_number == 6731924123456789012
+    assert db_initiative.debit_cards[0].card_number == str(6731924123456789012)
 
 
 @pytest.mark.asyncio

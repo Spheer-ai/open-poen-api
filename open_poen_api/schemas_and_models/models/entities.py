@@ -215,28 +215,38 @@ class Payment(Base):
     transaction_id: Mapped[str] = mapped_column(
         String(length=64), unique=True, nullable=False, index=True
     )
-    entry_reference: Mapped[str] = mapped_column(String(length=128))
-    end_to_end_id: Mapped[str] = mapped_column(String(length=128))
+    entry_reference: Mapped[str] = mapped_column(String(length=128), nullable=True)
+    end_to_end_id: Mapped[str] = mapped_column(String(length=128), nullable=True)
     booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
-    creditor_name: Mapped[str] = mapped_column(String(length=128))
-    creditor_account: Mapped[str] = mapped_column(String(length=128))
-    debtor_name: Mapped[str] = mapped_column(String(length=128))
-    debtor_account: Mapped[str] = mapped_column(String(length=128))
+    creditor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
+    creditor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
+    debtor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
+    debtor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
     route: Mapped[Route] = mapped_column(ChoiceType(Route, impl=VARCHAR(length=32)))
     type: Mapped[PaymentType] = mapped_column(
         ChoiceType(PaymentType, impl=VARCHAR(length=32))
     )
     remittance_information_unstructured: Mapped[str] = mapped_column(String(length=256))
     remittance_information_structured: Mapped[str] = mapped_column(String(length=256))
-    short_user_description: Mapped[str] = mapped_column(String(length=512))
-    long_user_description: Mapped[str] = mapped_column(String(length=128))
+    short_user_description: Mapped[str] = mapped_column(
+        String(length=512), nullable=True
+    )
+    long_user_description: Mapped[str] = mapped_column(
+        String(length=128), nullable=True
+    )
 
-    activity_id: Mapped[int] = mapped_column(Integer, ForeignKey("activity.id"))
+    activity_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("activity.id"), nullable=True
+    )
     activity = relationship("Activity", back_populates="payments", lazy="noload")
-    initiative_id: Mapped[int] = mapped_column(Integer, ForeignKey("initiative.id"))
+    initiative_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("initiative.id"), nullable=True
+    )
     initiative = relationship("Initiative", back_populates="payments", lazy="noload")
-    debit_card_id: Mapped[int] = mapped_column(Integer, ForeignKey("debitcard.id"))
+    debit_card_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("debitcard.id"), nullable=True
+    )
     debit_card = relationship("DebitCard", back_populates="payments", lazy="noload")
 
 
