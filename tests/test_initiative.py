@@ -57,6 +57,23 @@ async def test_add_initiative_owner(async_client, as_2, status_code):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+)
+async def test_add_debit_cards(async_client, as_2, status_code):
+    initiative_id = 1
+    body = {"card_numbers": [6731924123456789012]}
+    response = await async_client.patch(
+        f"/initiative/{initiative_id}/debit-cards", json=body
+    )
+    assert response.status_code == status_code
+    im = await get_initiative_manager(as_2).__anext__()
+    db_initiative = await im.detail_load(initiative_id)
+    assert len(db_initiative.debit_cards) == 1
+    assert db_initiative.debit_cards[0].card_number == str(6731924123456789012)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
         (superuser_info, {"location": "Groningen"}, 200),

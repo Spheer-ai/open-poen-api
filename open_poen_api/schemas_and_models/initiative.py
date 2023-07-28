@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, ValidationError
 from .models.entities import LegalEntity
 from .mixins import NotNullValidatorMixin
 
@@ -78,3 +78,29 @@ class InitiativeOwnersUpdate(BaseModel):
     @validator("user_ids", pre=True)
     def remove_duplicates(cls, v):
         return list(set(v))
+
+
+class InitiativeDebitCardsUpdate(BaseModel):
+    card_numbers: list[str]
+    ignore_already_linked: bool = False
+
+    @validator("card_numbers", pre=True)
+    def remove_duplicates(cls, v):
+        return list(set(v))
+
+    @validator("card_numbers", each_item=True, pre=True)
+    def remove_whitespace(cls, v):
+        v = str(v)
+        return v.replace(" ", "")
+
+    @validator("card_numbers", each_item=True)
+    def validate_card_numbers(cls, v):
+        if not v.startswith("6731924"):
+            raise ValidationError(
+                f"Card number {v} does not start with 6731924. All card numbers should start with this sequence."
+            )
+        if not len(v) == 19:
+            raise ValidationError(
+                f"Card number {v} is not exactly 19 digits long, but {len(v)} digits. All card numbers should be exactly 19 digits long."
+            )
+        return v

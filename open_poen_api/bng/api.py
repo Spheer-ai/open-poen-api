@@ -109,7 +109,7 @@ def make_headers(
 
 
 def create_consent(
-    iban: str, valid_until: datetime, redirect_url: str, requester_ip: str
+    iban: str, valid_until: datetime, redirect_url: str, requester_ip: str = ""
 ) -> tuple[str, str]:
     body = {
         "access": {
@@ -152,7 +152,7 @@ def create_consent(
     return parsed_json["consentId"], oauth_url
 
 
-def retrieve_access_token(access_code: str, redirect_url: str, requester_ip: str):
+def retrieve_access_token(access_code: str, redirect_url: str, requester_ip: str = ""):
     body = {
         "client_id": CLIENT_ID,
         "grant_type": "authorization_code",
@@ -191,7 +191,9 @@ def delete_consent(consent_id, access_token):
     return r.json()
 
 
-def read_transaction_list(consent_id, access_token, account_id, date_from):
+def read_transaction_list(
+    consent_id, access_token, account_id, date_from, requester_ip: str = ""
+):
     booking_status = "booked"  # booked, pending or both
     with_balance = "true"
     url = (
@@ -209,13 +211,14 @@ def read_transaction_list(consent_id, access_token, account_id, date_from):
             "Authorization": f"Bearer {access_token}",
             "Consent-ID": consent_id,
         },
+        psu_ip_address=requester_ip,
     )
     r = requests.get(url, data="", headers=headers, cert=TLS_CERTS)
     r.raise_for_status()
-    r.content
+    return r.content
 
 
-def read_account_information(consent_id, access_token):
+def read_account_information(consent_id, access_token, requester_ip: str = ""):
     url = f"{API_URL_PREFIX}accounts"
     request_id = str(uuid.uuid4())
     headers = make_headers(
@@ -227,6 +230,7 @@ def read_account_information(consent_id, access_token):
             "Authorization": f"Bearer {access_token}",
             "Consent-ID": consent_id,
         },
+        psu_ip_address=requester_ip,
     )
     r = requests.get(url, data="", headers=headers, cert=TLS_CERTS)
     r.raise_for_status()

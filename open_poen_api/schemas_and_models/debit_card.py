@@ -1,30 +1,16 @@
-from .models.entities import DebitCardBase
-from pydantic import BaseModel, Extra
-from .mixins import TimeStampMixin
+from pydantic import BaseModel
 
 
-class DebitCardCreateAdmin(DebitCardBase):
-    initiative_id: int
-
-    class Config:
-        title = "DebitCardCreate"
-        extra = Extra.forbid
-
-
-class DebitCardUpdateAdmin(BaseModel):
-    initiative_id: int
-
-
-class DebitCardOutputActivityOwner(TimeStampMixin):
+class DebitCardRead(BaseModel):
     id: int
     card_number: str
 
     class Config:
-        title = "DebitCardOutput"
+        orm_mode = True
 
 
-class DebitCardOutputActivityOwnerList(BaseModel):
-    debit_cards: list[DebitCardOutputActivityOwner]
+class DebitCardReadList(BaseModel):
+    debit_cards: list[DebitCardRead]
 
-    class config:
+    class Config:
         orm_mode = True
