@@ -61,7 +61,7 @@ async def create_user(
     response_model=s.UserReadLinked,
     response_model_exclude_unset=True,
 )
-async def get_initiative(
+async def get_user(
     user_id: int,
     optional_user=Depends(optional_login_dep),
     user_manager: um.UserManager = Depends(um.get_user_manager),
