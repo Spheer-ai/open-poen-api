@@ -63,6 +63,14 @@ def list_requisitions(limit: int = 100, offset: int = 0):
 
 
 @app.command()
+def delete_all_requisitions(limit: int = 100, offset: int = 0):
+    asyncio.run(refresh_tokens())
+    requisitions = client.requisition.get_requisitions(limit, offset)
+    for r in requisitions["results"]:
+        client.requisition.delete_requisition(r["id"])
+
+
+@app.command()
 def list_transactions(account_id: str, date_from: str, date_to: str):
     asyncio.run(refresh_tokens())
     transactions = client.account_api(account_id).get_transactions(date_from, date_to)

@@ -307,10 +307,13 @@ async def gocardless_callback(
     except JWTError:
         raise HTTPException(status_code=401, detail="Could not validate JWT token")
 
+    if payload["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
     requisition_q = await session.execute(
         select(ent.Requisition).where(
             and_(
-                ent.Requisition.api_requisition_id == payload["reference_id"],
+                ent.Requisition.reference_id == payload["reference_id"],
                 ent.Requisition.user_id == payload["user_id"],
             )
         )
