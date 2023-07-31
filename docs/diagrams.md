@@ -14,14 +14,13 @@ erDiagram
     BNG_ACCOUNT |o--|| USER : created_by
     DEBIT_CARD |o--o{ PAYMENT : linked_to
     DEBIT_CARD }o--o| INITIATIVE : linked_to
-    CATEGORY |o--o{ PAYMENT : linked_to
-    CATEGORY }o--|| ACTIVITY : linked_to
     REQUISITION }o--|| USER : created_by
     BANK_ACCOUNT }o--|| REQUISITION : linked_to
     PAYMENT }o--o| BANK_ACCOUNT : linked_to
+    USER ||--o{ BANK_ACCOUNT_ROLES : gives_access
+    BANK_ACCOUNT || --|{ BANK_ACCOUNT_ROLES: gives_access
     FUNDER ||--o{ REGULATION : issues
     REGULATION ||--o{ GRANT : part_of
-
     REGULATION_ROLES }o--o{ USER : has
     REGULATION }o--o{ REGULATION_ROLES : gives_access_to
     %% What type of relationship should this be?
@@ -34,6 +33,13 @@ erDiagram
         int user_id
         int grant_id
         %% subsidy_officer, policy_officer or overseer
+        str role
+    }
+
+    BANK_ACCOUNT_ROLES {
+        int user_id
+        int bank_account_id
+        %% owner, sharer
         str role
     }
 
