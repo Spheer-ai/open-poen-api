@@ -32,7 +32,12 @@ from time import time
 import pytz
 from .authorization.authorization import SECRET_KEY, ALGORITHM
 from .authorization import authorization as auth
-from .gocardless import refresh_tokens, client, INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS
+from .gocardless import (
+    refresh_tokens,
+    client,
+    INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS,
+    get_gocardless_payments,
+)
 import uuid
 
 
@@ -280,6 +285,7 @@ async def gocardless_initiatite(
         institution_id=institution_id,
         api_requisition_id=init.requisition_id,
         reference_id=reference_id,
+        status=ent.ReqStatus.CREATED,
     )
     session.add(requisition_db)
     await session.commit()
@@ -326,7 +332,8 @@ async def gocardless_callback(
     session.add(requisition)
     await session.commit()
 
-    # background_tasks.add_task(get_gocardless_payments, session)  # TODO
+    await get_gocardless_payments(session, requisition.id)
+    # background_tasks.add_task(get_gocardless_payments, session, requisition.id)  # TODO
     return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 
 

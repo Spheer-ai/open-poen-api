@@ -268,6 +268,18 @@ class DebitCard(Base):
     payments = relationship("Payment", back_populates="debit_card", lazy="noload")
 
 
+class ReqStatus(str, Enum):
+    CREATED = "CR"
+    GIVING_CONSENT = "GC"
+    UNDERGOING_AUTHENTICATON = "UA"
+    REJECTED = "RJ"
+    SELECTING_ACCOUNTS = "SA"
+    GRANTING_ACCESS = "GA"
+    LINKED = "LN"
+    SUSPENDED = "SU"
+    EXPIRED = "EX"
+
+
 class Requisition(Base):
     __tablename__ = "requisition"
 
@@ -277,6 +289,9 @@ class Requisition(Base):
     reference_id: Mapped[str] = mapped_column(String(length=36), nullable=False)
     callback_handled: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
+    )
+    status: Mapped[ReqStatus] = mapped_column(
+        ChoiceType(ReqStatus, impl=VARCHAR(length=32))
     )
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
