@@ -25,7 +25,7 @@ from .bng import get_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
@@ -258,10 +258,20 @@ async def gocardless_initiatite(
 
     reference_id = str(uuid.uuid4())
 
+    token = jwt.encode(
+        {
+            "user_id": user_id,
+            "reference_id": reference_id,
+            "exp": time() + 1800,
+        },
+        SECRET_KEY,
+        ALGORITHM,
+    )
+
     init = client.initialize_session(
         redirect_uri=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/gocardless-callback",
         institution_id=institution_id,
-        reference_id=reference_id,
+        reference_id=token,
         max_historical_days=INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS[institution_id],
     )
 
@@ -287,11 +297,34 @@ async def gocardless_callback(
     details: str | None = None,
     session: AsyncSession = Depends(get_async_session),
 ):
-    print("stop")
-    print("stop")
+    if error is not None:
+        raise HTTPException(status_code=500, detail=details)
 
-    # if error or details are not None, something went wrong.
-    # if error or details are None, everything went fine.
+    try:
+        payload = jwt.decode(ref, SECRET_KEY, algorithms=[ALGORITHM])
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="JWT token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate JWT token")
+
+    requisition_q = await session.execute(
+        select(ent.Requisition).where(
+            and_(
+                ent.Requisition.api_requisition_id == payload["reference_id"],
+                ent.Requisition.user_id == payload["user_id"],
+            )
+        )
+    )
+    requisition = requisition_q.scalars().first()
+    if requisition is None:
+        raise HTTPException(status_code=404, detail="Requisition not found")
+
+    requisition.callback_handled = True
+    session.add(requisition)
+    await session.commit()
+
+    # background_tasks.add_task(get_gocardless_payments, session)  # TODO
+    return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 
 
 @router.post("/initiative", response_model=s.InitiativeRead)

@@ -275,6 +275,9 @@ class Requisition(Base):
     institution_id: Mapped[str] = mapped_column(String(length=32), nullable=False)
     api_requisition_id: Mapped[str] = mapped_column(String(length=128), nullable=False)
     reference_id: Mapped[str] = mapped_column(String(length=36), nullable=False)
+    callback_handled: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
     user = relationship("User", back_populates="requisitions", lazy="noload")
