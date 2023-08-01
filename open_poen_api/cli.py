@@ -5,7 +5,7 @@ from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
 from .managers.user_manager import get_user_manager_context
 from fastapi_users.exceptions import UserAlreadyExists
-from .models import Role
+from .models import UserRole
 import asyncio
 from rich import print
 from pydantic import EmailStr

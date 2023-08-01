@@ -3,7 +3,7 @@ from open_poen_api.database import (
     asyng_engine,
 )
 from open_poen_api.app import app
-from open_poen_api.models import Base, User, Initiative, Role, Activity
+from open_poen_api.models import Base, User, Initiative, UserRole, Activity
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api.managers import user_manager as um
 import pytest
@@ -25,7 +25,7 @@ from open_poen_api.schemas import (
 
 superuser_info = {
     "obj_id": 42,
-    "role": Role.USER,
+    "role": UserRole.USER,
     "email": "test@example.com",
     "is_active": True,
     "is_superuser": True,

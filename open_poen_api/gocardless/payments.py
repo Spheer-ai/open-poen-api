@@ -72,6 +72,9 @@ async def process_requisition(
                 selectinload(ent.BankAccount.user_roles).selectinload(
                     ent.UserBankAccountRole.user
                 ),
+                selectinload(ent.BankAccount.owner_role).selectinload(
+                    ent.UserBankAccountRole.user
+                ),
             )
         )
         account = account_q.scalars().first()
@@ -88,7 +91,9 @@ async def process_requisition(
             await session.commit()
             await session.refresh(account)
             new_role = ent.UserBankAccountRole(
-                user_id=requisition.user_id, bank_account_id=account.id
+                user_id=requisition.user_id,
+                bank_account_id=account.id,
+                role=ent.BankAccountRole.OWNER,
             )
             session.add(new_role)
             await session.commit()

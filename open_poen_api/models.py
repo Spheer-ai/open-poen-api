@@ -61,15 +61,40 @@ class UserActivityRole(Base):
     activity = relationship("Activity", back_populates="user_roles")
 
 
+class BankAccountRole(str, Enum):
+    OWNER = "owner"
+    USER = "user"
+
+
 class UserBankAccountRole(Base):
     __tablename__ = "bank_account_roles"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     bank_account_id = Column(Integer, ForeignKey("bank_account.id"), primary_key=True)
+    role: Mapped[BankAccountRole] = mapped_column(
+        ChoiceType(BankAccountRole, impl=VARCHAR(length=32))
+    )
     user = relationship("User", back_populates="bank_account_roles")
     bank_account = relationship("BankAccount", back_populates="user_roles")
+    owner_bank_account = relationship("BankAccount", back_populates="owner_role")
 
 
-class Role(str, Enum):
+class RegulationRole(str, Enum):
+    GRANT_OFFICER = "subsidiemedewerker"
+    POLICY_OFFICER = "beleidsmedewerker"
+
+
+class UserRegulationRole(Base):
+    __tablename__ = "user_regulation_roles"
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    regulation_id = Column(Integer, ForeignKey("regulation.id"), primary_key=True)
+    role: Mapped[RegulationRole] = mapped_column(
+        ChoiceType(RegulationRole, impl=VARCHAR(length=32))
+    )
+    user = relationship("User", back_populates="regulation_roles")
+    regulation = relationship("Regulation", back_populates="user_roles")
+
+
+class UserRole(str, Enum):
     """These are the roles we save in the db, but there are more roles that
     are not based on a a field, but on relationship(s)."""
 
@@ -83,7 +108,9 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     first_name: Mapped[str | None] = mapped_column(String(length=64))
     last_name: Mapped[str | None] = mapped_column(String(length=64))
     biography: Mapped[str | None] = mapped_column(String(length=512))
-    role: Mapped[Role] = mapped_column(ChoiceType(Role, impl=VARCHAR(length=32)))
+    role: Mapped[UserRole] = mapped_column(
+        ChoiceType(UserRole, impl=VARCHAR(length=32))
+    )
     image: Mapped[str | None] = mapped_column(String(length=128))
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -360,11 +387,20 @@ class BankAccount(Base):
         "UserBankAccountRole",
         back_populates="bank_account",
         lazy="noload",
+        primaryjoin="and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='user')",
     )
+    users: AssociationProxy[list[User]] = association_proxy("user_roles", "user")
+
+    owner_role = relationship(
+        "UserBankAccountRole",
+        back_populates="bank_account",
+        lazy="noload",
+        primaryjoin="and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='owner')",
+        uselist=False,
+    )
+    owner: AssociationProxy[User] = association_proxy("owner_role", "user")
+
     payments = relationship("Payment", back_populates="bank_account", lazy="noload")
-    bank_account_owners: AssociationProxy[list[User]] = association_proxy(
-        "user_roles", "user"
-    )
 
 
 # class Requisition(SQLModel, TimeStampMixin, table=True):
