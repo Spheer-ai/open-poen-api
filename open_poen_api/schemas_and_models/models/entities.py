@@ -25,7 +25,7 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.associationproxy import association_proxy, AssociationProxy
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
@@ -309,6 +309,9 @@ class ReqStatus(str, Enum):
     LINKED = "LN"
     SUSPENDED = "SU"
     EXPIRED = "EX"
+    # Defined by us, not Gocardless. Indicates that the requisition was done for a bank
+    # account that was requisitioned earlier by another user.
+    CONFLICTED = "CO"
 
 
 class Requisition(Base):
@@ -325,7 +328,7 @@ class Requisition(Base):
         ChoiceType(ReqStatus, impl=VARCHAR(length=32))
     )
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"), nullable=False)
     user = relationship("User", back_populates="requisitions", lazy="noload")
 
     bank_accounts: Mapped[list["BankAccount"]] = relationship(
@@ -359,7 +362,9 @@ class BankAccount(Base):
         lazy="noload",
     )
     payments = relationship("Payment", back_populates="bank_account", lazy="noload")
-    bank_account_owners = association_proxy("user_roles", "user")
+    bank_account_owners: AssociationProxy[list[User]] = association_proxy(
+        "user_roles", "user"
+    )
 
 
 # class Requisition(SQLModel, TimeStampMixin, table=True):

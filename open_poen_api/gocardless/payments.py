@@ -1,5 +1,5 @@
 from ..schemas_and_models.models import entities as ent
-from sqlalchemy import select, and_, inspect
+from sqlalchemy import select, and_, inspect, not_
 from sqlalchemy.ext.asyncio import AsyncSession
 from .utils import client
 from datetime import datetime, timedelta
@@ -8,7 +8,20 @@ from dateutil.parser import parse
 import re
 from decimal import Decimal
 from sqlalchemy.orm import selectinload
-import time
+from asyncio import sleep
+
+
+CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
+ALLOWED_PAYMENT_FIELDS = [f.key for f in inspect(ent.Payment).attrs]
+# Retrieve payments in chunks of N days.
+PAYMENT_RETRIEVAL_INTERVAL = 14
+# Don't process requisitions with these statuses. Requisitions with
+# statuses will never again become valid for payment retrieval.
+EXCLUDED_STATUSES = [
+    ent.ReqStatus.SUSPENDED,
+    ent.ReqStatus.EXPIRED,
+    ent.ReqStatus.CONFLICTED,
+]
 
 
 def _flatten(d, parent_key="", sep="_"):
@@ -22,22 +35,19 @@ def _flatten(d, parent_key="", sep="_"):
     return dict(items)
 
 
-CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
-
-ALLOWED_PAYMENT_FIELDS = [f.key for f in inspect(ent.Payment).attrs]
-
-
 async def process_requisition(
     session: AsyncSession, requisition: ent.Requisition, date_from: datetime
 ):
     api_requisition = client.requisition.get_requisition_by_id(
         requisition.api_requisition_id
     )
+    await sleep(1)
 
     requisition.status = ent.ReqStatus(api_requisition["status"])
+    session.add(requisition)
+    await session.commit()
+
     if not requisition.status == ent.ReqStatus.LINKED:
-        # The requisition is no longer valid.
-        # TODO: Log.
         return
 
     for account in api_requisition["accounts"]:
@@ -45,15 +55,23 @@ async def process_requisition(
         # (Multiple requisitions can be for the same account.)
         api_account = client.account_api(account)
         metadata = api_account.get_metadata()
-        details = api_account.get_details()
+        await sleep(1)
+
         if metadata["status"] != "READY":
-            # The account is not ready.
-            # TODO: Log.
             continue
+
+        details = api_account.get_details()
+        await sleep(1)
+
         account_q = await session.execute(
             select(ent.BankAccount)
             .where(ent.BankAccount.api_account_id == metadata["id"])
-            .options(selectinload(ent.BankAccount.requisitions))
+            .options(
+                selectinload(ent.BankAccount.requisitions),
+                selectinload(ent.BankAccount.user_roles).selectinload(
+                    ent.UserBankAccountRole.user
+                ),
+            )
         )
         account = account_q.scalars().first()
         if not account:
@@ -74,22 +92,28 @@ async def process_requisition(
             session.add(new_role)
             await session.commit()
         else:
-            account.last_accessed = datetime.now()
+            if requisition.user not in account.bank_account_owners:
+                # Case: a third user requisitioned this bank account earlier.
+                requisition.status = ent.ReqStatus.CONFLICTED
+                session.add(requisition)
+                await session.commit()
             if requisition not in account.requisitions:
                 account.requisitions.append(requisition)
+            account.last_accessed = parse(metadata["last_accessed"])
             session.add(account)
             await session.commit()
-
-        counter = 0
 
         date_to = datetime.now()
         cur_start_date = date_from
         while cur_start_date < date_to:
-            cur_end_date = min(cur_start_date + timedelta(days=7), date_to)
+            cur_end_date = min(
+                cur_start_date + timedelta(days=PAYMENT_RETRIEVAL_INTERVAL), date_to
+            )
             api_transactions = api_account.get_transactions(
                 date_from=cur_start_date.strftime("%Y-%m-%d"),
                 date_to=cur_end_date.strftime("%Y-%m-%d"),
             )
+            await sleep(1)
             for payment in api_transactions["transactions"]["booked"]:
                 payment = {
                     CAMEL_CASE_PATTERN.sub("_", k).lower(): v
@@ -124,10 +148,6 @@ async def process_requisition(
                 ):
                     payment["debtor_account"] = payment["debtor_account"]["iban"]
 
-                print(counter)
-                counter += 1
-                time.sleep(1)
-
                 new_payment = ent.Payment(
                     **{k: v for k, v in payment.items() if k in ALLOWED_PAYMENT_FIELDS},
                     route=route,
@@ -147,26 +167,27 @@ async def get_gocardless_payments(
 ):
     if requisition_id is not None:
         requisition_q = await session.execute(
-            select(ent.Requisition).where(
-                and_(
-                    ent.Requisition.id == requisition_id,
-                    ent.Requisition.status != ent.ReqStatus.EXPIRED,
-                )
+            select(ent.Requisition).options(
+                selectinload(ent.Requisition.user),
             )
+            # .where(
+            #     and_(
+            #         ent.Requisition.id == requisition_id,
+            #         not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)),
+            #     )
+            # )
         )
         requisition = requisition_q.scalars().first()
+        user = await session.get(ent.User, 1)
         if not requisition:
-            raise ValueError("No non expired Requisition found")
+            raise ValueError("No valid Requisition found")
         await process_requisition(session, requisition, date_from)
     else:
         requisition_q_list = (
             select(ent.Requisition)
-            .where(ent.Requisition.status != ent.ReqStatus.EXPIRED)
+            .options(selectinload(ent.Requisition.user))
+            .where(not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)))
             .execution_options(yield_per=256)
         )
         for requisition in await session.scalars(requisition_q_list):
             await process_requisition(session, requisition, date_from)
-
-
-async def import_bank_accounts(session: AsyncSession, requisition_id: int):
-    api_requisition = client.requisition.get_requisition_by_id(requisition_id)
