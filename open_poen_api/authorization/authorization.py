@@ -84,7 +84,7 @@ OSO.register_class(
         )
     },
 )
-OSO.load_file("open_poen_api/main.polar")
+OSO.load_files(["open_poen_api/main.polar"])
 
 
 async def set_sqlalchemy_adapter(session: Session = Depends(get_sync_session)):

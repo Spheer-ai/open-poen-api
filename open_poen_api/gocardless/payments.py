@@ -8,6 +8,7 @@ from dateutil.parser import parse
 import re
 from decimal import Decimal
 from sqlalchemy.orm import selectinload
+import time
 
 
 def _flatten(d, parent_key="", sep="_"):
@@ -125,6 +126,7 @@ async def process_requisition(
 
                 print(counter)
                 counter += 1
+                time.sleep(1)
 
                 new_payment = ent.Payment(
                     **{k: v for k, v in payment.items() if k in ALLOWED_PAYMENT_FIELDS},

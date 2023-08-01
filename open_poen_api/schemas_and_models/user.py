@@ -35,7 +35,6 @@ class UserCreate(schemas.CreateUpdateDictModel):
     last_name: str | None = None
     biography: str | None = None
     role: Role = Field(default=Role.USER)
-    image: str | None = None
     is_active: bool | None = True
     is_superuser: bool | None = False
     is_verified: bool | None = True
