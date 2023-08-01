@@ -1,11 +1,11 @@
 import typer
 from .database import asyng_engine, get_async_session_context, get_user_db_context
-from .schemas_and_models import UserCreateWithPassword
+from .schemas import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
 from .managers.user_manager import get_user_manager_context
 from fastapi_users.exceptions import UserAlreadyExists
-from .schemas_and_models.models.entities import Role
+from .models import Role
 import asyncio
 from rich import print
 from pydantic import EmailStr

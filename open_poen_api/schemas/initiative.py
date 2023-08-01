@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator, ValidationError
-from .models.entities import LegalEntity
+from ..models import LegalEntity
 from .mixins import NotNullValidatorMixin
 
 

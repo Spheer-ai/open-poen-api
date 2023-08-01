@@ -3,8 +3,8 @@ from fastapi import HTTPException, Request
 import os
 import string
 import random
-from ..schemas_and_models.models import entities as ent
-from .. import schemas_and_models as s
+from .. import models as ent
+from .. import schemas as s
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 

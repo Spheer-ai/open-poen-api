@@ -1,10 +1,6 @@
 from fastapi import Depends, Request
 from ..database import get_user_db, get_async_session
-from ..schemas_and_models.models.entities import (
-    User,
-    UserInitiativeRole,
-    UserActivityRole,
-)
+from ..models import User, UserInitiativeRole, UserActivityRole
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from ..utils.load_env import load_env_vars

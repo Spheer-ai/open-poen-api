@@ -1,5 +1,5 @@
-from .schemas_and_models.models import entities as ent
-from . import schemas_and_models as s
+from . import models as ent
+from . import schemas as s
 from typing import Any
 from fastapi import HTTPException
 from sqlmodel import Session

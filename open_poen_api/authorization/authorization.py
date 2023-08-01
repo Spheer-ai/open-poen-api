@@ -1,7 +1,7 @@
 import os
 from oso import Oso, Relation
 from oso.exceptions import ForbiddenError, NotFoundError
-from ..schemas_and_models.models import entities as ent
+from .. import models as ent
 from fastapi import HTTPException, Depends
 from ..database import get_sync_session
 from pydantic import BaseModel

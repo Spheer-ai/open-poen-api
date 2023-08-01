@@ -1,4 +1,4 @@
-from ..schemas_and_models.models import entities as ent
+from .. import models as ent
 from sqlalchemy import select, and_, inspect, not_
 from sqlalchemy.ext.asyncio import AsyncSession
 from .utils import client
@@ -9,6 +9,7 @@ import re
 from decimal import Decimal
 from sqlalchemy.orm import selectinload
 from asyncio import sleep
+from ..database import async_session_maker
 
 
 CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
@@ -161,33 +162,33 @@ async def process_requisition(
 
 
 async def get_gocardless_payments(
-    session: AsyncSession,
     requisition_id: int | None = None,
     date_from: datetime = datetime.today() - timedelta(days=7),
 ):
-    if requisition_id is not None:
-        requisition_q = await session.execute(
-            select(ent.Requisition).options(
-                selectinload(ent.Requisition.user),
+    async with async_session_maker() as session:
+        if requisition_id is not None:
+            requisition_q = await session.execute(
+                select(ent.Requisition)
+                .options(
+                    selectinload(ent.Requisition.user),
+                )
+                .where(
+                    and_(
+                        ent.Requisition.id == requisition_id,
+                        not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)),
+                    )
+                )
             )
-            # .where(
-            #     and_(
-            #         ent.Requisition.id == requisition_id,
-            #         not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)),
-            #     )
-            # )
-        )
-        requisition = requisition_q.scalars().first()
-        user = await session.get(ent.User, 1)
-        if not requisition:
-            raise ValueError("No valid Requisition found")
-        await process_requisition(session, requisition, date_from)
-    else:
-        requisition_q_list = (
-            select(ent.Requisition)
-            .options(selectinload(ent.Requisition.user))
-            .where(not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)))
-            .execution_options(yield_per=256)
-        )
-        for requisition in await session.scalars(requisition_q_list):
+            requisition = requisition_q.scalars().first()
+            if not requisition:
+                raise ValueError("No valid Requisition found")
             await process_requisition(session, requisition, date_from)
+        else:
+            requisition_q_list = (
+                select(ent.Requisition)
+                .options(selectinload(ent.Requisition.user))
+                .where(not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)))
+                .execution_options(yield_per=256)
+            )
+            for requisition in await session.scalars(requisition_q_list):
+                await process_requisition(session, requisition, date_from)

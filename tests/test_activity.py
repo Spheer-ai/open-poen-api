@@ -6,7 +6,7 @@ from tests.conftest import (
     anon_info,
     activity_info,
 )
-from open_poen_api.schemas_and_models.models.entities import Activity, Initiative
+from open_poen_api.models import Activity, Initiative
 from open_poen_api.managers.activity_manager import get_activity_manager
 
 

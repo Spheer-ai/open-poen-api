@@ -1,4 +1,4 @@
-from .schemas_and_models.models.entities import User, Base
+from .models import User, Base
 from typing import AsyncGenerator
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi import Depends

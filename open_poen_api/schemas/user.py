@@ -3,7 +3,7 @@ from pydantic import EmailStr, BaseModel, Field, validator
 from .mixins import NotNullValidatorMixin
 
 from fastapi_users import schemas
-from .models.entities import Role
+from ..models import Role
 
 
 class UserRead(schemas.BaseUser[int]):

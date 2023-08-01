@@ -9,8 +9,8 @@ from fastapi import (
 )
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
-from . import schemas_and_models as s
-from .schemas_and_models.models import entities as ent
+from . import schemas as s
+from . import models as ent
 from .managers import user_manager as um
 from .managers import initiative_manager as im
 from .managers import activity_manager as am
