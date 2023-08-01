@@ -37,6 +37,14 @@ class Base(DeclarativeBase):
     pass
 
 
+requisition_bankaccount = Table(
+    "requisition_bankaccount",
+    Base.metadata,
+    Column("requisition_id", Integer, ForeignKey("requisition.id"), primary_key=True),
+    Column("bank_account_id", Integer, ForeignKey("bank_account.id"), primary_key=True),
+)
+
+
 class UserInitiativeRole(Base):
     __tablename__ = "user_initiative_roles"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
@@ -51,6 +59,14 @@ class UserActivityRole(Base):
     activity_id = Column(Integer, ForeignKey("activity.id"), primary_key=True)
     user = relationship("User", back_populates="activity_roles")
     activity = relationship("Activity", back_populates="user_roles")
+
+
+class UserBankAccountRole(Base):
+    __tablename__ = "bank_account_roles"
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    bank_account_id = Column(Integer, ForeignKey("bank_account.id"), primary_key=True)
+    user = relationship("User", back_populates="bank_account_roles")
+    bank_account = relationship("BankAccount", back_populates="user_roles")
 
 
 class Role(str, Enum):
@@ -86,6 +102,10 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     )
     activities = association_proxy("activity_roles", "activity")
     requisitions = relationship("Requisition", back_populates="user", lazy="noload")
+    bank_account_roles = relationship(
+        "UserBankAccountRole", back_populates="user", lazy="noload"
+    )
+    bank_accounts = association_proxy("bank_account_roles", "bank_account")
 
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
@@ -156,9 +176,12 @@ class Initiative(Base):
         "UserInitiativeRole",
         back_populates="initiative",
         lazy="noload",
+        cascade="delete",
     )
     initiative_owners = association_proxy("user_roles", "user")
-    activities = relationship("Activity", back_populates="initiative", lazy="noload")
+    activities = relationship(
+        "Activity", back_populates="initiative", lazy="noload", cascade="delete"
+    )
     payments = relationship("Payment", back_populates="initiative", lazy="noload")
     debit_cards: Mapped[list["DebitCard"]] = relationship(
         "DebitCard", back_populates="initiative", lazy="noload"
@@ -207,7 +230,7 @@ class Route(str, Enum):
 
 class PaymentType(str, Enum):
     BNG = "BNG"
-    NORDIGEN = "NORDIGEN"
+    GOCARDLESS = "GOCARDLESS"
     MANUAL = "MANUAL"
 
 
@@ -230,8 +253,10 @@ class Payment(Base):
     type: Mapped[PaymentType] = mapped_column(
         ChoiceType(PaymentType, impl=VARCHAR(length=32))
     )
-    remittance_information_unstructured: Mapped[str] = mapped_column(String(length=256))
-    remittance_information_structured: Mapped[str] = mapped_column(String(length=256))
+    remittance_information_unstructured: Mapped[str] = mapped_column(String(length=512))
+    remittance_information_structured: Mapped[str] = mapped_column(
+        String(length=512), nullable=True
+    )
     short_user_description: Mapped[str] = mapped_column(
         String(length=512), nullable=True
     )
@@ -251,6 +276,12 @@ class Payment(Base):
         Integer, ForeignKey("debitcard.id"), nullable=True
     )
     debit_card = relationship("DebitCard", back_populates="payments", lazy="noload")
+    bank_account_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("bank_account.id"), nullable=True
+    )
+    bank_account: Mapped[Optional["BankAccount"]] = relationship(
+        "BankAccount", back_populates="payments", lazy="noload"
+    )
 
 
 class DebitCard(Base):
@@ -296,6 +327,39 @@ class Requisition(Base):
 
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
     user = relationship("User", back_populates="requisitions", lazy="noload")
+
+    bank_accounts: Mapped[list["BankAccount"]] = relationship(
+        "BankAccount",
+        back_populates="requisitions",
+        lazy="noload",
+        secondary=requisition_bankaccount,
+    )
+
+
+class BankAccount(Base):
+    __tablename__ = "bank_account"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    api_account_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    iban: Mapped[str] = mapped_column(String(128), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    requisitions: Mapped[list[Requisition]] = relationship(
+        "Requisition",
+        back_populates="bank_accounts",
+        lazy="noload",
+        secondary=requisition_bankaccount,
+    )
+
+    user_roles = relationship(
+        "UserBankAccountRole",
+        back_populates="bank_account",
+        lazy="noload",
+    )
+    payments = relationship("Payment", back_populates="bank_account", lazy="noload")
+    bank_account_owners = association_proxy("user_roles", "user")
 
 
 # class Requisition(SQLModel, TimeStampMixin, table=True):

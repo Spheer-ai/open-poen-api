@@ -223,6 +223,7 @@ async def bng_callback(
     )
     session.add(new_bng_account)
     await session.commit()
+    # TODO: On first import, import the entire history.
     # background_tasks.add_task(get_bng_payments, session)  # TODO
     return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
 
@@ -332,7 +333,10 @@ async def gocardless_callback(
     session.add(requisition)
     await session.commit()
 
-    await get_gocardless_payments(session, requisition.id)
+    await get_gocardless_payments(
+        session, requisition.id, date_from=datetime.today() - timedelta(days=365)
+    )
+    # TODO: On first import, import the entire history.
     # background_tasks.add_task(get_gocardless_payments, session, requisition.id)  # TODO
     return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 

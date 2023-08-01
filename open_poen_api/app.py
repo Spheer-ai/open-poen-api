@@ -30,3 +30,4 @@ async def custom_exception_handler(request: Request, exc: CustomException):
 async def on_startup():
     # TODO: Don't recreate db every time.
     await create_db_and_tables()
+    pass
