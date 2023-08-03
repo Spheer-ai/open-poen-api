@@ -98,8 +98,8 @@ async def process_requisition(
             session.add(new_role)
             await session.commit()
         else:
-            if requisition.user not in account.bank_account_owners:
-                # Case: a third user requisitioned this bank account earlier.
+            if requisition.user is not account.owner:
+                # In this case a third user requisitioned this bank account earlier.
                 requisition.status = ent.ReqStatus.CONFLICTED
                 session.add(requisition)
                 await session.commit()
