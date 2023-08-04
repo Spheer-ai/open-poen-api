@@ -7,11 +7,8 @@ from .. import models as ent
 from .. import schemas as s
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
-from .load_env import load_env_vars
 import datetime
 
-load_env_vars()
 
 DEBUG = os.environ.get("ENVIRONMENT") == "debug"
 

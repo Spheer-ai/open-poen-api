@@ -1,13 +1,11 @@
+from .utils import load_env
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
-from .utils.load_env import load_env_vars
 from .managers.user_manager import fastapi_users, auth_backend
 from .managers import CustomException
 from .database import create_db_and_tables, get_async_session
 from .routes import router
 from sqlalchemy.ext.asyncio import AsyncSession
-
-load_env_vars()
 
 app = FastAPI()
 
@@ -29,5 +27,5 @@ async def custom_exception_handler(request: Request, exc: CustomException):
 @app.on_event("startup")
 async def on_startup():
     # TODO: Don't recreate db every time.
-    await create_db_and_tables()
+    # await create_db_and_tables()
     pass
