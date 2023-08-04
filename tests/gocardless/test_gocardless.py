@@ -1,5 +1,19 @@
-# from open_poen_api.gocardless import client as gcl
-# import pytest
+import pytest
+from tests.conftest import user_info
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(user_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_create_gocardless(async_client, as_1, status_code):
+    params = {"institution_id": "ING_INGBNL2A"}
+    user_id = 1
+    response = await async_client.get(
+        f"/users/{user_id}/gocardless-initiate", params=params
+    )
+    assert response.status_code == status_code
 
 
 # @pytest.fixture(scope="module")

@@ -1,13 +1,8 @@
 from fastapi import Depends, Request
 from ..database import get_user_db, get_async_session
-from ..schemas_and_models.models.entities import (
-    User,
-    UserInitiativeRole,
-    UserActivityRole,
-)
+from ..models import User, UserInitiativeRole, UserActivityRole
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from ..utils.load_env import load_env_vars
 from ..utils.email import MessageSchema, conf, env
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
@@ -27,8 +22,6 @@ import os
 from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
-
-load_env_vars()
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):

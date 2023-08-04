@@ -3,13 +3,7 @@ from open_poen_api.database import (
     asyng_engine,
 )
 from open_poen_api.app import app
-from open_poen_api.schemas_and_models.models.entities import (
-    Base,
-    User,
-    Initiative,
-    Role,
-    Activity,
-)
+from open_poen_api.models import Base, User, Initiative, UserRole, Activity
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api.managers import user_manager as um
 import pytest
@@ -22,7 +16,7 @@ from open_poen_api.managers.user_manager import get_user_manager
 from open_poen_api.database import get_user_db
 from open_poen_api.managers.initiative_manager import get_initiative_manager
 from open_poen_api.managers.activity_manager import get_activity_manager
-from open_poen_api.schemas_and_models import (
+from open_poen_api.schemas import (
     UserCreateWithPassword,
     InitiativeCreate,
     ActivityCreate,
@@ -31,7 +25,7 @@ from open_poen_api.schemas_and_models import (
 
 superuser_info = {
     "obj_id": 42,
-    "role": Role.USER,
+    "role": UserRole.USER,
     "email": "test@example.com",
     "is_active": True,
     "is_superuser": True,

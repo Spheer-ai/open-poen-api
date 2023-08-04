@@ -1,13 +1,8 @@
 from ..database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request, HTTPException
-from ..schemas_and_models.models.entities import (
-    Initiative,
-    User,
-    UserInitiativeRole,
-    DebitCard,
-)
-from ..schemas_and_models import InitiativeCreate, InitiativeUpdate
+from ..models import Initiative, User, UserInitiativeRole, DebitCard
+from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select

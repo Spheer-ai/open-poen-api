@@ -7,7 +7,7 @@ from tests.conftest import (
     anon_info,
     initiative_info,
 )
-from open_poen_api.schemas_and_models.models.entities import Initiative
+from open_poen_api.models import Initiative
 from open_poen_api.managers.initiative_manager import get_initiative_manager
 
 

@@ -1,5 +1,5 @@
 import pytest
-from open_poen_api.schemas_and_models.models.entities import User
+from open_poen_api.models import User
 from tests.conftest import (
     retrieve_token_from_last_sent_email,
     superuser_info,

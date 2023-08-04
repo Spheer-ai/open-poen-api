@@ -6,7 +6,7 @@ import json
 from dateutil.parser import parse
 import pytz
 from .api import read_account_information, read_transaction_list
-from ..schemas_and_models.models import entities as ent
+from .. import models as ent
 from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal
 from sqlalchemy import select

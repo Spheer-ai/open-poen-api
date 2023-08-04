@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Extra, validator
 from .mixins import TimeStampMixin, Money
-from .models.entities import PaymentBase, Route, PaymentType
+
+# from .models.entities import PaymentBase, Route, PaymentType
+# # from ..models import
 from .mixins import NotNullValidatorMixin, HiddenMixin
 from datetime import datetime
 

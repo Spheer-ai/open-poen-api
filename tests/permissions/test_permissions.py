@@ -1,5 +1,5 @@
 from open_poen_api.authorization.authorization import OSO
-from open_poen_api.schemas_and_models.models.entities import User
+from open_poen_api.models import User
 import pytest_asyncio
 import pytest
 from oso.exceptions import NotFoundError, ForbiddenError

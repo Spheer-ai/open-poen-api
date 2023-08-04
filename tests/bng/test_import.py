@@ -1,6 +1,6 @@
 import pytest
 from open_poen_api.bng import get_bng_payments
-from open_poen_api.schemas_and_models.models.entities import BNG
+from open_poen_api.models import BNG
 import pytest_asyncio
 import json
 from datetime import datetime

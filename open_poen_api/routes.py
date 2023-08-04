@@ -8,14 +8,17 @@ from fastapi import (
     Query,
 )
 from fastapi.responses import RedirectResponse
-from fastapi_users.exceptions import UserAlreadyExists
 from .database import get_async_session
-from . import schemas_and_models as s
-from .schemas_and_models.models import entities as ent
+from . import schemas as s
+from . import models as ent
 from .managers import user_manager as um
 from .managers import initiative_manager as im
 from .managers import activity_manager as am
-from .utils.utils import temp_password_generator, get_requester_ip
+from .utils.utils import (
+    temp_password_generator,
+    get_requester_ip,
+    format_user_timestamp,
+)
 import os
 from .bng.api import create_consent
 from .bng import get_bng_payments, retrieve_access_token, create_consent
@@ -29,6 +32,13 @@ from time import time
 import pytz
 from .authorization.authorization import SECRET_KEY, ALGORITHM
 from .authorization import authorization as auth
+from .gocardless import (
+    refresh_tokens,
+    client,
+    INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS,
+    get_gocardless_payments,
+)
+import uuid
 
 
 router = APIRouter()
@@ -50,7 +60,7 @@ async def create_user(
 ):
     auth.authorize(superuser, "create", ent.User, oso)
     user_with_password = s.UserCreateWithPassword(
-        **user.dict(), password=temp_password_generator(16)
+        **user.dict(), password=temp_password_generator(size=16)
     )
     user_db = await user_manager.create(user_with_password, request=request)
     return auth.get_authorized_output_fields(superuser, "read", user_db, oso)
@@ -213,6 +223,7 @@ async def bng_callback(
     )
     session.add(new_bng_account)
     await session.commit()
+    # TODO: On first import, import the entire history.
     # background_tasks.add_task(get_bng_payments, session)  # TODO
     return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
 
@@ -238,42 +249,96 @@ async def bng_callback(
 #     return Response(status_code=204)
 
 
-# # GOCARDLESS
-# @router.get("/users/{user_id}/gocardless-initiate", response_class=RedirectResponse)
-# async def gocardless_initiatite(
-#     user_id: int,
-#     # gocardless: s.GoCardlessCreateActivityOwnerCreate,
-#     logged_in_user=Depends(auth.get_logged_in_user),
-#     requires_user_owner=Depends(auth.requires_user_owner),
-#     session: AsyncSession = Depends(get_async_session),
-# ):
-#     user = session.get(ent.User, user_id)
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
+# GOCARDLESS
+@router.get("/users/{user_id}/gocardless-initiate", response_model=s.GocardlessInitiate)
+async def gocardless_initiatite(
+    user_id: int,
+    institution_id: str = Depends(s.validate_institution_id),
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(required_login_dep),
+    user_manager: um.UserManager = Depends(um.get_user_manager),
+):
+    user = await user_manager.min_load(user_id)
 
-#     # A user can only have one requisition per bank (institution_id).
-#     # TODO
+    await refresh_tokens()
 
-#     await refresh_tokens()
+    reference_id = str(uuid.uuid4())
 
-#     init = client.initialize_session(
-#         # TODO: This has to redirect to the SPA.
-#         redirect_uri=f"https://{DOMAIN_NAME}/users/{user_id}/gocardless-callback",
-#         # TODO: Parse dynamically
-#         institution_id="ING_INGBNL2A",
-#         reference_id=format_user_timestamp(user.id),
-#         max_historical_days=720,
-#     )
+    token = jwt.encode(
+        {
+            "user_id": user_id,
+            "reference_id": reference_id,
+            "exp": time() + 1800,
+        },
+        SECRET_KEY,
+        ALGORITHM,
+    )
 
-#     new_requisition = ent.Requisition(
-#         user_id=user_id,
-#         api_institution_id="ING_INGBNL2A",
-#         api_requisition_id=init.requisition_id,
-#     )
-#     session.add(new_requisition)
-#     session.commit()
-#     # TODO: Don´t return a redirect, but some json with the link.
-#     return RedirectResponse(url=init.link)
+    init = client.initialize_session(
+        redirect_uri=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/gocardless-callback",
+        institution_id=institution_id,
+        reference_id=token,
+        max_historical_days=INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS[institution_id],
+    )
+
+    requisition_db = ent.Requisition(
+        user_id=user_id,
+        institution_id=institution_id,
+        api_requisition_id=init.requisition_id,
+        reference_id=reference_id,
+        status=ent.ReqStatus.CREATED,
+    )
+    session.add(requisition_db)
+    await session.commit()
+
+    return s.GocardlessInitiate(url=init.link)
+
+
+@router.get("/users/{user_id}/gocardless-callback")
+async def gocardless_callback(
+    user_id: int,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    ref: str,
+    error: str | None = None,
+    details: str | None = None,
+    session: AsyncSession = Depends(get_async_session),
+):
+    if error is not None:
+        raise HTTPException(status_code=500, detail=details)
+
+    try:
+        payload = jwt.decode(ref, SECRET_KEY, algorithms=[ALGORITHM])
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="JWT token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate JWT token")
+
+    if payload["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    requisition_q = await session.execute(
+        select(ent.Requisition).where(
+            and_(
+                ent.Requisition.reference_id == payload["reference_id"],
+                ent.Requisition.user_id == payload["user_id"],
+            )
+        )
+    )
+    requisition = requisition_q.scalars().first()
+    if requisition is None:
+        raise HTTPException(status_code=404, detail="Requisition not found")
+
+    requisition.callback_handled = True
+    session.add(requisition)
+    await session.commit()
+
+    # await get_gocardless_payments(
+    # session, requisition.id, date_from=datetime.today() - timedelta(days=365)
+    # )
+    # TODO: On first import, import the entire history.
+    # background_tasks.add_task(get_gocardless_payments, session, requisition.id)  # TODO
+    return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 
 
 @router.post("/initiative", response_model=s.InitiativeRead)

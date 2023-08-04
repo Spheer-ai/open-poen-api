@@ -1,13 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
-from ..schemas_and_models import ActivityCreate, ActivityUpdate
-from ..schemas_and_models.models.entities import (
-    Activity,
-    UserActivityRole,
-    User,
-    Initiative,
-)
+from ..schemas import ActivityCreate, ActivityUpdate
+from ..models import Activity, UserActivityRole, User, Initiative
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload

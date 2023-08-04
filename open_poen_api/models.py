@@ -25,14 +25,24 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.associationproxy import association_proxy, AssociationProxy
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
+from sqlalchemy.dialects import postgresql as pg
+import uuid
 
 
 class Base(DeclarativeBase):
     pass
+
+
+requisition_bankaccount = Table(
+    "requisition_bankaccount",
+    Base.metadata,
+    Column("requisition_id", Integer, ForeignKey("requisition.id"), primary_key=True),
+    Column("bank_account_id", Integer, ForeignKey("bank_account.id"), primary_key=True),
+)
 
 
 class UserInitiativeRole(Base):
@@ -51,7 +61,41 @@ class UserActivityRole(Base):
     activity = relationship("Activity", back_populates="user_roles")
 
 
-class Role(str, Enum):
+class BankAccountRole(str, Enum):
+    OWNER = "owner"
+    USER = "user"
+
+
+class UserBankAccountRole(Base):
+    __tablename__ = "user_bank_account_roles"
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    bank_account_id = Column(Integer, ForeignKey("bank_account.id"), primary_key=True)
+    role: Mapped[BankAccountRole] = mapped_column(
+        ChoiceType(BankAccountRole, impl=VARCHAR(length=32))
+    )
+
+    user = relationship("User")
+    bank_account = relationship("BankAccount")
+
+
+class RegulationRole(str, Enum):
+    GRANT_OFFICER = "grant officer"
+    POLICY_OFFICER = "policy officer"
+
+
+class UserRegulationRole(Base):
+    __tablename__ = "user_regulation_roles"
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    regulation_id = Column(Integer, ForeignKey("regulation.id"), primary_key=True)
+    role: Mapped[RegulationRole] = mapped_column(
+        ChoiceType(RegulationRole, impl=VARCHAR(length=32))
+    )
+
+    user = relationship("User")
+    regulation = relationship("Regulation")
+
+
+class UserRole(str, Enum):
     """These are the roles we save in the db, but there are more roles that
     are not based on a a field, but on relationship(s)."""
 
@@ -65,12 +109,16 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     first_name: Mapped[str | None] = mapped_column(String(length=64))
     last_name: Mapped[str | None] = mapped_column(String(length=64))
     biography: Mapped[str | None] = mapped_column(String(length=512))
-    role: Mapped[Role] = mapped_column(ChoiceType(Role, impl=VARCHAR(length=32)))
+    role: Mapped[UserRole] = mapped_column(
+        ChoiceType(UserRole, impl=VARCHAR(length=32))
+    )
     image: Mapped[str | None] = mapped_column(String(length=128))
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     bng = relationship("BNG", uselist=False, back_populates="user", lazy="noload")
+    requisitions = relationship("Requisition", back_populates="user", lazy="noload")
+
     initiative_roles = relationship(
         "UserInitiativeRole",
         back_populates="user",
@@ -84,15 +132,61 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     )
     activities = association_proxy("activity_roles", "activity")
 
+    user_bank_account_roles = relationship(
+        "UserBankAccountRole",
+        lazy="noload",
+        primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
+        overlaps="owner_bank_account_role, user",
+    )
+    used_bank_accounts = association_proxy("user_bank_account_roles", "bank_account")
+
+    owner_bank_account_role = relationship(
+        "UserBankAccountRole",
+        lazy="noload",
+        primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
+        overlaps="user_bank_account_roles, user",
+    )
+    owned_bank_account = association_proxy("owner_bank_account_role", "bank_account")
+
+    grant_officer_regulation_roles = relationship(
+        "UserRegulationRole",
+        lazy="noload",
+        primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
+        overlaps="policy_officer_regulation_roles, user",
+    )
+    grant_officer_regulations = association_proxy(
+        "grant_officer_regulation_roles", "regulation"
+    )
+
+    policy_officer_regulation_roles = relationship(
+        "UserRegulationRole",
+        lazy="noload",
+        primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
+        overlaps="grant_officer_regulation_roles, user",
+    )
+    policy_officer_regulations = association_proxy(
+        "policy_officer_regulation_roles", "regulation"
+    )
+
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
 
     REL_FIELDS = [
         "bng",
+        "requisitions",
         "initiative_roles",
         "initiatives",
         "activity_roles",
         "activities",
+        "shared_bank_account_roles",
+        "shared_bank_accounts",
+        "owned_bank_account_role",
+        "owned_bank_account",
+        "grant_officer_regulation_roles",
+        "grant_officer_regulation_roles",
+        "grant_officer_regulations",
+        "policy_officer_regulation_roles",
+        "policy_officer_regulations",
     ]
 
 
@@ -153,9 +247,12 @@ class Initiative(Base):
         "UserInitiativeRole",
         back_populates="initiative",
         lazy="noload",
+        cascade="delete",
     )
     initiative_owners = association_proxy("user_roles", "user")
-    activities = relationship("Activity", back_populates="initiative", lazy="noload")
+    activities = relationship(
+        "Activity", back_populates="initiative", lazy="noload", cascade="delete"
+    )
     payments = relationship("Payment", back_populates="initiative", lazy="noload")
     debit_cards: Mapped[list["DebitCard"]] = relationship(
         "DebitCard", back_populates="initiative", lazy="noload"
@@ -198,14 +295,14 @@ class Route(str, Enum):
     we can take corrective payments into account in the calculation rules, such
     as refunds."""
 
-    INCOME = "income"
-    EXPENSES = "expenses"
+    INCOME = "inkomen"
+    EXPENSES = "uitgaven"
 
 
 class PaymentType(str, Enum):
     BNG = "BNG"
-    NORDIGEN = "NORDIGEN"
-    MANUAL = "MANUAL"
+    GOCARDLESS = "GoCardless"
+    MANUAL = "handmatig"
 
 
 class Payment(Base):
@@ -227,8 +324,10 @@ class Payment(Base):
     type: Mapped[PaymentType] = mapped_column(
         ChoiceType(PaymentType, impl=VARCHAR(length=32))
     )
-    remittance_information_unstructured: Mapped[str] = mapped_column(String(length=256))
-    remittance_information_structured: Mapped[str] = mapped_column(String(length=256))
+    remittance_information_unstructured: Mapped[str] = mapped_column(String(length=512))
+    remittance_information_structured: Mapped[str] = mapped_column(
+        String(length=512), nullable=True
+    )
     short_user_description: Mapped[str] = mapped_column(
         String(length=512), nullable=True
     )
@@ -248,6 +347,12 @@ class Payment(Base):
         Integer, ForeignKey("debitcard.id"), nullable=True
     )
     debit_card = relationship("DebitCard", back_populates="payments", lazy="noload")
+    bank_account_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("bank_account.id"), nullable=True
+    )
+    bank_account: Mapped[Optional["BankAccount"]] = relationship(
+        "BankAccount", back_populates="payments", lazy="noload"
+    )
 
 
 class DebitCard(Base):
@@ -265,30 +370,102 @@ class DebitCard(Base):
     payments = relationship("Payment", back_populates="debit_card", lazy="noload")
 
 
-# class Requisition(SQLModel, TimeStampMixin, table=True):
-#     id: int | None = Field(default=None, primary_key=True)
-#     user_id: int = Field(
-#         sa_column=Column(Integer, ForeignKey("user.id"), nullable=False)
-#     )
-#     user: User = Relationship(back_populates="requisitions")
-#     api_institution_id: str
-#     api_requisition_id: str
+class ReqStatus(str, Enum):
+    CREATED = "CR"
+    GIVING_CONSENT = "GC"
+    UNDERGOING_AUTHENTICATON = "UA"
+    REJECTED = "RJ"
+    SELECTING_ACCOUNTS = "SA"
+    GRANTING_ACCESS = "GA"
+    LINKED = "LN"
+    SUSPENDED = "SU"
+    EXPIRED = "EX"
+    # Defined by us, not Gocardless. Indicates that the requisition was done for a bank
+    # account that was requisitioned earlier by another user.
+    CONFLICTED = "CO"
 
-#     __table_args__ = (
-#         UniqueConstraint("api_institution_id", "user_id", name="single_bank_per_user"),
-#     )
+
+class Requisition(Base):
+    __tablename__ = "requisition"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    institution_id: Mapped[str] = mapped_column(String(length=32), nullable=False)
+    api_requisition_id: Mapped[str] = mapped_column(String(length=128), nullable=False)
+    reference_id: Mapped[str] = mapped_column(String(length=36), nullable=False)
+    callback_handled: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    status: Mapped[ReqStatus] = mapped_column(
+        ChoiceType(ReqStatus, impl=VARCHAR(length=32))
+    )
+
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"), nullable=False)
+    user = relationship("User", back_populates="requisitions", lazy="noload")
+
+    bank_accounts: Mapped[list["BankAccount"]] = relationship(
+        "BankAccount",
+        back_populates="requisitions",
+        lazy="noload",
+        secondary=requisition_bankaccount,
+    )
 
 
-# class Account(SQLModel, TimeStampMixin, table=True):
-#     id: int | None = Field(default=None, primary_key=True)
-#     api_account_id: str
+class BankAccount(Base):
+    __tablename__ = "bank_account"
 
-#     requisition_id: int | None = Field(
-#         sa_column=Column(Integer, ForeignKey("requisition.id"), nullable=True)
-#     )
-#     requisition: Requisition = Relationship(back_populates="accounts")
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    api_account_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    iban: Mapped[str] = mapped_column(String(128), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-#     initiative_id: int | None = Field(
-#         sa_column=Column(Integer, ForeignKey("initiative.id"), nullable=True)
-#     )
-#     initiative: Initiative = Relationship(back_populates="accounts")
+    requisitions: Mapped[list[Requisition]] = relationship(
+        "Requisition",
+        back_populates="bank_accounts",
+        lazy="noload",
+        secondary=requisition_bankaccount,
+    )
+
+    user_roles = relationship(
+        "UserBankAccountRole",
+        lazy="noload",
+        primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
+        overlaps="owner_role, bank_account",
+    )
+    users: AssociationProxy[list[User]] = association_proxy("user_roles", "user")
+
+    owner_role = relationship(
+        "UserBankAccountRole",
+        lazy="noload",
+        primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
+        uselist=False,
+        overlaps="user_roles, bank_account",
+    )
+    owner: AssociationProxy[User] = association_proxy("owner_role", "user")
+
+    payments = relationship("Payment", back_populates="bank_account", lazy="noload")
+
+
+class Regulation(Base):
+    __tablename__ = "regulation"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str] = mapped_column(String(512), nullable=False)
+
+    grant_officer_roles = relationship(
+        "UserRegulationRole",
+        lazy="noload",
+        primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
+        overlaps="policy_officer_roles, regulation",
+    )
+    grant_officers = association_proxy("grant_officer_roles", "user")
+
+    policy_officer_roles = relationship(
+        "UserRegulationRole",
+        lazy="noload",
+        primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
+        overlaps="grant_officer_roles, regulation",
+    )
+    policy_officers = association_proxy("policy_officer_roles", "user")

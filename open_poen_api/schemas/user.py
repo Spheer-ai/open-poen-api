@@ -3,7 +3,7 @@ from pydantic import EmailStr, BaseModel, Field, validator
 from .mixins import NotNullValidatorMixin
 
 from fastapi_users import schemas
-from .models.entities import Role
+from ..models import UserRole
 
 
 class UserRead(schemas.BaseUser[int]):
@@ -11,7 +11,7 @@ class UserRead(schemas.BaseUser[int]):
     first_name: str | None
     last_name: str | None
     biography: str | None
-    role: Role
+    role: UserRole
     image: str | None
     hidden: bool | None
 
@@ -34,8 +34,7 @@ class UserCreate(schemas.CreateUpdateDictModel):
     first_name: str | None = None
     last_name: str | None = None
     biography: str | None = None
-    role: Role = Field(default=Role.USER)
-    image: str | None = None
+    role: UserRole = Field(default=UserRole.USER)
     is_active: bool | None = True
     is_superuser: bool | None = False
     is_verified: bool | None = True
@@ -60,7 +59,7 @@ class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
     first_name: str | None
     last_name: str | None
     biography: str | None
-    role: Role | None
+    role: UserRole | None
     image: str | None
     hidden: bool | None
 
