@@ -26,6 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 load_env_vars()
 
+print(SECRET_KEY)
+
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     reset_password_token_secret = SECRET_KEY

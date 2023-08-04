@@ -74,10 +74,8 @@ class UserBankAccountRole(Base):
         ChoiceType(BankAccountRole, impl=VARCHAR(length=32))
     )
 
-    # user = relationship("User", back_populates="user_bank_account_roles")
-    # owner = relationship("User", back_populates="owner_bank_account_role")
-    # bank_account = relationship("BankAccount", back_populates="user_roles")
-    # owner_bank_account = relationship("BankAccount", back_populates="owner_role")
+    user = relationship("User")
+    bank_account = relationship("BankAccount")
 
 
 class RegulationRole(str, Enum):
@@ -93,14 +91,8 @@ class UserRegulationRole(Base):
         ChoiceType(RegulationRole, impl=VARCHAR(length=32))
     )
 
-    # grant_officer = relationship(
-    #     "User", back_populates="grant_officer_regulation_roles"
-    # )
-    # policy_officer = relationship(
-    #     "User", back_populates="policy_officer_regulation_roles"
-    # )
-
-    # regulation = relationship("Regulation", back_populates="user_roles")
+    user = relationship("User")
+    regulation = relationship("Regulation")
 
 
 class UserRole(str, Enum):
@@ -142,31 +134,25 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 
     user_bank_account_roles = relationship(
         "UserBankAccountRole",
-        # back_populates="user",
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
-        overlaps="owner_bank_account_role",
+        overlaps="owner_bank_account_role, user",
     )
-    accessible_bank_accounts = association_proxy(
-        "user_bank_account_roles", "bank_account"
-    )
+    used_bank_accounts = association_proxy("user_bank_account_roles", "bank_account")
 
-    owner_bank_acount_role = relationship(
+    owner_bank_account_role = relationship(
         "UserBankAccountRole",
-        # back_populates="user",
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
-        uselist=False,
-        overlaps="user_bank_account_roles",
+        overlaps="user_bank_account_roles, user",
     )
     owned_bank_account = association_proxy("owner_bank_account_role", "bank_account")
 
     grant_officer_regulation_roles = relationship(
         "UserRegulationRole",
-        # back_populates="user",
         lazy="noload",
-        primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER}')",
-        overlaps="policy_officer_regulation_roles",
+        primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
+        overlaps="policy_officer_regulation_roles, user",
     )
     grant_officer_regulations = association_proxy(
         "grant_officer_regulation_roles", "regulation"
@@ -174,10 +160,9 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 
     policy_officer_regulation_roles = relationship(
         "UserRegulationRole",
-        # back_populates="user",
         lazy="noload",
-        primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER}')",
-        overlaps="grant_officer_regulation_roles",
+        primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
+        overlaps="grant_officer_regulation_roles, user",
     )
     policy_officer_regulations = association_proxy(
         "policy_officer_regulation_roles", "regulation"
@@ -444,20 +429,18 @@ class BankAccount(Base):
 
     user_roles = relationship(
         "UserBankAccountRole",
-        # back_populates="bank_account",
         lazy="noload",
-        primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.USER}')",
-        overlaps="owner_role",
+        primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
+        overlaps="owner_role, bank_account",
     )
     users: AssociationProxy[list[User]] = association_proxy("user_roles", "user")
 
     owner_role = relationship(
         "UserBankAccountRole",
-        # back_populates="bank_account",
         lazy="noload",
-        primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.OWNER}')",
+        primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
         uselist=False,
-        overlaps="user_roles",
+        overlaps="user_roles, bank_account",
     )
     owner: AssociationProxy[User] = association_proxy("owner_role", "user")
 
@@ -473,18 +456,16 @@ class Regulation(Base):
 
     grant_officer_roles = relationship(
         "UserRegulationRole",
-        # back_populates="regulation",
         lazy="noload",
-        primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER}')",
-        overlaps="policy_officer_roles",
+        primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
+        overlaps="policy_officer_roles, regulation",
     )
     grant_officers = association_proxy("grant_officer_roles", "user")
 
     policy_officer_roles = relationship(
         "UserRegulationRole",
-        # back_populates="regulation",
         lazy="noload",
-        primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER}')",
-        overlaps="grant_officer_roles",
+        primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
+        overlaps="grant_officer_roles, regulation",
     )
     policy_officers = association_proxy("policy_officer_roles", "user")

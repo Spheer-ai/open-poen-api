@@ -37,7 +37,10 @@ def _flatten(d, parent_key="", sep="_"):
 
 
 async def process_requisition(
-    session: AsyncSession, requisition: ent.Requisition, date_from: datetime
+    session: AsyncSession,
+    requisition: ent.Requisition,
+    date_from: datetime,
+    processed_accounts: set[str],
 ):
     api_requisition = client.requisition.get_requisition_by_id(
         requisition.api_requisition_id
@@ -54,6 +57,11 @@ async def process_requisition(
     for account in api_requisition["accounts"]:
         # TODO: Make sure we don't do double imports for an account.
         # (Multiple requisitions can be for the same account.)
+        if account in processed_accounts:
+            continue
+        else:
+            processed_accounts.add(account)
+
         api_account = client.account_api(account)
         metadata = api_account.get_metadata()
         await sleep(1)
@@ -171,6 +179,8 @@ async def get_gocardless_payments(
     date_from: datetime = datetime.today() - timedelta(days=7),
 ):
     async with async_session_maker() as session:
+        processed_accounts: set[str] = set()
+
         if requisition_id is not None:
             requisition_q = await session.execute(
                 select(ent.Requisition)
@@ -187,7 +197,9 @@ async def get_gocardless_payments(
             requisition = requisition_q.scalars().first()
             if not requisition:
                 raise ValueError("No valid Requisition found")
-            await process_requisition(session, requisition, date_from)
+            await process_requisition(
+                session, requisition, date_from, processed_accounts
+            )
         else:
             requisition_q_list = (
                 select(ent.Requisition)
@@ -196,4 +208,6 @@ async def get_gocardless_payments(
                 .execution_options(yield_per=256)
             )
             for requisition in await session.scalars(requisition_q_list):
-                await process_requisition(session, requisition, date_from)
+                await process_requisition(
+                    session, requisition, date_from, processed_accounts
+                )
