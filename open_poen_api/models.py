@@ -242,6 +242,7 @@ class Initiative(Base):
         Boolean, default=False, nullable=False
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # TODO: Add budget
 
     user_roles = relationship(
         "UserInitiativeRole",
@@ -257,6 +258,8 @@ class Initiative(Base):
     debit_cards: Mapped[list["DebitCard"]] = relationship(
         "DebitCard", back_populates="initiative", lazy="noload"
     )
+    grant_id: Mapped[int] = mapped_column(Integer, ForeignKey("grant.id"))
+    grant = relationship("Grant", back_populates="initiatives", lazy="noload")
 
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"
@@ -275,6 +278,7 @@ class Activity(Base):
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
+    # TODO: Add budget
 
     user_roles = relationship(
         "UserActivityRole",
@@ -469,3 +473,30 @@ class Regulation(Base):
         overlaps="grant_officer_roles, regulation",
     )
     policy_officers = association_proxy("policy_officer_roles", "user")
+
+    grants = relationship("Grant", back_populates="regulation", lazy="noload")
+    funder_id: Mapped[int] = mapped_column(Integer, ForeignKey("funder.id"))
+    funder = relationship("Funder", back_populates="regulations", lazy="noload")
+
+
+class Grant(Base):
+    __tablename__ = "grant"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    reference: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+
+    regulation_id: Mapped[int] = mapped_column(Integer, ForeignKey("regulation.id"))
+    regulation = relationship("Regulation", back_populates="grants", lazy="noload")
+    initiatives = relationship("Initiative", back_populates="grant", lazy="noload")
+
+
+class Funder(Base):
+    __tablename__ = "funder"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    url: Mapped[str] = mapped_column(String(512))
+
+    regulations = relationship("Regulation", back_populates="funder", lazy="noload")
