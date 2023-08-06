@@ -547,6 +547,9 @@ class Regulation(Base):
 
 class Grant(Base):
     __tablename__ = "grant"
+    __table_args__ = (
+        UniqueConstraint("name", "regulation_id", name="_name_regulation_uc"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -555,7 +558,7 @@ class Grant(Base):
 
     regulation_id: Mapped[int] = mapped_column(Integer, ForeignKey("regulation.id"))
     regulation: Mapped[Regulation] = relationship(
-        "Regulation", back_populates="grants", lazy="noload"
+        "Regulation", back_populates="grants", lazy="noload", uselist=False
     )
     initiatives: Mapped[list[Initiative]] = relationship(
         "Initiative", back_populates="grant", lazy="noload"

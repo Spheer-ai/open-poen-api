@@ -26,7 +26,6 @@ def validate_iban(iban: str = Query(...)):
 #         )
 #     )
 
-
 # class HiddenMixin(BaseModel):
 #     hidden: bool | None = Field(nullable=False, default=False)
 

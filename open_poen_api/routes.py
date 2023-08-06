@@ -16,6 +16,7 @@ from .managers import initiative_manager as im
 from .managers import activity_manager as am
 from .managers import funder_manager as fm
 from .managers import regulation_manager as rm
+from .managers import grant_manager as gm
 from .utils.utils import (
     temp_password_generator,
     get_requester_ip,
