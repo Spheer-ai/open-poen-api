@@ -7,6 +7,7 @@ from ..database import get_sync_session
 from pydantic import BaseModel
 from .data_adapter import SqlAlchemyAdapter
 from sqlalchemy.orm import Session
+from typing import Type
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -101,7 +102,7 @@ def get_oso_actor(actor: ent.User | None):
 
 
 def get_authorized_query(
-    actor: ent.User | None, action: str, resource: ent.Base, oso: Oso
+    actor: ent.User | None, action: str, resource: Type[ent.Base], oso: Oso
 ):
     oso_actor = get_oso_actor(actor)
 

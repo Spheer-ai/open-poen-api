@@ -10,5 +10,5 @@ from .bng import *
 from .user import *
 from .mixins import *
 from .linked_entities import *
-
+from .funder import *
 from .gocardless import *

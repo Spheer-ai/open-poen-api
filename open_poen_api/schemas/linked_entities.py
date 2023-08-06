@@ -1,7 +1,7 @@
 from .initiative import InitiativeRead
 from .activity import ActivityRead
 from .user import UserRead
-from .debit_card import DebitCardRead
+from .funder import FunderRead
 from pydantic import validator
 
 
@@ -29,5 +29,13 @@ class ActivityReadLinked(ActivityRead):
     initiative: InitiativeRead
 
     @validator("activity_owners", pre=True)
+    def apply_operation(cls, v):
+        return list(v)
+
+
+class FunderReadLinked(FunderRead):
+    regulations: list  # RegulationRead
+
+    @validator("regulations", pre=True)
     def apply_operation(cls, v):
         return list(v)

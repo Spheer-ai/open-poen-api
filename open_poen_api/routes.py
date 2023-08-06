@@ -333,11 +333,9 @@ async def gocardless_callback(
     session.add(requisition)
     await session.commit()
 
-    # await get_gocardless_payments(
-    # session, requisition.id, date_from=datetime.today() - timedelta(days=365)
-    # )
-    # TODO: On first import, import the entire history.
-    # background_tasks.add_task(get_gocardless_payments, session, requisition.id)  # TODO
+    background_tasks.add_task(
+        get_gocardless_payments, requisition.id, datetime.today() - timedelta(days=365)
+    )
     return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 
 
@@ -589,6 +587,90 @@ async def link_initiative_debit_cards(
     return s.DebitCardReadList(debit_cards=filtered_debit_cards)
 
 
+@router.post("/funder", response_model=s.FunderRead)
+async def create_funder(
+    funder: s.FunderCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    auth.authorize(required_user, "create", ent.Funder, oso)
+    funder_db = await funder_manager.create(funder, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", funder_db, oso)
+
+
+@router.get(
+    "/funder/{funder_id}",
+    response_model=s.FunderReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_funder(
+    funder_id: int,
+    optional_user=Depends(optional_login_dep),
+    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.detail_load(funder_id)
+    auth.authorize(optional_user, "read", funder_db, oso)
+    return auth.get_authorized_output_fields(optional_user, "read", funder_db, oso)
+
+
+@router.patch(
+    "/funder/{funder_id}",
+    response_model=s.FunderRead,
+    response_model_exclude_unset=True,
+)
+async def update_funder(
+    funder_id: int,
+    funder: s.FunderUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.min_load(funder_id)
+    auth.authorize(required_user, "edit", funder_db, oso)
+    auth.authorize_input_fields(required_user, "edit", funder_db, funder)
+    edited_funder = await funder_manager.update(funder, funder_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_funder, oso)
+
+
+@router.delete("/funder/{funder_id}")
+async def delete_funder(
+    funder_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.min_load(funder_id)
+    auth.authorize(required_user, "delete", funder_db, oso)
+    await funder_manager.delete(funder_db, request=request)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/funders",
+    response_model=s.FunderReadList,
+    response_model_exclude_unset=True,
+)
+async def get_funders(
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    # TODO: pagination.
+    q = auth.get_authorized_query(optional_user, "read", ent.Funder, oso)
+    funders_result = await async_session.execute(q)
+    funders_scalar = funders_result.scalars().all()
+    filtered_funders = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in funders_scalar
+    ]
+    return s.FunderReadList(funders=filtered_funders)
+
+
 # ROUTES
 # POST "/initiative/{initiative_id}/activity/{activity_id}/payment",
 # PATCH "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}",
@@ -599,7 +681,4 @@ async def link_initiative_debit_cards(
 # PATCH "/initiative/{initiative_id}/payment/{payment_id}",
 # DELETE "/initiative/{initiative_id}/payment/{payment_id}"
 # GET "/initiative/{initiative_id}/payments"
-# POST /debit-card,
-# PATCH "/debit-card/{debit_card_id}",
-# GET "/initiative/{initiative_id}/debit-cards"
 # GET "/initiative/{initiative_id}/debit-cards/aggregate-numbers"
