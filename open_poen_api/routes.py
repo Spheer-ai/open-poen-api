@@ -15,6 +15,7 @@ from .managers import user_manager as um
 from .managers import initiative_manager as im
 from .managers import activity_manager as am
 from .managers import funder_manager as fm
+from .managers import regulation_manager as rm
 from .utils.utils import (
     temp_password_generator,
     get_requester_ip,
@@ -670,6 +671,102 @@ async def get_funders(
         for i in funders_scalar
     ]
     return s.FunderReadList(funders=filtered_funders)
+
+
+@router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
+async def create_regulation(
+    funder_id: int,
+    regulation: s.RegulationCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.min_load(funder_id)
+    auth.authorize(required_user, "create_regulation", funder_db, oso)
+    regulation_db = await regulation_manager.create(
+        regulation, funder_id, request=request
+    )
+    return auth.get_authorized_output_fields(required_user, "read", regulation_db, oso)
+
+
+@router.get(
+    "/funder/{funder_id}/regulation/{regulation_id}",
+    response_model=s.RegulationReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_regulation(
+    funder_id: int,
+    regulation_id: int,
+    optional_user=Depends(optional_login_dep),
+    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.detail_load(regulation_id)
+    auth.authorize(optional_user, "read", regulation_db, oso)
+    return auth.get_authorized_output_fields(optional_user, "read", regulation_db, oso)
+
+
+@router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}",
+    response_model=s.RegulationRead,
+    response_model_exclude_unset=True,
+)
+async def update_regulation(
+    funder_id: int,
+    regulation_id: int,
+    regulation: s.RegulationUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.min_load(regulation_id)
+    auth.authorize(required_user, "edit", regulation_db, oso)
+    auth.authorize_input_fields(required_user, "edit", regulation_db, regulation)
+    edited_regulation = await regulation_manager.update(
+        regulation, regulation_db, request=request
+    )
+    return auth.get_authorized_output_fields(
+        required_user, "read", edited_regulation, oso
+    )
+
+
+@router.delete("/funder/{funder_id}/regulation/{regulation_id}")
+async def delete_regulation(
+    funder_id: int,
+    regulation_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.min_load(regulation_id)
+    auth.authorize(required_user, "delete", regulation_db, oso)
+    await regulation_manager.delete(regulation_db, request=request)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/funder/{funder_id}/regulations",
+    response_model=s.RegulationReadList,
+    response_model_exclude_unset=True,
+)
+async def get_regulations(
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    # TODO: pagination.
+    q = auth.get_authorized_query(optional_user, "read", ent.Regulation, oso)
+    regulations_result = await async_session.execute(q)
+    regulations_scalar = regulations_result.scalars().all()
+    filtered_regulations = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in regulations_scalar
+    ]
+    return s.RegulationReadList(regulations=filtered_regulations)
 
 
 # ROUTES

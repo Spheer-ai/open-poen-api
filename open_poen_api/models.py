@@ -513,7 +513,7 @@ class Regulation(Base):
     __tablename__ = "regulation"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     description: Mapped[str] = mapped_column(String(512), nullable=False)
 
     grant_officer_roles: Mapped[list[UserRegulationRole]] = relationship(

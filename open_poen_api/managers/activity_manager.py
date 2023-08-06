@@ -25,7 +25,7 @@ class ActivityManager:
         try:
             await self.session.commit()
         except IntegrityError:
-            self.session.rollback()
+            await self.session.rollback()
             raise EntityAlreadyExists(message="Name is already in use")
         return activity
 
@@ -41,7 +41,7 @@ class ActivityManager:
         try:
             await self.session.commit()
         except IntegrityError:
-            self.session.rollback()
+            await self.session.rollback()
             raise EntityAlreadyExists("Name is already in use")
         return activity_db
 

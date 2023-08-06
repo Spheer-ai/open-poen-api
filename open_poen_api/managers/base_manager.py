@@ -17,8 +17,9 @@ class Manager:
         entity_create: BaseModel,
         db_model: Type[T],
         request: Request | None = None,
+        **kwargs,
     ) -> T:
-        entity = db_model(**entity_create.dict())
+        entity = db_model(**entity_create.dict(), **kwargs)
         self.session.add(entity)
         await self.session.commit()
         await self.after_create(entity, request)

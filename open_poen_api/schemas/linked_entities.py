@@ -2,6 +2,7 @@ from .initiative import InitiativeRead
 from .activity import ActivityRead
 from .user import UserRead
 from .funder import FunderRead
+from .regulation import RegulationRead
 from pydantic import validator
 
 
@@ -34,8 +35,15 @@ class ActivityReadLinked(ActivityRead):
 
 
 class FunderReadLinked(FunderRead):
-    regulations: list  # RegulationRead
+    regulations: list[RegulationRead]
 
     @validator("regulations", pre=True)
     def apply_operation(cls, v):
         return list(v)
+
+
+class RegulationReadLinked(RegulationRead):
+    grant_officers: list[UserRead]
+    policy_officers: list[UserRead]
+    # grants: list[GrantRead]
+    funder: FunderRead
