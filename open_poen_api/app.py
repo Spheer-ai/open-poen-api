@@ -27,5 +27,5 @@ async def custom_exception_handler(request: Request, exc: CustomException):
 @app.on_event("startup")
 async def on_startup():
     # TODO: Don't recreate db every time.
-    # await create_db_and_tables()
+    await create_db_and_tables()
     pass

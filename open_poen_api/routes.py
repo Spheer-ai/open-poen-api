@@ -14,6 +14,7 @@ from . import models as ent
 from .managers import user_manager as um
 from .managers import initiative_manager as im
 from .managers import activity_manager as am
+from .managers import funder_manager as fm
 from .utils.utils import (
     temp_password_generator,
     get_requester_ip,

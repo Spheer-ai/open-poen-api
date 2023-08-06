@@ -85,6 +85,7 @@ OSO.register_class(
         )
     },
 )
+OSO.register_class(ent.Funder)
 OSO.load_files(["open_poen_api/main.polar"])
 
 
