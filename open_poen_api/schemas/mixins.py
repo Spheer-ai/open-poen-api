@@ -26,23 +26,12 @@ def validate_iban(iban: str = Query(...)):
 #         )
 #     )
 
-# class HiddenMixin(BaseModel):
-#     hidden: bool | None = Field(nullable=False, default=False)
-
-
-# class NotNullValidatorMixin:
-#     """This validator helps enforce the condition that certain fields cannot be set to `None`. This is useful
-#     in situations where you want to distinguish between a field being omitted from a request (which is allowed)
-#     and a field being explicitly set to `None` (which is not allowed)."""
-
-#     @staticmethod
-#     def not_null(value, field):
-#         if value is None:
-#             raise ValueError(f"{field.name} cannot be null")
-#         return value
-
 
 class NotNullValidatorMixin(BaseModel):
+    """This validator helps enforce the condition that certain fields cannot be set to `None`. This is useful
+    in situations where you want to distinguish between a field being omitted from a request (which is allowed)
+    and a field being explicitly set to `None` (which is not allowed)."""
+
     NOT_NULL_FIELDS = []
 
     def __init__(self, **data):
