@@ -1,4 +1,4 @@
-from .utils import load_env
+from .utils.load_env import DEBUG
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from .managers.user_manager import fastapi_users, auth_backend
@@ -6,6 +6,9 @@ from .managers import CustomException
 from .database import create_db_and_tables, get_async_session
 from .routes import router
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.cors import CORSMiddleware
+import os
 
 app = FastAPI()
 
@@ -29,3 +32,20 @@ async def on_startup():
     # TODO: Don't recreate db every time.
     await create_db_and_tables()
     pass
+
+
+domain: str = os.environ["DOMAIN_NAME"]
+allowed_hosts = [domain, f"www.{domain}"]
+if DEBUG:
+    allowed_hosts.extend(["localhost", "127.0.0.1"])
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=allowed_hosts,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[f"https://{domain}"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
