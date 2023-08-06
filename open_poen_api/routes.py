@@ -769,6 +769,106 @@ async def get_regulations(
     return s.RegulationReadList(regulations=filtered_regulations)
 
 
+@router.post(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant", response_model=s.GrantRead
+)
+async def create_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant: s.GrantCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.min_load(regulation_id)
+    auth.authorize(required_user, "create_grant", regulation_db, oso)
+    grant_db = await grant_manager.create(
+        grant, regulation_db.funder_id, regulation_id, request=request
+    )
+    return auth.get_authorized_output_fields(required_user, "read", grant_db, oso)
+
+
+@router.get(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}",
+    response_model=s.GrantReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    optional_user=Depends(optional_login_dep),
+    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.detail_load(grant_id)
+    auth.authorize(optional_user, "read", grant_db, oso)
+    return auth.get_authorized_output_fields(optional_user, "read", grant_db, oso)
+
+
+@router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}",
+    response_model=s.GrantRead,
+    response_model_exclude_unset=True,
+)
+async def update_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    grant: s.GrantUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.min_load(grant_id)
+    auth.authorize(required_user, "edit", grant_db, oso)
+    auth.authorize_input_fields(required_user, "edit", grant_db, grant)
+    # TODO: Pass id's for linking.
+    edited_grant = await grant_manager.update(grant, grant_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_grant, oso)
+
+
+@router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")
+async def delete_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.min_load(grant_id)
+    auth.authorize(required_user, "delete", grant_db, oso)
+    await grant_manager.delete(grant_db, request=request)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/funder/{funder_id}/regulation/{regulation_id}/grants",
+    response_model=s.GrantReadList,
+    response_model_exclude_unset=True,
+)
+async def get_grants(
+    funder_id: int,
+    regulation_id: int,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    q = auth.get_authorized_query(optional_user, "read", ent.Grant, oso)
+    grants_result = await async_session.execute(q)
+    grants_scalar = grants_result.scalars().all()
+    filtered_grants = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in grants_scalar
+    ]
+    return s.GrantReadList(grants=filtered_grants)
+
+
 # ROUTES
 # POST "/initiative/{initiative_id}/activity/{activity_id}/payment",
 # PATCH "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}",
