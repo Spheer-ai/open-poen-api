@@ -15,7 +15,6 @@ class GrantManager(Manager):
     async def create(
         self,
         grant_create: GrantCreate,
-        funder_id: int,
         regulation_id: int,
         request: Request | None,
     ) -> Grant:
@@ -24,7 +23,6 @@ class GrantManager(Manager):
                 grant_create,
                 Grant,
                 request,
-                funder_id=funder_id,
                 regulation_id=regulation_id,
             )
         except IntegrityError:

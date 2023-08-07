@@ -21,6 +21,27 @@ import asyncio
     ],
     indirect=["get_mock_user"],
 )
+async def test_create_user_new(async_client, dummy_session, body, status_code):
+    response = await async_client.post("/user", json=body)
+    assert response.status_code == status_code
+    if status_code == 200:
+        db_user = await dummy_session.get(User, response.json()["id"])
+        assert db_user is not None
+        user_data = response.json()
+        assert user_data["email"] == body["email"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, body, status_code",
+    [
+        (superuser_info, {"email": "test@example.com"}, 200),
+        (userowner_info, {"email": "test@example.com"}, 403),
+        (anon_info, {"email": "test@example.com"}, 403),
+        (superuser_info, {"email": "existing@user.com"}, 400),
+    ],
+    indirect=["get_mock_user"],
+)
 async def test_create_user(async_client, as_1, body, status_code):
     response = await async_client.post("/user", json=body)
     assert response.status_code == status_code

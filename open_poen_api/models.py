@@ -274,7 +274,7 @@ class Initiative(Base):
         Boolean, default=False, nullable=False
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    # TODO: Add budget
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
 
     user_roles: Mapped[list[UserInitiativeRole]] = relationship(
         "UserInitiativeRole",
@@ -316,7 +316,7 @@ class Activity(Base):
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
-    # TODO: Add budget
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
 
     user_roles: Mapped[list[UserActivityRole]] = relationship(
         "UserActivityRole",

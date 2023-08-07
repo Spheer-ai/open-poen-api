@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, validator, ValidationError
 from ..models import LegalEntity
-from .mixins import NotNullValidatorMixin
+from .mixins import NotNullValidatorMixin, Budget
 
 
 class InitiativeRead(BaseModel):
@@ -17,6 +17,7 @@ class InitiativeRead(BaseModel):
     location: str | None
     hidden_sponsors: bool | None
     hidden: bool | None
+    budget: Budget
 
     class Config:
         orm_mode = True
@@ -42,6 +43,7 @@ class InitiativeCreate(BaseModel):
     location: str
     hidden_sponsors: bool = Field(default=False)
     hidden: bool = Field(default=False)
+    budget: Budget
 
 
 class InitiativeUpdate(NotNullValidatorMixin):
@@ -56,6 +58,7 @@ class InitiativeUpdate(NotNullValidatorMixin):
         "location",
         "hidden_sponsors",
         "hidden",
+        "budget",
     ]
 
     name: str | None
@@ -70,6 +73,7 @@ class InitiativeUpdate(NotNullValidatorMixin):
     location: str | None
     hidden_sponsors: bool | None
     hidden: bool | None
+    budget: Budget | None
 
 
 class InitiativeOwnersUpdate(BaseModel):

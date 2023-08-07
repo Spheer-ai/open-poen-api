@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-from .mixins import NotNullValidatorMixin
+from .mixins import NotNullValidatorMixin, Budget
 
 
 class ActivityRead(BaseModel):
@@ -9,6 +9,7 @@ class ActivityRead(BaseModel):
     purpose: str
     target_audience: str
     hidden: bool | None
+    budget: Budget
     finished: bool
     finished_description: str | None
 
@@ -29,6 +30,7 @@ class ActivityCreate(BaseModel):
     purpose: str
     target_audience: str
     hidden: bool = Field(default=False)
+    budget: Budget
 
 
 class ActivityUpdate(NotNullValidatorMixin):
@@ -40,6 +42,7 @@ class ActivityUpdate(NotNullValidatorMixin):
         "hidden",
         "finished",
         "finished_description",
+        "budget",
     ]
 
     name: str | None
@@ -49,6 +52,7 @@ class ActivityUpdate(NotNullValidatorMixin):
     hidden: bool | None
     finished: bool | None
     finished_description: bool | None
+    budget: Budget | None
 
 
 class ActivityOwnersUpdate(BaseModel):

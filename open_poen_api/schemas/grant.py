@@ -1,13 +1,12 @@
-from pydantic import BaseModel, HttpUrl
-from .mixins import NotNullValidatorMixin
-from decimal import Decimal
+from pydantic import BaseModel, condecimal
+from .mixins import NotNullValidatorMixin, Budget
 
 
 class GrantRead(BaseModel):
     id: int
     name: str
     reference: str
-    budget: Decimal  # TODO: validate digits
+    budget: Budget
 
     class Config:
         orm_mode = True
@@ -23,7 +22,7 @@ class GrantReadList(BaseModel):
 class GrantCreate(BaseModel):
     name: str
     reference: str
-    budget: Decimal  # TODO: validate digits
+    budget: Budget
 
 
 class GrantUpdate(NotNullValidatorMixin):
@@ -31,4 +30,4 @@ class GrantUpdate(NotNullValidatorMixin):
 
     name: str | None
     reference: str | None
-    budget: Decimal | None
+    budget: Budget | None

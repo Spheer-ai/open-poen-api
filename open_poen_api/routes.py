@@ -11,12 +11,7 @@ from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
 from . import models as ent
-from .managers import user_manager as um
-from .managers import initiative_manager as im
-from .managers import activity_manager as am
-from .managers import funder_manager as fm
-from .managers import regulation_manager as rm
-from .managers import grant_manager as gm
+from . import managers as m
 from .utils.utils import (
     temp_password_generator,
     get_requester_ip,
@@ -50,9 +45,9 @@ funder_router = APIRouter(tags=["funder"])
 
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
-superuser_dep = um.fastapi_users.current_user(superuser=True)
-required_login_dep = um.fastapi_users.current_user(optional=False)
-optional_login_dep = um.fastapi_users.current_user(optional=True)
+superuser_dep = m.fastapi_users.current_user(superuser=True)
+required_login_dep = m.fastapi_users.current_user(optional=False)
+optional_login_dep = m.fastapi_users.current_user(optional=True)
 
 
 @user_router.post("/user", response_model=s.UserRead)
@@ -60,7 +55,7 @@ async def create_user(
     user: s.UserCreate,
     request: Request,
     superuser=Depends(superuser_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     auth.authorize(superuser, "create", ent.User, oso)
@@ -79,7 +74,7 @@ async def create_user(
 async def get_user(
     user_id: int,
     optional_user=Depends(optional_login_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.detail_load(user_id)
@@ -97,7 +92,7 @@ async def update_user(
     user: s.UserUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
@@ -112,7 +107,7 @@ async def delete_user(
     user_id: int,
     request: Request,
     superuser=Depends(superuser_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
@@ -265,7 +260,7 @@ async def gocardless_initiatite(
     institution_id: str = Depends(s.validate_institution_id),
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
 ):
     user = await user_manager.min_load(user_id)
 
@@ -353,10 +348,11 @@ async def create_initiative(
     initiative: s.InitiativeCreate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     auth.authorize(required_user, "create", ent.Initiative, oso)
+    # TODO: Pass grant_id
     initiative_db = await initiative_manager.create(initiative, request=request)
     return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
@@ -369,7 +365,7 @@ async def create_initiative(
 async def get_initiative(
     initiative_id: int,
     optional_user=Depends(optional_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
@@ -387,7 +383,7 @@ async def update_initiative(
     initiative: s.InitiativeUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.min_load(initiative_id)
@@ -410,7 +406,7 @@ async def link_initiative_owners(
     initiative: s.InitiativeOwnersUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
@@ -434,7 +430,7 @@ async def delete_initiative(
     initiative_id: int,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.min_load(initiative_id)
@@ -472,8 +468,8 @@ async def create_activity(
     activity: s.ActivityCreate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.min_load(initiative_id)
@@ -493,7 +489,7 @@ async def get_activity(
     initiative_id: int,
     activity_id: int,
     optional_user=Depends(optional_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(initiative_id, activity_id)
@@ -512,7 +508,7 @@ async def update_activity(
     activity: s.ActivityUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.min_load(initiative_id, activity_id)
@@ -535,7 +531,7 @@ async def link_activity_owners(
     activity: s.ActivityOwnersUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(initiative_id, activity_id)
@@ -560,7 +556,7 @@ async def delete_activity(
     activity_id: int,
     request: Request,
     required_user=Depends(required_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.min_load(initiative_id, activity_id)
@@ -578,7 +574,7 @@ async def link_initiative_debit_cards(
     initiative: s.InitiativeDebitCardsUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
@@ -603,7 +599,7 @@ async def create_funder(
     funder: s.FunderCreate,
     request: Request,
     required_user=Depends(required_login_dep),
-    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     auth.authorize(required_user, "create", ent.Funder, oso)
@@ -619,7 +615,7 @@ async def create_funder(
 async def get_funder(
     funder_id: int,
     optional_user=Depends(optional_login_dep),
-    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.detail_load(funder_id)
@@ -637,7 +633,7 @@ async def update_funder(
     funder: s.FunderUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.min_load(funder_id)
@@ -652,7 +648,7 @@ async def delete_funder(
     funder_id: int,
     request: Request,
     required_user=Depends(required_login_dep),
-    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.min_load(funder_id)
@@ -688,8 +684,8 @@ async def create_regulation(
     regulation: s.RegulationCreate,
     request: Request,
     required_user=Depends(required_login_dep),
-    funder_manager: fm.FunderManager = Depends(fm.get_funder_manager),
-    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.min_load(funder_id)
@@ -709,7 +705,7 @@ async def get_regulation(
     funder_id: int,
     regulation_id: int,
     optional_user=Depends(optional_login_dep),
-    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     regulation_db = await regulation_manager.detail_load(regulation_id)
@@ -728,7 +724,7 @@ async def update_regulation(
     regulation: s.RegulationUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     regulation_db = await regulation_manager.min_load(regulation_id)
@@ -748,7 +744,7 @@ async def delete_regulation(
     regulation_id: int,
     request: Request,
     required_user=Depends(required_login_dep),
-    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     regulation_db = await regulation_manager.min_load(regulation_id)
@@ -787,15 +783,14 @@ async def create_grant(
     grant: s.GrantCreate,
     request: Request,
     required_user=Depends(required_login_dep),
-    regulation_manager: rm.RegulationManager = Depends(rm.get_regulation_manager),
-    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
+    # TODO: What to do with funder_id?
     regulation_db = await regulation_manager.min_load(regulation_id)
     auth.authorize(required_user, "create_grant", regulation_db, oso)
-    grant_db = await grant_manager.create(
-        grant, regulation_db.funder_id, regulation_id, request=request
-    )
+    grant_db = await grant_manager.create(grant, regulation_id, request=request)
     return auth.get_authorized_output_fields(required_user, "read", grant_db, oso)
 
 
@@ -809,7 +804,7 @@ async def get_grant(
     regulation_id: int,
     grant_id: int,
     optional_user=Depends(optional_login_dep),
-    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.detail_load(grant_id)
@@ -829,7 +824,7 @@ async def update_grant(
     grant: s.GrantUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.min_load(grant_id)
@@ -847,7 +842,7 @@ async def delete_grant(
     grant_id: int,
     request: Request,
     required_user=Depends(required_login_dep),
-    grant_manager: gm.GrantManager = Depends(gm.get_grant_manager),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.min_load(grant_id)

@@ -1,7 +1,6 @@
 from fastapi import Query, HTTPException
 import re
-from pydantic import validator
-from pydantic import BaseModel
+from pydantic import BaseModel, ConstrainedDecimal
 
 
 def validate_iban(iban: str = Query(...)):
@@ -41,8 +40,9 @@ class NotNullValidatorMixin(BaseModel):
                 raise ValueError(f"field '{field}' cannot be None")
 
 
-# class Money(ConstrainedDecimal):
-#     """This amount can be at the most one billion and can't have more than two decimal places."""
+class Budget(ConstrainedDecimal):
+    """This amount can be at the most one billion and can't have more than two decimal places."""
 
-#     max_digits = 10
-#     decimal_places = 2
+    max_digits = 10
+    decimal_places = 2
+    gt = 0

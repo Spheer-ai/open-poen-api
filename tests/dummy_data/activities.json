@@ -1,0 +1,218 @@
+[
+    {
+        "name": "Youth Coding Workshop",
+        "description": "Introduction to coding for young students.",
+        "purpose": "Inspire interest in computer science.",
+        "target_audience": "Middle school students",
+        "hidden": false,
+        "budget": "250.50",
+        "initiative_id": 1
+    },
+    {
+        "name": "Community Cleanup Day",
+        "description": "Clean up the local park and surrounding areas.",
+        "purpose": "Promote environmental stewardship.",
+        "target_audience": "Local residents",
+        "hidden": false,
+        "budget": "180.25",
+        "initiative_id": 1
+    },
+    {
+        "name": "Health and Nutrition Seminar",
+        "description": "Educational seminar on healthy living.",
+        "purpose": "Promote health and well-being.",
+        "target_audience": "General public",
+        "hidden": false,
+        "budget": "120.75",
+        "initiative_id": 2
+    },
+    {
+        "name": "Art and Craft Exhibition",
+        "description": "Showcasing local art and crafts.",
+        "purpose": "Support local artists and artisans.",
+        "target_audience": "Art enthusiasts",
+        "hidden": false,
+        "budget": "300.00",
+        "initiative_id": 4
+    },
+    {
+        "name": "Entrepreneurship Bootcamp",
+        "description": "Intensive training for aspiring entrepreneurs.",
+        "purpose": "Foster innovation and business skills.",
+        "target_audience": "Startups and aspiring entrepreneurs",
+        "hidden": false,
+        "budget": "400.00",
+        "initiative_id": 5
+    },
+    {
+        "name": "Tree Planting Drive",
+        "description": "Planting trees for a greener environment.",
+        "purpose": "Contribute to reforestation efforts.",
+        "target_audience": "Volunteers and environmentalists",
+        "hidden": false,
+        "budget": "80.50",
+        "initiative_id": 6
+    },
+    {
+        "name": "STEM Robotics Workshop",
+        "description": "Hands-on experience with robotics.",
+        "purpose": "Encourage interest in STEM fields.",
+        "target_audience": "High school students",
+        "hidden": false,
+        "budget": "180.00",
+        "initiative_id": 7
+    },
+    {
+        "name": "Disaster Preparedness Training",
+        "description": "Preparing for natural disasters.",
+        "purpose": "Build community resilience.",
+        "target_audience": "Local residents",
+        "hidden": false,
+        "budget": "90.75",
+        "initiative_id": 8
+    },
+    {
+        "name": "Women's Empowerment Seminar",
+        "description": "Empowering women to reach their potential.",
+        "purpose": "Support gender equality and leadership.",
+        "target_audience": "Women from all backgrounds",
+        "hidden": false,
+        "budget": "150.00",
+        "initiative_id": 9
+    },
+    {
+        "name": "Sustainable Farming Workshop",
+        "description": "Promoting sustainable agriculture practices.",
+        "purpose": "Enhance agricultural productivity.",
+        "target_audience": "Farmers and agriculture enthusiasts",
+        "hidden": false,
+        "budget": "350.00",
+        "initiative_id": 10
+    },
+    {
+        "name": "Science Fair Competition",
+        "description": "Showcasing innovative science projects.",
+        "purpose": "Promote scientific inquiry.",
+        "target_audience": "Students and science enthusiasts",
+        "hidden": false,
+        "budget": "200.50",
+        "initiative_id": 11
+    },
+    {
+        "name": "Public Health Awareness Campaign",
+        "description": "Raising awareness about public health issues.",
+        "purpose": "Inform and educate the community.",
+        "target_audience": "General public",
+        "hidden": false,
+        "budget": "70.25",
+        "initiative_id": 11
+    },
+    {
+        "name": "Theater and Drama Workshop",
+        "description": "Building acting and stage skills.",
+        "purpose": "Promote artistic expression.",
+        "target_audience": "Aspiring actors and theater enthusiasts",
+        "hidden": false,
+        "budget": "130.00",
+        "initiative_id": 13
+    },
+    {
+        "name": "Tech Innovation Hackathon",
+        "description": "Intensive coding and innovation challenge.",
+        "purpose": "Foster technological innovation.",
+        "target_audience": "Tech enthusiasts and developers",
+        "hidden": false,
+        "budget": "220.75",
+        "initiative_id": 14
+    },
+    {
+        "name": "Community Garden Project",
+        "description": "Creating a communal garden space.",
+        "purpose": "Promote urban gardening and green spaces.",
+        "target_audience": "Community members",
+        "hidden": false,
+        "budget": "90.00",
+        "initiative_id": 15
+    },
+    {
+        "name": "Language and Cultural Exchange",
+        "description": "Connecting people through language and culture.",
+        "purpose": "Celebrate diversity and cultural understanding.",
+        "target_audience": "Language learners and cultural enthusiasts",
+        "hidden": false,
+        "budget": "180.00",
+        "initiative_id": 16
+    },
+    {
+        "name": "Youth Leadership Training",
+        "description": "Developing leadership skills in youth.",
+        "purpose": "Empower young leaders.",
+        "target_audience": "Youth leaders and activists",
+        "hidden": false,
+        "budget": "120.50",
+        "initiative_id": 17
+    },
+    {
+        "name": "Renewable Energy Workshop",
+        "description": "Learning about renewable energy technologies.",
+        "purpose": "Promote sustainable energy solutions.",
+        "target_audience": "Students and energy enthusiasts",
+        "hidden": false,
+        "budget": "180.25",
+        "initiative_id": 18
+    },
+    {
+        "name": "Community Library Project",
+        "description": "Setting up a library in the community.",
+        "purpose": "Promote literacy and access to books.",
+        "target_audience": "Community members",
+        "hidden": false,
+        "budget": "250.00",
+        "initiative_id": 19
+    },
+    {
+        "name": "Inclusive Sports Program",
+        "description": "Sports activities for people with disabilities.",
+        "purpose": "Promote inclusivity in sports.",
+        "target_audience": "People with disabilities",
+        "hidden": false,
+        "budget": "140.50",
+        "initiative_id": 20
+    },
+    {
+        "name": "Science Outreach Program",
+        "description": "Bringing science education to schools.",
+        "purpose": "Inspire curiosity in science.",
+        "target_audience": "School students",
+        "hidden": false,
+        "budget": "200.00",
+        "initiative_id": 21
+    },
+    {
+        "name": "Community Health Clinic",
+        "description": "Providing medical services to the community.",
+        "purpose": "Improve access to healthcare.",
+        "target_audience": "Local residents",
+        "hidden": false,
+        "budget": "70.75",
+        "initiative_id": 24
+    },
+    {
+        "name": "Music and Dance Festival",
+        "description": "A celebration of music and dance.",
+        "purpose": "Promote cultural expression through arts.",
+        "target_audience": "Music and dance enthusiasts",
+        "hidden": false,
+        "budget": "150.00",
+        "initiative_id": 24
+    },
+    {
+        "name": "Environmental Education Program",
+        "description": "Educating students about environmental conservation.",
+        "purpose": "Raise awareness about environmental issues.",
+        "target_audience": "School students",
+        "hidden": false,
+        "budget": "90.50",
+        "initiative_id": 24
+    }
+]

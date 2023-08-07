@@ -1,0 +1,146 @@
+[
+    {
+        "regulation_id": 6,
+        "name": "Clean Energy Research Grant",
+        "reference": "CERG001",
+        "budget": "25000.00"
+    },
+    {
+        "regulation_id": 3,
+        "name": "Youth Education Enrichment Fund",
+        "reference": "YEEF002",
+        "budget": "15000.00"
+    },
+    {
+        "regulation_id": 10,
+        "name": "Community Health Initiative",
+        "reference": "CHI003",
+        "budget": "50000.00"
+    },
+    {
+        "regulation_id": 7,
+        "name": "Local Art and Culture Grant",
+        "reference": "LACG004",
+        "budget": "10000.00"
+    },
+    {
+        "regulation_id": 9,
+        "name": "Small Business Growth Support",
+        "reference": "SBGS005",
+        "budget": "35000.00"
+    },
+    {
+        "regulation_id": 1,
+        "name": "Environmental Conservation Fund",
+        "reference": "ECF006",
+        "budget": "40000.00"
+    },
+    {
+        "regulation_id": 2,
+        "name": "Urban Mobility Innovation Grant",
+        "reference": "UMIG007",
+        "budget": "20000.00"
+    },
+    {
+        "regulation_id": 8,
+        "name": "Disaster Resilience Assistance",
+        "reference": "DRA008",
+        "budget": "18000.00"
+    },
+    {
+        "regulation_id": 4,
+        "name": "Women's Empowerment Initiative",
+        "reference": "WEI009",
+        "budget": "22000.00"
+    },
+    {
+        "regulation_id": 12,
+        "name": "Rural Development Support",
+        "reference": "RDS010",
+        "budget": "27000.00"
+    },
+    {
+        "regulation_id": 5,
+        "name": "STEM Education Advancement",
+        "reference": "SEAG011",
+        "budget": "12000.00"
+    },
+    {
+        "regulation_id": 11,
+        "name": "Public Health Innovations Fund",
+        "reference": "PHIF012",
+        "budget": "30000.00"
+    },
+    {
+        "regulation_id": 8,
+        "name": "Artificial Intelligence Research Grant",
+        "reference": "AIRG013",
+        "budget": "23000.00"
+    },
+    {
+        "regulation_id": 6,
+        "name": "Cultural Heritage Preservation Fund",
+        "reference": "CHPF014",
+        "budget": "18000.00"
+    },
+    {
+        "regulation_id": 2,
+        "name": "Smart City Solutions Grant",
+        "reference": "SCSG015",
+        "budget": "27000.00"
+    },
+    {
+        "regulation_id": 10,
+        "name": "Sustainable Agriculture Fund",
+        "reference": "SAF016",
+        "budget": "21000.00"
+    },
+    {
+        "regulation_id": 4,
+        "name": "Entrepreneurship and Innovation Boost",
+        "reference": "EIB017",
+        "budget": "14000.00"
+    },
+    {
+        "regulation_id": 11,
+        "name": "Healthcare Access for All",
+        "reference": "HAA018",
+        "budget": "25000.00"
+    },
+    {
+        "regulation_id": 3,
+        "name": "Global Education Support",
+        "reference": "GES019",
+        "budget": "30000.00"
+    },
+    {
+        "regulation_id": 12,
+        "name": "Climate Change Adaptation Grant",
+        "reference": "CCAG020",
+        "budget": "19000.00"
+    },
+    {
+        "regulation_id": 1,
+        "name": "Inclusive Community Development",
+        "reference": "ICD021",
+        "budget": "32000.00"
+    },
+    {
+        "regulation_id": 7,
+        "name": "Heritage Conservation Project",
+        "reference": "HCP022",
+        "budget": "28000.00"
+    },
+    {
+        "regulation_id": 9,
+        "name": "Digital Skills Training Initiative",
+        "reference": "DSTI023",
+        "budget": "26000.00"
+    },
+    {
+        "regulation_id": 5,
+        "name": "Youth Sports and Recreation Grant",
+        "reference": "YSRG024",
+        "budget": "17000.00"
+    }
+]
