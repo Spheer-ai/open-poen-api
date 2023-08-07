@@ -34,18 +34,17 @@ async def on_startup():
     pass
 
 
-domain: str = os.environ["DOMAIN_NAME"]
-allowed_hosts = [domain, f"www.{domain}"]
-if DEBUG:
-    allowed_hosts.extend(["localhost", "127.0.0.1"])
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=allowed_hosts,
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[f"https://{domain}"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    allow_credentials=True,
-)
+if not DEBUG:
+    domain: str = os.environ["DOMAIN_NAME"]
+    allowed_hosts = [domain, f"www.{domain}"]
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=allowed_hosts,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[f"https://{domain}", "localhost", "127.0.0.1"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=True,
+    )
