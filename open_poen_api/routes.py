@@ -588,7 +588,7 @@ async def create_funder(
     funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(required_user, "create", ent.Funder, oso)
+    auth.authorize(required_user, "create", "Funder", oso)
     funder_db = await funder_manager.create(funder, request=request)
     return auth.get_authorized_output_fields(required_user, "read", funder_db, oso)
 
@@ -873,7 +873,7 @@ async def create_initiative(
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(required_user, "create", ent.Initiative, oso)
+    auth.authorize(required_user, "create", "Initiative", oso)
     # TODO: Validate funder_id, regulation_id and grant_id.
     initiative_db = await initiative_manager.create(
         initiative, grant_id, request=request

@@ -3,6 +3,7 @@ from tests.conftest import (
     superuser_info,
     userowner_info,
     user_info,
+    admin_info,
     anon_info,
     initiative_info,
 )
@@ -13,8 +14,8 @@ from open_poen_api.managers import get_initiative_manager
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (user_info, 403), (anon_info, 403)],
-    ids=["Superuser can", "User cannot", "Anon cannot"],
+    [(superuser_info, 200), (user_info, 403), (admin_info, 200), (anon_info, 403)],
+    ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
 async def test_create_initiative(async_client, dummy_session, status_code):
@@ -25,10 +26,11 @@ async def test_create_initiative(async_client, dummy_session, status_code):
         json=body,
     )
     assert response.status_code == status_code
-    db_initiative = dummy_session.get(Initiative, response.json()["id"])
-    assert db_initiative is not None
-    initiative_data = response.json()
-    assert initiative_data["name"] == body["name"]
+    if status_code == 200:
+        db_initiative = dummy_session.get(Initiative, response.json()["id"])
+        assert db_initiative is not None
+        initiative_data = response.json()
+        assert initiative_data["name"] == body["name"]
 
 
 @pytest.mark.asyncio

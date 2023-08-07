@@ -31,6 +31,7 @@ from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
 from sqlalchemy.dialects import postgresql as pg
 import uuid
+from sqlalchemy.ext.asyncio import AsyncAttrs
 
 
 class Base(DeclarativeBase):
@@ -103,7 +104,7 @@ class UserRegulationRole(Base):
         Integer, ForeignKey("user.id"), primary_key=True
     )
     regulation_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("regulation.id"), primary_key=True
+        Integer, ForeignKey("regulation.id", ondelete="CASCADE"), primary_key=True
     )
     role: Mapped[RegulationRole] = mapped_column(
         ChoiceType(RegulationRole, impl=VARCHAR(length=32))
@@ -294,7 +295,9 @@ class Initiative(Base):
     debit_cards: Mapped[list["DebitCard"]] = relationship(
         "DebitCard", back_populates="initiative", lazy="noload"
     )
-    grant_id: Mapped[int] = mapped_column(Integer, ForeignKey("grant.id"))
+    grant_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("grant.id", ondelete="CASCADE")
+    )
     grant: Mapped["Grant"] = relationship(
         "Grant", back_populates="initiatives", lazy="noload", uselist=False
     )
@@ -326,7 +329,9 @@ class Activity(Base):
     activity_owners: AssociationProxy[list[User]] = association_proxy(
         "user_roles", "user"
     )
-    initiative_id: Mapped[int] = mapped_column(Integer, ForeignKey("initiative.id"))
+    initiative_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("initiative.id", ondelete="CASCADE")
+    )
     initiative: Mapped[Initiative] = relationship(
         "Initiative", back_populates="activities", lazy="noload", uselist=False
     )
@@ -521,6 +526,7 @@ class Regulation(Base):
         lazy="noload",
         primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
         overlaps="policy_officer_roles, regulation",
+        cascade="all",
     )
     grant_officers: AssociationProxy[list[User]] = association_proxy(
         "grant_officer_roles", "user"
@@ -531,15 +537,21 @@ class Regulation(Base):
         lazy="noload",
         primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
         overlaps="grant_officer_roles, regulation",
+        cascade="all",
     )
     policy_officers: AssociationProxy[list[User]] = association_proxy(
         "policy_officer_roles", "user"
     )
 
     grants: Mapped[list["Grant"]] = relationship(
-        "Grant", back_populates="regulation", lazy="noload"
+        "Grant",
+        back_populates="regulation",
+        lazy="noload",
+        cascade="all",
     )
-    funder_id: Mapped[int] = mapped_column(Integer, ForeignKey("funder.id"))
+    funder_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("funder.id", ondelete="CASCADE")
+    )
     funder: Mapped["Funder"] = relationship(
         "Funder", back_populates="regulations", lazy="noload", uselist=False
     )
@@ -556,12 +568,14 @@ class Grant(Base):
     reference: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
 
-    regulation_id: Mapped[int] = mapped_column(Integer, ForeignKey("regulation.id"))
+    regulation_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("regulation.id", ondelete="CASCADE")
+    )
     regulation: Mapped[Regulation] = relationship(
         "Regulation", back_populates="grants", lazy="noload", uselist=False
     )
     initiatives: Mapped[list[Initiative]] = relationship(
-        "Initiative", back_populates="grant", lazy="noload"
+        "Initiative", back_populates="grant", lazy="noload", cascade="all"
     )
 
 
@@ -573,5 +587,8 @@ class Funder(Base):
     url: Mapped[str] = mapped_column(String(512))
 
     regulations: Mapped[list[Regulation]] = relationship(
-        "Regulation", back_populates="funder", lazy="noload"
+        "Regulation",
+        back_populates="funder",
+        lazy="noload",
+        cascade="all",
     )

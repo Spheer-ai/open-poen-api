@@ -117,7 +117,7 @@ def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):
     return OSO.is_allowed(oso_actor, action, resource)
 
 
-def authorize(actor: ent.User | None, action: str, resource: ent.Base, oso: Oso):
+def authorize(actor: ent.User | None, action: str, resource: ent.Base | str, oso: Oso):
     """
     Authorizes a given user (actor) to perform an action on a resource
     if allowed by Oso's policies.

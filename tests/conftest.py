@@ -39,6 +39,8 @@ userowner_info.update({"obj_id": 1})
 userowner_info.update({"is_superuser": False})
 user_info = userowner_info.copy()
 user_info.update({"obj_id": 42})
+admin_info = user_info.copy()
+admin_info.update({"role": "administrator"})
 anon_info = user_info.copy()
 anon_info.update({"return_none": True})
 
@@ -61,6 +63,11 @@ activity_info = {
     "description": "Een fantastische picnic in het park.",
     "purpose": "Bevorderen buurtgevoel.",
     "target_audience": "Mensen uit buurt De Florijn",
+}
+
+funder_info = {
+    "name": "Gemeente Amsterdam",
+    "url": "https://amsterdam.nl",
 }
 
 
