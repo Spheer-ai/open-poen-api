@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from .managers.user_manager import fastapi_users, auth_backend
 from .managers import CustomException
 from .database import create_db_and_tables, get_async_session
-from .routes import router
+from .routes import user_router, initiative_router, funder_router
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -19,7 +19,9 @@ app.include_router(
     fastapi_users.get_reset_password_router(), prefix="/auth", tags=["auth"]
 )
 
-app.include_router(router)
+app.include_router(user_router)
+app.include_router(initiative_router)
+app.include_router(funder_router)
 
 
 @app.exception_handler(CustomException)

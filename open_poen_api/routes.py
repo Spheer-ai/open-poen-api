@@ -44,7 +44,9 @@ from .gocardless import (
 import uuid
 
 
-router = APIRouter()
+user_router = APIRouter(tags=["user"])
+initiative_router = APIRouter(tags=["initiative"])
+funder_router = APIRouter(tags=["funder"])
 
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
@@ -53,7 +55,7 @@ required_login_dep = um.fastapi_users.current_user(optional=False)
 optional_login_dep = um.fastapi_users.current_user(optional=True)
 
 
-@router.post("/user", response_model=s.UserRead)
+@user_router.post("/user", response_model=s.UserRead)
 async def create_user(
     user: s.UserCreate,
     request: Request,
@@ -69,7 +71,7 @@ async def create_user(
     return auth.get_authorized_output_fields(superuser, "read", user_db, oso)
 
 
-@router.get(
+@user_router.get(
     "/user/{user_id}",
     response_model=s.UserReadLinked,
     response_model_exclude_unset=True,
@@ -85,7 +87,7 @@ async def get_user(
     return auth.get_authorized_output_fields(optional_user, "read", user_db, oso)
 
 
-@router.patch(
+@user_router.patch(
     "/user/{user_id}",
     response_model=s.UserRead,
     response_model_exclude_unset=True,
@@ -105,7 +107,7 @@ async def update_user(
     return auth.get_authorized_output_fields(required_user, "read", edited_user, oso)
 
 
-@router.delete("/user/{user_id}")
+@user_router.delete("/user/{user_id}")
 async def delete_user(
     user_id: int,
     request: Request,
@@ -119,7 +121,9 @@ async def delete_user(
     return Response(status_code=204)
 
 
-@router.get("/users", response_model=s.UserReadList, response_model_exclude_unset=True)
+@user_router.get(
+    "/users", response_model=s.UserReadList, response_model_exclude_unset=True
+)
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
@@ -138,7 +142,7 @@ async def get_users(
 
 
 # BNG
-@router.get(
+@user_router.get(
     "/users/{user_id}/bng-initiate",
     response_model=s.BNGInitiate,
 )
@@ -186,7 +190,7 @@ async def bng_initiate(
     return s.BNGInitiate(url=url_to_return)
 
 
-@router.get("/users/{user_id}/bng-callback")
+@user_router.get("/users/{user_id}/bng-callback")
 async def bng_callback(
     user_id: int,
     background_tasks: BackgroundTasks,
@@ -231,7 +235,7 @@ async def bng_callback(
     return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
 
 
-# @router.delete("/users/{user_id}/bng-connection")
+# @user_router.delete("/users/{user_id}/bng-connection")
 # async def delete_bng_connection(
 #     user_id: int,
 #     requires_user_owner=Depends(auth.requires_user_owner),
@@ -253,7 +257,9 @@ async def bng_callback(
 
 
 # GOCARDLESS
-@router.get("/users/{user_id}/gocardless-initiate", response_model=s.GocardlessInitiate)
+@user_router.get(
+    "/users/{user_id}/gocardless-initiate", response_model=s.GocardlessInitiate
+)
 async def gocardless_initiatite(
     user_id: int,
     institution_id: str = Depends(s.validate_institution_id),
@@ -297,7 +303,7 @@ async def gocardless_initiatite(
     return s.GocardlessInitiate(url=init.link)
 
 
-@router.get("/users/{user_id}/gocardless-callback")
+@user_router.get("/users/{user_id}/gocardless-callback")
 async def gocardless_callback(
     user_id: int,
     background_tasks: BackgroundTasks,
@@ -342,7 +348,7 @@ async def gocardless_callback(
     return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 
 
-@router.post("/initiative", response_model=s.InitiativeRead)
+@initiative_router.post("/initiative", response_model=s.InitiativeRead)
 async def create_initiative(
     initiative: s.InitiativeCreate,
     request: Request,
@@ -355,7 +361,7 @@ async def create_initiative(
     return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
 
-@router.get(
+@initiative_router.get(
     "/initiative/{initiative_id}",
     response_model=s.InitiativeReadLinked,
     response_model_exclude_unset=True,
@@ -371,7 +377,7 @@ async def get_initiative(
     return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}",
     response_model=s.InitiativeRead,
     response_model_exclude_unset=True,
@@ -395,7 +401,7 @@ async def update_initiative(
     )
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/owners",
     response_model=s.UserReadList,
 )
@@ -423,7 +429,7 @@ async def link_initiative_owners(
     return s.UserReadList(users=filtered_initiative_owners)
 
 
-@router.delete("/initiative/{initiative_id}")
+@initiative_router.delete("/initiative/{initiative_id}")
 async def delete_initiative(
     initiative_id: int,
     request: Request,
@@ -437,7 +443,7 @@ async def delete_initiative(
     return Response(status_code=204)
 
 
-@router.get(
+@initiative_router.get(
     "/initiatives",
     response_model=s.InitiativeReadList,
     response_model_exclude_unset=True,
@@ -458,7 +464,9 @@ async def get_initiatives(
     return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
-@router.post("/initiative/{initiative_id}/activity", response_model=s.ActivityRead)
+@initiative_router.post(
+    "/initiative/{initiative_id}/activity", response_model=s.ActivityRead
+)
 async def create_activity(
     initiative_id: int,
     activity: s.ActivityCreate,
@@ -476,7 +484,7 @@ async def create_activity(
     return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
 
 
-@router.get(
+@initiative_router.get(
     "/initiative/{initiative_id}/activity/{activity_id}",
     response_model=s.ActivityReadLinked,
     response_model_exclude_unset=True,
@@ -493,7 +501,7 @@ async def get_activity(
     return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}",
     response_model=s.ActivityRead,
     response_model_exclude_unset=True,
@@ -517,7 +525,7 @@ async def update_activity(
     )
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}/owners",
     response_model=s.UserReadList,
 )
@@ -546,7 +554,7 @@ async def link_activity_owners(
     return s.UserReadList(users=filtered_activity_owners)
 
 
-@router.delete("/initiative/{initiative_id}/activity/{activity_id}")
+@initiative_router.delete("/initiative/{initiative_id}/activity/{activity_id}")
 async def delete_activity(
     initiative_id: int,
     activity_id: int,
@@ -561,7 +569,7 @@ async def delete_activity(
     return Response(status_code=204)
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/debit-cards",
     response_model=s.DebitCardReadList,
 )
@@ -590,7 +598,7 @@ async def link_initiative_debit_cards(
     return s.DebitCardReadList(debit_cards=filtered_debit_cards)
 
 
-@router.post("/funder", response_model=s.FunderRead)
+@funder_router.post("/funder", response_model=s.FunderRead)
 async def create_funder(
     funder: s.FunderCreate,
     request: Request,
@@ -603,7 +611,7 @@ async def create_funder(
     return auth.get_authorized_output_fields(required_user, "read", funder_db, oso)
 
 
-@router.get(
+@funder_router.get(
     "/funder/{funder_id}",
     response_model=s.FunderReadLinked,
     response_model_exclude_unset=True,
@@ -619,7 +627,7 @@ async def get_funder(
     return auth.get_authorized_output_fields(optional_user, "read", funder_db, oso)
 
 
-@router.patch(
+@funder_router.patch(
     "/funder/{funder_id}",
     response_model=s.FunderRead,
     response_model_exclude_unset=True,
@@ -639,7 +647,7 @@ async def update_funder(
     return auth.get_authorized_output_fields(required_user, "read", edited_funder, oso)
 
 
-@router.delete("/funder/{funder_id}")
+@funder_router.delete("/funder/{funder_id}")
 async def delete_funder(
     funder_id: int,
     request: Request,
@@ -653,7 +661,7 @@ async def delete_funder(
     return Response(status_code=204)
 
 
-@router.get(
+@funder_router.get(
     "/funders",
     response_model=s.FunderReadList,
     response_model_exclude_unset=True,
@@ -674,7 +682,7 @@ async def get_funders(
     return s.FunderReadList(funders=filtered_funders)
 
 
-@router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
+@funder_router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
 async def create_regulation(
     funder_id: int,
     regulation: s.RegulationCreate,
@@ -692,7 +700,7 @@ async def create_regulation(
     return auth.get_authorized_output_fields(required_user, "read", regulation_db, oso)
 
 
-@router.get(
+@funder_router.get(
     "/funder/{funder_id}/regulation/{regulation_id}",
     response_model=s.RegulationReadLinked,
     response_model_exclude_unset=True,
@@ -709,7 +717,7 @@ async def get_regulation(
     return auth.get_authorized_output_fields(optional_user, "read", regulation_db, oso)
 
 
-@router.patch(
+@funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}",
     response_model=s.RegulationRead,
     response_model_exclude_unset=True,
@@ -734,7 +742,7 @@ async def update_regulation(
     )
 
 
-@router.delete("/funder/{funder_id}/regulation/{regulation_id}")
+@funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}")
 async def delete_regulation(
     funder_id: int,
     regulation_id: int,
@@ -749,7 +757,7 @@ async def delete_regulation(
     return Response(status_code=204)
 
 
-@router.get(
+@funder_router.get(
     "/funder/{funder_id}/regulations",
     response_model=s.RegulationReadList,
     response_model_exclude_unset=True,
@@ -770,7 +778,7 @@ async def get_regulations(
     return s.RegulationReadList(regulations=filtered_regulations)
 
 
-@router.post(
+@funder_router.post(
     "/funder/{funder_id}/regulation/{regulation_id}/grant", response_model=s.GrantRead
 )
 async def create_grant(
@@ -791,7 +799,7 @@ async def create_grant(
     return auth.get_authorized_output_fields(required_user, "read", grant_db, oso)
 
 
-@router.get(
+@funder_router.get(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}",
     response_model=s.GrantReadLinked,
     response_model_exclude_unset=True,
@@ -809,7 +817,7 @@ async def get_grant(
     return auth.get_authorized_output_fields(optional_user, "read", grant_db, oso)
 
 
-@router.patch(
+@funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}",
     response_model=s.GrantRead,
     response_model_exclude_unset=True,
@@ -832,7 +840,7 @@ async def update_grant(
     return auth.get_authorized_output_fields(required_user, "read", edited_grant, oso)
 
 
-@router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")
+@funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")
 async def delete_grant(
     funder_id: int,
     regulation_id: int,
@@ -848,7 +856,7 @@ async def delete_grant(
     return Response(status_code=204)
 
 
-@router.get(
+@funder_router.get(
     "/funder/{funder_id}/regulation/{regulation_id}/grants",
     response_model=s.GrantReadList,
     response_model_exclude_unset=True,
