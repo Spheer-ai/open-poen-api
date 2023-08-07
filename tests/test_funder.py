@@ -63,3 +63,28 @@ async def test_patch_funder(async_client, dummy_session, body, status_code):
         funder = await dummy_session.get(Funder, funder_id)
         for key in body:
             assert getattr(funder, key) == body[key]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    ids=["Superuser sees everything", "Anon sees everything"],
+    indirect=["get_mock_user"],
+)
+async def test_get_funders_list(async_client, dummy_session, status_code):
+    response = await async_client.get("/funders")
+    assert response.status_code == status_code
+    assert len(response.json()["funders"]) == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (anon_info, 200)],
+    indirect=["get_mock_user"],
+)
+async def test_get_linked_funder_detail(async_client, dummy_session, status_code):
+    funder_id = 1
+    response = await async_client.get(f"/funder/{funder_id}")
+    assert response.status_code == status_code
