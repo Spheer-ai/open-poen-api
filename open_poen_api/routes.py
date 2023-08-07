@@ -185,7 +185,7 @@ async def bng_initiate(
     return s.BNGInitiate(url=url_to_return)
 
 
-@user_router.get("/users/{user_id}/bng-callback")
+@user_router.get("/users/{user_id}/bng-callback", include_in_schema=False)
 async def bng_callback(
     user_id: int,
     background_tasks: BackgroundTasks,
@@ -298,7 +298,7 @@ async def gocardless_initiatite(
     return s.GocardlessInitiate(url=init.link)
 
 
-@user_router.get("/users/{user_id}/gocardless-callback")
+@user_router.get("/users/{user_id}/gocardless-callback", include_in_schema=False)
 async def gocardless_callback(
     user_id: int,
     background_tasks: BackgroundTasks,
@@ -341,20 +341,6 @@ async def gocardless_callback(
         get_gocardless_payments, requisition.id, datetime.today() - timedelta(days=365)
     )
     return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
-
-
-@initiative_router.post("/initiative", response_model=s.InitiativeRead)
-async def create_initiative(
-    initiative: s.InitiativeCreate,
-    request: Request,
-    required_user=Depends(required_login_dep),
-    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    auth.authorize(required_user, "create", ent.Initiative, oso)
-    # TODO: Pass grant_id
-    initiative_db = await initiative_manager.create(initiative, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
 
 @initiative_router.get(
@@ -871,6 +857,28 @@ async def get_grants(
         for i in grants_scalar
     ]
     return s.GrantReadList(grants=filtered_grants)
+
+
+@funder_router.post(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/initiative",
+    response_model=s.InitiativeRead,
+)
+async def create_initiative(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    initiative: s.InitiativeCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    auth.authorize(required_user, "create", ent.Initiative, oso)
+    # TODO: Validate funder_id, regulation_id and grant_id.
+    initiative_db = await initiative_manager.create(
+        initiative, grant_id, request=request
+    )
+    return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
 
 # ROUTES

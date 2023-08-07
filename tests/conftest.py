@@ -53,6 +53,7 @@ initiative_info = {
     "address_applicant": "Het stoepje 42, Assen, 9408DT, Nederland",
     "kvk_registration": "12345678",
     "location": "Amsterdam",
+    "budget": 1000.00,
 }
 
 activity_info = {
@@ -193,6 +194,7 @@ async def dummy_session(async_session):
         initiative_id = act.pop("initiative_id")
         schema = ActivityCreate(**act)
         await activity_manager.create(schema, initiative_id, request=None)
+    return async_session
 
 
 @pytest_asyncio.fixture(scope="function")

@@ -1,6 +1,5 @@
 import pytest
 from tests.conftest import (
-    retrieve_token_from_last_sent_email,
     superuser_info,
     userowner_info,
     user_info,
@@ -8,18 +7,25 @@ from tests.conftest import (
     initiative_info,
 )
 from open_poen_api.models import Initiative
-from open_poen_api.managers.initiative_manager import get_initiative_manager
+from open_poen_api.managers import get_initiative_manager
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (user_info, 403), (anon_info, 403)],
+    ids=["Superuser can", "User cannot", "Anon cannot"],
+    indirect=["get_mock_user"],
 )
-async def test_create_initiative(async_client, async_session, status_code):
+async def test_create_initiative(async_client, dummy_session, status_code):
+    funder_id, regulation_id, grant_id = 1, 1, 1
     body = initiative_info
-    response = await async_client.post("/initiative", json=body)
+    response = await async_client.post(
+        f"/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/initiative",
+        json=body,
+    )
     assert response.status_code == status_code
-    db_initiative = async_session.get(Initiative, response.json()["id"])
+    db_initiative = dummy_session.get(Initiative, response.json()["id"])
     assert db_initiative is not None
     initiative_data = response.json()
     assert initiative_data["name"] == body["name"]

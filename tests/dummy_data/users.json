@@ -116,7 +116,7 @@
         "is_active": true,
         "is_superuser": false,
         "is_verified": true,
-        "hidden": false,
+        "hidden": true,
         "password": "financial4password"
     }
 ]
