@@ -7,6 +7,7 @@ from tests.conftest import (
     funder_info,
 )
 from open_poen_api.models import Funder
+from open_poen_api.managers import get_funder_manager
 
 
 @pytest.mark.asyncio
@@ -41,3 +42,24 @@ async def test_delete_funder(async_client, dummy_session, status_code):
     if status_code == 204:
         funder = await dummy_session.get(Funder, funder_id)
         assert funder is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, body, status_code",
+    [
+        (superuser_info, {"name": "Another Name"}, 200),
+        (user_info, {"name": "Another Name"}, 403),
+        (superuser_info, {"name": "EcoFuture Fund"}, 400),
+    ],
+    ids=["Superuser can", "User cannot", "Duplicate name fails"],
+    indirect=["get_mock_user"],
+)
+async def test_patch_funder(async_client, dummy_session, body, status_code):
+    funder_id = 1
+    response = await async_client.patch(f"/funder/{funder_id}", json=body)
+    assert response.status_code == status_code
+    if status_code == 200:
+        funder = await dummy_session.get(Funder, funder_id)
+        for key in body:
+            assert getattr(funder, key) == body[key]
