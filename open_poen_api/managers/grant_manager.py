@@ -38,8 +38,7 @@ class GrantManager(Manager):
     ) -> Grant:
         try:
             grant = await self.base_update(grant_update, grant_db, request)
-        except:
-            IntegrityError
+        except IntegrityError:
             await self.session.rollback()
             raise EntityAlreadyExists(message="Name is already in use")
         return grant

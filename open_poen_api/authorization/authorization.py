@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from typing import Type
 from sqlalchemy.ext.associationproxy import _AssociationList
 
-SECRET_KEY = os.environ.get("SECRET_KEY")
+SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 
 OSO = Oso()

@@ -8,22 +8,20 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from .exc import EntityNotFound
 from .exc import EntityAlreadyExists, EntityNotFound
+from .base_manager import Manager
 
 
-class ActivityManager:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
+class ActivityManager(Manager):
     async def create(
         self,
         activity_create: ActivityCreate,
         initiative_id: int,
         request: Request | None = None,
     ) -> Activity:
-        activity = Activity(initiative_id=initiative_id, **activity_create.dict())
-        self.session.add(activity)
         try:
-            await self.session.commit()
+            activity = await self.base_create(
+                activity_create, Activity, request, initiative_id=initiative_id
+            )
         except IntegrityError:
             await self.session.rollback()
             raise EntityAlreadyExists(message="Name is already in use")
@@ -35,19 +33,15 @@ class ActivityManager:
         activity_db: Activity,
         request: Request | None = None,
     ) -> Activity:
-        for key, value in activity_update.dict(exclude_unset=True).items():
-            setattr(activity_db, key, value)
-        self.session.add(activity_db)
         try:
-            await self.session.commit()
+            activity = await self.base_update(activity_update, activity_db, request)
         except IntegrityError:
             await self.session.rollback()
-            raise EntityAlreadyExists("Name is already in use")
-        return activity_db
+            raise EntityAlreadyExists(message="Name is already in use")
+        return activity
 
     async def delete(self, activity: Activity, request: Request | None = None) -> None:
-        await self.session.delete(activity)
-        await self.session.commit()
+        await self.base_delete(activity, request)
 
     async def make_users_owner(
         self, activity: Activity, user_ids: list[int], request: Request | None = None
@@ -83,7 +77,7 @@ class ActivityManager:
         return activity
 
     async def detail_load(self, initiative_id: int, activity_id: int):
-        query_result = await self.session.execute(
+        query_result_q = await self.session.execute(
             select(Activity)
             .options(
                 selectinload(Activity.user_roles).selectinload(UserActivityRole.user),
@@ -91,21 +85,13 @@ class ActivityManager:
             )
             .where(and_(Initiative.id == initiative_id, Activity.id == activity_id))
         )
-        query_result = query_result.scalars().first()
+        query_result = query_result_q.scalars().first()
         if query_result is None:
             raise EntityNotFound(message="Activity not found")
         return query_result
 
-    async def min_load(self, initiative_id: int, activity_id: int):
-        query_result = await self.session.execute(
-            select(Activity).where(
-                and_(Initiative.id == initiative_id, Activity.id == activity_id)
-            )
-        )
-        query_result = query_result.scalars().first()
-        if query_result is None:
-            raise EntityNotFound(message="Activity not found")
-        return query_result
+    async def min_load(self, initiative_id: int, activity_id: int) -> Activity:
+        return await self.base_min_load(Activity, activity_id)
 
 
 async def get_activity_manager(session: AsyncSession = Depends(get_async_session)):
