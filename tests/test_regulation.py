@@ -7,6 +7,7 @@ from tests.conftest import (
     regulation_info,
 )
 from open_poen_api.models import Regulation
+from open_poen_api.managers import get_regulation_manager
 
 
 @pytest.mark.asyncio
@@ -44,6 +45,27 @@ async def test_delete_regulation(async_client, dummy_session, status_code):
     if status_code == 204:
         regulation = await dummy_session.get(Regulation, funder_id)
         assert regulation is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser_info, 200), (user_info, 403), (admin_info, 200), (anon_info, 403)],
+    ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
+    indirect=["get_mock_user"],
+)
+async def test_add_grant_officer(async_client, dummy_session, status_code):
+    funder_id, regulation_id = 1, 1
+    body = {"user_ids": [1], "permission": "grant officer"}
+    response = await async_client.patch(
+        f"/funder/{funder_id}/regulation/{regulation_id}/officers", json=body
+    )
+    assert response.status_code == status_code
+    if status_code == 200:
+        rm = await get_regulation_manager(dummy_session).__anext__()
+        db_regulation = await rm.detail_load(regulation_id)
+        assert len(db_regulation.grant_officers) == 1
+        assert db_regulation.grant_officers[0].email == "user1@example.com"
 
 
 @pytest.mark.asyncio

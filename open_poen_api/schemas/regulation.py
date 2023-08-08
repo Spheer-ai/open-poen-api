@@ -1,5 +1,6 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, validator
 from .mixins import NotNullValidatorMixin
+from ..models import RegulationRole
 
 
 class RegulationRead(BaseModel):
@@ -21,6 +22,15 @@ class RegulationReadList(BaseModel):
 class RegulationCreate(BaseModel):
     name: str
     description: str
+
+
+class RegulationOfficersUpdate(BaseModel):
+    user_ids: list[int]
+    permission: RegulationRole
+
+    @validator("user_ids", pre=True)
+    def remove_duplicates(cls, v):
+        return list(set(v))
 
 
 class RegulationUpdate(NotNullValidatorMixin):

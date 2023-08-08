@@ -724,6 +724,40 @@ async def update_regulation(
     )
 
 
+@funder_router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}/officers",
+    response_model=s.UserReadList,
+)
+async def link_officers(
+    funder_id: int,
+    regulation_id: int,
+    regulation: s.RegulationOfficersUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.detail_load(regulation_id)
+    auth.authorize(required_user, "edit", regulation_db, oso)
+    regulation_db = await regulation_manager.make_users_officer(
+        regulation_db, regulation.user_ids, request=request
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await regulation_manager.session.refresh(regulation_db)
+    attr = (
+        "grant_officers"
+        if regulation.permission == "grant officer"
+        else "policy_officers"
+    )
+    filtered_officers = [
+        auth.get_authorized_output_fields(
+            required_user, "read", i, oso, ent.User.REL_FIELDS
+        )
+        for i in getattr(regulation_db, attr)
+    ]
+    return s.UserReadList(users=filtered_officers)
+
+
 @funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}")
 async def delete_regulation(
     funder_id: int,

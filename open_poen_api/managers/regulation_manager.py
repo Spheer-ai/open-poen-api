@@ -1,6 +1,6 @@
 from .base_manager import Manager
 from ..schemas import RegulationCreate, RegulationUpdate
-from ..models import Regulation, UserRegulationRole
+from ..models import Regulation, UserRegulationRole, User, RegulationRole
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
@@ -40,11 +40,54 @@ class RegulationManager(Manager):
         except:
             IntegrityError
             await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+            raise EntityAlreadyExists(message="Name is already in u4se")
         return regulation
 
     async def delete(self, regulation: Regulation, request: Request | None = None):
         await self.base_delete(regulation, request)
+
+    async def make_users_officer(
+        self,
+        regulation: Regulation,
+        user_ids: list[int],
+        request: Request | None = None,
+    ):
+        # TODO: Make this work for policy officers as well.
+        linked_user_ids = {role.user_id for role in regulation.grant_officer_roles}
+
+        matched_users_q = await self.session.execute(
+            select(User).where(User.id.in_(user_ids))
+        )
+        matched_users = matched_users_q.scalars().all()
+        matched_user_ids = {user.id for user in matched_users}
+
+        if not len(matched_users) == len(user_ids):
+            raise EntityNotFound(
+                message=f"There exist no Users with id's: {set(user_ids) - matched_user_ids}"
+            )
+
+        # TODO: Log this.
+        stay_linked_user_ids = linked_user_ids.intersection(matched_user_ids)
+        unlink_user_ids = linked_user_ids - matched_user_ids
+        link_user_ids = matched_user_ids - linked_user_ids
+
+        for role in [
+            role
+            for role in regulation.grant_officer_roles
+            if role.user_id in unlink_user_ids
+        ]:
+            await self.session.delete(role)
+
+        for user_id in link_user_ids:
+            new_role = UserRegulationRole(
+                user_id=user_id,
+                regulation_id=regulation.id,
+                role=RegulationRole.GRANT_OFFICER,
+            )
+            self.session.add(new_role)
+
+        await self.session.commit()
+        return regulation
 
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
