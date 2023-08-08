@@ -1,5 +1,11 @@
-from open_poen_api.authorization.authorization import OSO
-from open_poen_api.models import User
+from open_poen_api.authorization.authorization import (
+    OSO,
+    get_authorized_output_fields,
+    set_sqlalchemy_adapter,
+)
+from open_poen_api.database import sync_session_maker
+from open_poen_api.models import User, Regulation
+from open_poen_api.managers import get_regulation_manager
 import pytest_asyncio
 import pytest
 from oso.exceptions import NotFoundError, ForbiddenError
@@ -77,3 +83,18 @@ async def test_field_permissions(
         assert all_fields_are_authorized
     else:
         assert not all_fields_are_authorized
+
+
+async def test_get_authorized_output_fields(dummy_session):
+    user = await dummy_session.get(User, 1)
+    regulation = await dummy_session.get(Regulation, 1)
+    fields = get_authorized_output_fields(user, "read", regulation, OSO)
+
+
+async def test_get_authorized_output_fields_2(dummy_session):
+    regulation_manager = await get_regulation_manager(dummy_session).__anext__()
+    with sync_session_maker() as s:
+        oso = await set_sqlalchemy_adapter(s).__anext__()
+        user = await dummy_session.get(User, 1)
+        regulation = await regulation_manager.detail_load(1)
+        fields = get_authorized_output_fields(user, "read", regulation, oso)

@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncAttrs
 
 
 class Base(DeclarativeBase):
-    pass
+    PROXIES: list[str] = []
 
 
 requisition_bankaccount = Table(
@@ -199,9 +199,19 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         list["Regulation"]
     ] = association_proxy("policy_officer_regulation_roles", "regulation")
 
+    PROXIES = [
+        "initiatives",
+        "activities",
+        "used_bank_accounts",
+        "owned_bank_account",
+        "grant_officer_regulations",
+        "policy_officer_regulations",
+    ]
+
     def __repr__(self):
         return f"User(id={self.id}, name='{self.first_name} {self.last_name}', role='{self.role}', is_superuser='{self.is_superuser}')"
 
+    # TODO: Factor out.
     REL_FIELDS = [
         "bng",
         "requisitions",
@@ -302,6 +312,8 @@ class Initiative(Base):
         "Grant", back_populates="initiatives", lazy="noload", uselist=False
     )
 
+    PROXIES = ["initiative_owners"]
+
     def __repr__(self):
         return f"Initiative(id={self.id}, name='{self.name}')"
 
@@ -338,6 +350,8 @@ class Activity(Base):
     payments: Mapped[list["Payment"]] = relationship(
         "Payment", back_populates="activity", lazy="noload"
     )
+
+    PROXIES = ["activity_owners"]
 
     def __repr__(self):
         return f"Activity(id={self.id}, name='{self.name}')"
@@ -513,6 +527,8 @@ class BankAccount(Base):
         "Payment", back_populates="bank_account", lazy="noload"
     )
 
+    PROXIES = ["users", "owner"]
+
 
 class Regulation(Base):
     __tablename__ = "regulation"
@@ -555,6 +571,8 @@ class Regulation(Base):
     funder: Mapped["Funder"] = relationship(
         "Funder", back_populates="regulations", lazy="noload", uselist=False
     )
+
+    PROXIES = ["grant_officers", "policy_officers"]
 
 
 class Grant(Base):

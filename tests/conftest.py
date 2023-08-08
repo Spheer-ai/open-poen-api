@@ -70,6 +70,11 @@ funder_info = {
     "url": "https://amsterdam.nl",
 }
 
+regulation_info = {
+    "name": "Regeling Buurtcohesie",
+    "description": "Voor het bevorderen van sociale cohesie in de buurt.",
+}
+
 
 async def retrieve_token_from_last_sent_email():
     """Gets the last send email from Mailhog, assumes it's an email reply to a password

@@ -675,7 +675,7 @@ async def create_regulation(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.min_load(funder_id)
-    auth.authorize(required_user, "create_regulation", funder_db, oso)
+    auth.authorize(required_user, "create", "Regulation", oso)
     regulation_db = await regulation_manager.create(
         regulation, funder_id, request=request
     )
@@ -745,12 +745,14 @@ async def delete_regulation(
     response_model_exclude_unset=True,
 )
 async def get_regulations(
+    funder_id: int,
     async_session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: pagination.
     q = auth.get_authorized_query(optional_user, "read", ent.Regulation, oso)
+    q = q.where(ent.Regulation.funder_id == funder_id)
     regulations_result = await async_session.execute(q)
     regulations_scalar = regulations_result.scalars().all()
     filtered_regulations = [

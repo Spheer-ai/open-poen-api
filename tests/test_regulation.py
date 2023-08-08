@@ -4,10 +4,9 @@ from tests.conftest import (
     user_info,
     admin_info,
     anon_info,
-    funder_info,
+    regulation_info,
 )
-from open_poen_api.models import Funder
-from open_poen_api.managers import get_funder_manager
+from open_poen_api.models import Regulation
 
 
 @pytest.mark.asyncio
@@ -17,15 +16,16 @@ from open_poen_api.managers import get_funder_manager
     ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
-async def test_create_funder(async_client, dummy_session, status_code):
-    body = funder_info
-    response = await async_client.post("/funder", json=body)
+async def test_create_regulation(async_client, dummy_session, status_code):
+    funder_id = 1
+    body = regulation_info
+    response = await async_client.post(f"/funder/{funder_id}/regulation", json=body)
     assert response.status_code == status_code
     if status_code == 200:
-        db_funder = dummy_session.get(Funder, response.json()["id"])
-        assert db_funder is not None
-        funder_data = response.json()
-        assert funder_data["name"] == body["name"]
+        db_regulation = dummy_session.get(Regulation, response.json()["id"])
+        assert db_regulation is not None
+        regulation_data = response.json()
+        assert regulation_data["name"] == body["name"]
 
 
 @pytest.mark.asyncio
@@ -35,13 +35,15 @@ async def test_create_funder(async_client, dummy_session, status_code):
     ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
-async def test_delete_funder(async_client, dummy_session, status_code):
-    funder_id = 1
-    response = await async_client.delete(f"/funder/{funder_id}")
+async def test_delete_regulation(async_client, dummy_session, status_code):
+    funder_id, regulation_id = 1, 1
+    response = await async_client.delete(
+        f"/funder/{funder_id}/regulation/{regulation_id}"
+    )
     assert response.status_code == status_code
     if status_code == 204:
-        funder = await dummy_session.get(Funder, funder_id)
-        assert funder is None
+        regulation = await dummy_session.get(Regulation, funder_id)
+        assert regulation is None
 
 
 @pytest.mark.asyncio
@@ -50,19 +52,21 @@ async def test_delete_funder(async_client, dummy_session, status_code):
     [
         (superuser_info, {"name": "Another Name"}, 200),
         (user_info, {"name": "Another Name"}, 403),
-        (superuser_info, {"name": "EcoFuture Fund"}, 400),
+        (superuser_info, {"name": "Healthcare Quality Assurance"}, 400),
     ],
     ids=["Superuser can", "User cannot", "Duplicate name fails"],
     indirect=["get_mock_user"],
 )
-async def test_patch_funder(async_client, dummy_session, body, status_code):
-    funder_id = 1
-    response = await async_client.patch(f"/funder/{funder_id}", json=body)
+async def test_patch_regulation(async_client, dummy_session, body, status_code):
+    funder_id, regulation_id = 1, 1
+    response = await async_client.patch(
+        f"/funder/{funder_id}/regulation/{regulation_id}", json=body
+    )
     assert response.status_code == status_code
     if status_code == 200:
-        funder = await dummy_session.get(Funder, funder_id)
+        regulation = await dummy_session.get(Regulation, funder_id)
         for key in body:
-            assert getattr(funder, key) == body[key]
+            assert getattr(regulation, key) == body[key]
 
 
 @pytest.mark.asyncio
@@ -72,10 +76,11 @@ async def test_patch_funder(async_client, dummy_session, body, status_code):
     ids=["Superuser sees everything", "Anon sees everything"],
     indirect=["get_mock_user"],
 )
-async def test_get_funders_list(async_client, dummy_session, status_code):
-    response = await async_client.get("/funders")
+async def test_get_regulations_list(async_client, dummy_session, status_code):
+    funder_id = 1
+    response = await async_client.get(f"/funder/{funder_id}/regulations")
     assert response.status_code == status_code
-    assert len(response.json()["funders"]) == 3
+    assert len(response.json()["regulations"]) == 5
 
 
 @pytest.mark.asyncio
@@ -85,7 +90,7 @@ async def test_get_funders_list(async_client, dummy_session, status_code):
     ids=["Superuser can", "Anon can"],
     indirect=["get_mock_user"],
 )
-async def test_get_linked_funder_detail(async_client, dummy_session, status_code):
-    funder_id = 1
-    response = await async_client.get(f"/funder/{funder_id}")
+async def test_get_linked_regulation_detail(async_client, dummy_session, status_code):
+    funder_id, regulation_id = 1, 1
+    response = await async_client.get(f"/funder/{funder_id}/regulation/{regulation_id}")
     assert response.status_code == status_code

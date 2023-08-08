@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from .data_adapter import SqlAlchemyAdapter
 from sqlalchemy.orm import Session
 from typing import Type
+from sqlalchemy.ext.associationproxy import _AssociationList
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -86,7 +87,39 @@ OSO.register_class(
     },
 )
 OSO.register_class(ent.Funder)
-OSO.register_class(ent.Regulation)
+OSO.register_class(
+    ent.UserRegulationRole,
+    fields={
+        "regulation": Relation(
+            kind="one",
+            other_type="Regulation",
+            my_field="regulation_id",
+            other_field="id",
+        )
+    },
+)
+OSO.register_class(
+    ent.Regulation,
+    fields={
+        "policy_officer_roles": Relation(
+            kind="many",
+            other_type="UserRegulationRole",
+            my_field="id",
+            other_field="regulation_id",
+        )
+    },
+)
+OSO.register_class(
+    ent.Grant,
+    fields={
+        "regulation": Relation(
+            kind="one",
+            other_type="Regulation",
+            my_field="regulation_id",
+            other_field="id",
+        )
+    },
+)
 OSO.load_files(["open_poen_api/main.polar"])
 
 
@@ -156,45 +189,46 @@ def get_authorized_output_fields(
     In that case, scalar relationships have a value of None and list relationships
     are an emtpy list. These fields in that case remain as they are.
     """
-    oso_actor = get_oso_actor(actor)
 
-    degree1_fields = oso.authorized_fields(oso_actor, action, resource) - set(
+    def get_fields_for_relationship(resource: ent.Base):
+        fields = oso.authorized_fields(oso_actor, action, resource)
+        filtered_fields = (
+            fields
+            - set(resource.PROXIES)
+            - set(resource.__mapper__.relationships.keys())
+        )
+        return {k: v for k, v in resource.__dict__.items() if k in filtered_fields}
+
+    oso_actor = get_oso_actor(actor)
+    allowed_fields = oso.authorized_fields(oso_actor, action, resource) - set(
         ignore_fields
     )
-    degree2_fields = {}
 
-    for rel_name, rel in resource.__mapper__.relationships.items():
-        if rel_name in degree1_fields:
-            related_class = rel.mapper.class_
-            second_degree_rels = set(related_class.__mapper__.relationships.keys())
-            related_class_fields = {
-                i
-                for i in oso.authorized_fields(
-                    oso_actor, action, getattr(resource, rel_name)
-                )
-                if i not in second_degree_rels
-            }
-            degree2_fields[rel_name] = related_class_fields
+    # Non relationship fields that are authorized.
+    non_rel_fields = (
+        allowed_fields
+        - set(resource.PROXIES)
+        - set(resource.__mapper__.relationships.keys())
+    )
+    # Relationship fields that are authorized.
+    rel_fields = allowed_fields & (
+        set(resource.PROXIES) | set(resource.__mapper__.relationships.keys())
+    )
+    assert non_rel_fields | rel_fields == allowed_fields
 
-    out_dict = {}
-    for f in degree1_fields:
-        val = getattr(resource, f)
-        if f not in degree2_fields:
-            out_dict[f] = val
+    # Fetch non relationship fields.
+    result = {f: getattr(resource, f) for f in non_rel_fields}
+
+    # Handle relationship fields.
+    for f in rel_fields:
+        rel = getattr(resource, f)
+        if isinstance(rel, ent.Base):
+            result[f] = get_fields_for_relationship(rel)
+        elif isinstance(rel, (list, _AssociationList)):
+            result[f] = [get_fields_for_relationship(i) for i in rel]
+        elif rel is None:
+            result[f] = rel
         else:
-            # Case of a single instance of a related model.
-            if isinstance(val, ent.Base) and f in degree2_fields:
-                out_dict[f] = {k: getattr(val, k) for k in degree2_fields[f]}
-            # Case of a list of related models and of an empty list for a relationship
-            # that's not loaded.
-            elif isinstance(val, list) and f in degree2_fields:
-                out_dict[f] = [
-                    {k: getattr(i, k) for k in degree2_fields[f]} for i in val
-                ]
-            # Case of a non loaded scalar relationship.
-            elif val is None:
-                out_dict[f] = None
-            else:
-                raise ValueError("Relationship of unfamiliar type")
+            raise ValueError(f"Unexpected relationship type for field {f}")
 
-    return out_dict
+    return result
