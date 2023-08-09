@@ -747,16 +747,17 @@ async def link_officers(
     )
     # Important for up to date relations. Has to be in this async context.
     await regulation_manager.session.refresh(regulation_db)
-    attr = (
-        "grant_officers"
+
+    officers = (
+        regulation_db.grant_officers
         if regulation.role == ent.RegulationRole.GRANT_OFFICER
-        else "policy_officers"
+        else regulation_db.policy_officers
     )
     filtered_officers = [
         auth.get_authorized_output_fields(
             required_user, "read", i, oso, ent.User.REL_FIELDS
         )
-        for i in getattr(regulation_db, attr)
+        for i in officers
     ]
     return s.UserReadList(users=filtered_officers)
 
