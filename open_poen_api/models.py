@@ -49,27 +49,33 @@ requisition_bankaccount = Table(
 class UserInitiativeRole(Base):
     __tablename__ = "user_initiative_roles"
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("user.id"), primary_key=True
+        Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
     )
     initiative_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("initiative.id"), primary_key=True
+        Integer, ForeignKey("initiative.id", ondelete="CASCADE"), primary_key=True
     )
-    user: Mapped["User"] = relationship("User", back_populates="initiative_roles")
+    user: Mapped["User"] = relationship(
+        "User", back_populates="initiative_roles", uselist=False
+    )
     initiative: Mapped["Initiative"] = relationship(
-        "Initiative", back_populates="user_roles"
+        "Initiative", back_populates="user_roles", uselist=False
     )
 
 
 class UserActivityRole(Base):
     __tablename__ = "user_activity_roles"
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("user.id"), primary_key=True
+        Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
     )
     activity_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("activity.id"), primary_key=True
+        Integer, ForeignKey("activity.id", ondelete="CASCADE"), primary_key=True
     )
-    user: Mapped["User"] = relationship("User", back_populates="activity_roles")
-    activity: Mapped["Activity"] = relationship("Activity", back_populates="user_roles")
+    user: Mapped["User"] = relationship(
+        "User", back_populates="activity_roles", uselist=False
+    )
+    activity: Mapped["Activity"] = relationship(
+        "Activity", back_populates="user_roles", uselist=False
+    )
 
 
 class BankAccountRole(str, Enum):
@@ -80,17 +86,17 @@ class BankAccountRole(str, Enum):
 class UserBankAccountRole(Base):
     __tablename__ = "user_bank_account_roles"
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("user.id"), primary_key=True
+        Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
     )
     bank_account_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("bank_account.id"), primary_key=True
+        Integer, ForeignKey("bank_account.id", ondelete="CASCADE"), primary_key=True
     )
     role: Mapped[BankAccountRole] = mapped_column(
         ChoiceType(BankAccountRole, impl=VARCHAR(length=32))
     )
 
-    user: Mapped["User"] = relationship("User")
-    bank_account: Mapped["BankAccount"] = relationship("BankAccount")
+    user: Mapped["User"] = relationship("User", uselist=False)
+    bank_account: Mapped["BankAccount"] = relationship("BankAccount", uselist=False)
 
 
 class RegulationRole(str, Enum):
@@ -101,7 +107,7 @@ class RegulationRole(str, Enum):
 class UserRegulationRole(Base):
     __tablename__ = "user_regulation_roles"
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("user.id"), primary_key=True
+        Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
     )
     regulation_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("regulation.id", ondelete="CASCADE"), primary_key=True
@@ -110,8 +116,21 @@ class UserRegulationRole(Base):
         ChoiceType(RegulationRole, impl=VARCHAR(length=32))
     )
 
-    user: Mapped["User"] = relationship("User")
-    regulation: Mapped["Regulation"] = relationship("Regulation")
+    user: Mapped["User"] = relationship("User", uselist=False)
+    regulation: Mapped["Regulation"] = relationship("Regulation", uselist=False)
+
+
+class UserGrantRole(Base):
+    __tablename__ = "user_grant_roles"
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
+    )
+    grant_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("grant.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    user: Mapped["User"] = relationship("User", uselist=False)
+    grant: Mapped["Grant"] = relationship("Grant", uselist=False)
 
 
 class UserRole(str, Enum):
@@ -136,16 +155,23 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     bng: Mapped[Optional["BNG"]] = relationship(
-        "BNG", uselist=False, back_populates="user", lazy="noload"
+        "BNG",
+        uselist=False,
+        back_populates="user",
+        lazy="noload",
+        cascade="all",
     )
     requisitions: Mapped[list["Requisition"]] = relationship(
-        "Requisition", back_populates="user", lazy="noload"
+        "Requisition",
+        back_populates="user",
+        lazy="noload",
     )
 
     initiative_roles: Mapped[list[UserInitiativeRole]] = relationship(
         "UserInitiativeRole",
         back_populates="user",
         lazy="noload",
+        cascade="all",
     )
     initiatives: AssociationProxy[list["Initiative"]] = association_proxy(
         "initiative_roles", "initiative"
@@ -154,6 +180,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "UserActivityRole",
         back_populates="user",
         lazy="noload",
+        cascade="all",
     )
     activities: AssociationProxy[list["Activity"]] = association_proxy(
         "activity_roles", "activity"
@@ -164,6 +191,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
         overlaps="owner_bank_account_role, user",
+        cascade="all",
     )
     used_bank_accounts: AssociationProxy[list["BankAccount"]] = association_proxy(
         "user_bank_account_roles", "bank_account"
@@ -174,6 +202,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
         overlaps="user_bank_account_roles, user",
+        cascade="all",
     )
     owned_bank_account: AssociationProxy[list["BankAccount"]] = association_proxy(
         "owner_bank_account_role", "bank_account"
@@ -184,6 +213,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
         overlaps="policy_officer_regulation_roles, user",
+        cascade="all",
     )
     grant_officer_regulations: AssociationProxy[list["Regulation"]] = association_proxy(
         "grant_officer_regulation_roles", "regulation"
@@ -194,10 +224,20 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
         overlaps="grant_officer_regulation_roles, user",
+        cascade="all",
     )
     policy_officer_regulations: AssociationProxy[
         list["Regulation"]
     ] = association_proxy("policy_officer_regulation_roles", "regulation")
+
+    overseer_roles: Mapped[list[UserGrantRole]] = relationship(
+        "UserGrantRole",
+        lazy="noload",
+        cascade="all",
+    )
+    grants: AssociationProxy[list["Grant"]] = association_proxy(
+        "overseer_roles", "grant"
+    )
 
     PROXIES = [
         "initiatives",
@@ -243,7 +283,9 @@ class BNG(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True
+    )
     user: Mapped[User] = relationship(
         "User", back_populates="bng", lazy="noload", uselist=False
     )
@@ -337,6 +379,7 @@ class Activity(Base):
         "UserActivityRole",
         back_populates="activity",
         lazy="noload",
+        cascade="all",
     )
     activity_owners: AssociationProxy[list[User]] = association_proxy(
         "user_roles", "user"
@@ -403,13 +446,13 @@ class Payment(Base):
     )
 
     activity_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("activity.id"), nullable=True
+        Integer, ForeignKey("activity.id", ondelete="SET NULL"), nullable=True
     )
     activity: Mapped[Optional[Activity]] = relationship(
         "Activity", back_populates="payments", lazy="noload", uselist=False
     )
     initiative_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("initiative.id"), nullable=True
+        Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
     initiative: Mapped[Optional[Initiative]] = relationship(
         "Initiative", back_populates="payments", lazy="noload", uselist=False
@@ -437,7 +480,7 @@ class DebitCard(Base):
     )
 
     initiative_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("initiative.id")
+        Integer, ForeignKey("initiative.id", ondelete="SET NULL")
     )
     initiative: Mapped[Initiative | None] = relationship(
         "Initiative", back_populates="debit_cards", lazy="noload", uselist=False
@@ -476,7 +519,9 @@ class Requisition(Base):
         ChoiceType(ReqStatus, impl=VARCHAR(length=32))
     )
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=False
+    )
     user: Mapped[User] = relationship(
         "User", back_populates="requisitions", lazy="noload", uselist=False
     )
@@ -595,6 +640,10 @@ class Grant(Base):
     initiatives: Mapped[list[Initiative]] = relationship(
         "Initiative", back_populates="grant", lazy="noload", cascade="all"
     )
+    overseer_role: Mapped[list[UserGrantRole]] = relationship(
+        "UserGrantRole", lazy="noload", cascade="all", uselist=False
+    )
+    overseer: AssociationProxy[User] = association_proxy("overseer_roles", "user")
 
 
 class Funder(Base):
