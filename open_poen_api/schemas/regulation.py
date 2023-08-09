@@ -26,7 +26,7 @@ class RegulationCreate(BaseModel):
 
 class RegulationOfficersUpdate(BaseModel):
     user_ids: list[int]
-    permission: RegulationRole
+    role: RegulationRole
 
     @validator("user_ids", pre=True)
     def remove_duplicates(cls, v):

@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_async_session
 from fastapi import Depends
+from typing import Literal
 
 
 class RegulationManager(Manager):
@@ -50,10 +51,19 @@ class RegulationManager(Manager):
         self,
         regulation: Regulation,
         user_ids: list[int],
+        regulation_role: RegulationRole,
         request: Request | None = None,
     ):
-        # TODO: Make this work for policy officers as well.
-        linked_user_ids = {role.user_id for role in regulation.grant_officer_roles}
+        if regulation_role == RegulationRole.GRANT_OFFICER:
+            officer_roles = regulation.grant_officer_roles
+            role_field = RegulationRole.GRANT_OFFICER
+        elif regulation_role == RegulationRole.POLICY_OFFICER:
+            officer_roles = regulation.policy_officer_roles
+            role_field = RegulationRole.POLICY_OFFICER
+        else:
+            raise ValueError(f"Unknown RegulationRole: {regulation_role}")
+
+        linked_user_ids = {role.user_id for role in officer_roles}
 
         matched_users_q = await self.session.execute(
             select(User).where(User.id.in_(user_ids))
@@ -71,18 +81,14 @@ class RegulationManager(Manager):
         unlink_user_ids = linked_user_ids - matched_user_ids
         link_user_ids = matched_user_ids - linked_user_ids
 
-        for role in [
-            role
-            for role in regulation.grant_officer_roles
-            if role.user_id in unlink_user_ids
-        ]:
+        for role in [role for role in officer_roles if role.user_id in unlink_user_ids]:
             await self.session.delete(role)
 
         for user_id in link_user_ids:
             new_role = UserRegulationRole(
                 user_id=user_id,
                 regulation_id=regulation.id,
-                role=RegulationRole.GRANT_OFFICER,
+                role=role_field,
             )
             self.session.add(new_role)
 

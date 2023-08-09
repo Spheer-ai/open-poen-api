@@ -48,15 +48,16 @@ async def test_delete_regulation(async_client, dummy_session, status_code):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["grant officer", "policy officer"])
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser_info, 200), (user_info, 403), (admin_info, 200), (anon_info, 403)],
     ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
-async def test_add_grant_officer(async_client, dummy_session, status_code):
+async def test_add_officer(async_client, dummy_session, status_code, role):
     funder_id, regulation_id = 1, 1
-    body = {"user_ids": [1], "permission": "grant officer"}
+    body = {"user_ids": [1], "role": role}
     response = await async_client.patch(
         f"/funder/{funder_id}/regulation/{regulation_id}/officers", json=body
     )
@@ -64,8 +65,13 @@ async def test_add_grant_officer(async_client, dummy_session, status_code):
     if status_code == 200:
         rm = await get_regulation_manager(dummy_session).__anext__()
         db_regulation = await rm.detail_load(regulation_id)
-        assert len(db_regulation.grant_officers) == 1
-        assert db_regulation.grant_officers[0].email == "user1@example.com"
+        officers = (
+            db_regulation.grant_officers
+            if role == "grant officer"
+            else db_regulation.policy_officers
+        )
+        assert len(officers) == 1
+        assert officers[0].email == "user1@example.com"
 
 
 @pytest.mark.asyncio
