@@ -11,9 +11,7 @@ from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
 from . import models as ent
-from .managers import user_manager as um
-from .managers import initiative_manager as im
-from .managers import activity_manager as am
+from . import managers as m
 from .utils.utils import (
     temp_password_generator,
     get_requester_ip,
@@ -41,21 +39,23 @@ from .gocardless import (
 import uuid
 
 
-router = APIRouter()
+user_router = APIRouter(tags=["user"])
+initiative_router = APIRouter(tags=["initiative"])
+funder_router = APIRouter(tags=["funder"])
 
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
-superuser_dep = um.fastapi_users.current_user(superuser=True)
-required_login_dep = um.fastapi_users.current_user(optional=False)
-optional_login_dep = um.fastapi_users.current_user(optional=True)
+superuser_dep = m.fastapi_users.current_user(superuser=True)
+required_login_dep = m.fastapi_users.current_user(optional=False)
+optional_login_dep = m.fastapi_users.current_user(optional=True)
 
 
-@router.post("/user", response_model=s.UserRead)
+@user_router.post("/user", response_model=s.UserRead)
 async def create_user(
     user: s.UserCreate,
     request: Request,
     superuser=Depends(superuser_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     auth.authorize(superuser, "create", ent.User, oso)
@@ -66,7 +66,7 @@ async def create_user(
     return auth.get_authorized_output_fields(superuser, "read", user_db, oso)
 
 
-@router.get(
+@user_router.get(
     "/user/{user_id}",
     response_model=s.UserReadLinked,
     response_model_exclude_unset=True,
@@ -74,7 +74,7 @@ async def create_user(
 async def get_user(
     user_id: int,
     optional_user=Depends(optional_login_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.detail_load(user_id)
@@ -82,7 +82,7 @@ async def get_user(
     return auth.get_authorized_output_fields(optional_user, "read", user_db, oso)
 
 
-@router.patch(
+@user_router.patch(
     "/user/{user_id}",
     response_model=s.UserRead,
     response_model_exclude_unset=True,
@@ -92,7 +92,7 @@ async def update_user(
     user: s.UserUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
@@ -102,12 +102,12 @@ async def update_user(
     return auth.get_authorized_output_fields(required_user, "read", edited_user, oso)
 
 
-@router.delete("/user/{user_id}")
+@user_router.delete("/user/{user_id}")
 async def delete_user(
     user_id: int,
     request: Request,
     superuser=Depends(superuser_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
@@ -116,7 +116,9 @@ async def delete_user(
     return Response(status_code=204)
 
 
-@router.get("/users", response_model=s.UserReadList, response_model_exclude_unset=True)
+@user_router.get(
+    "/users", response_model=s.UserReadList, response_model_exclude_unset=True
+)
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(optional_login_dep),
@@ -135,7 +137,7 @@ async def get_users(
 
 
 # BNG
-@router.get(
+@user_router.get(
     "/users/{user_id}/bng-initiate",
     response_model=s.BNGInitiate,
 )
@@ -183,7 +185,7 @@ async def bng_initiate(
     return s.BNGInitiate(url=url_to_return)
 
 
-@router.get("/users/{user_id}/bng-callback")
+@user_router.get("/users/{user_id}/bng-callback", include_in_schema=False)
 async def bng_callback(
     user_id: int,
     background_tasks: BackgroundTasks,
@@ -228,7 +230,7 @@ async def bng_callback(
     return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
 
 
-# @router.delete("/users/{user_id}/bng-connection")
+# @user_router.delete("/users/{user_id}/bng-connection")
 # async def delete_bng_connection(
 #     user_id: int,
 #     requires_user_owner=Depends(auth.requires_user_owner),
@@ -250,13 +252,15 @@ async def bng_callback(
 
 
 # GOCARDLESS
-@router.get("/users/{user_id}/gocardless-initiate", response_model=s.GocardlessInitiate)
+@user_router.get(
+    "/users/{user_id}/gocardless-initiate", response_model=s.GocardlessInitiate
+)
 async def gocardless_initiatite(
     user_id: int,
     institution_id: str = Depends(s.validate_institution_id),
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
-    user_manager: um.UserManager = Depends(um.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager),
 ):
     user = await user_manager.min_load(user_id)
 
@@ -294,7 +298,7 @@ async def gocardless_initiatite(
     return s.GocardlessInitiate(url=init.link)
 
 
-@router.get("/users/{user_id}/gocardless-callback")
+@user_router.get("/users/{user_id}/gocardless-callback", include_in_schema=False)
 async def gocardless_callback(
     user_id: int,
     background_tasks: BackgroundTasks,
@@ -333,28 +337,13 @@ async def gocardless_callback(
     session.add(requisition)
     await session.commit()
 
-    # await get_gocardless_payments(
-    # session, requisition.id, date_from=datetime.today() - timedelta(days=365)
-    # )
-    # TODO: On first import, import the entire history.
-    # background_tasks.add_task(get_gocardless_payments, session, requisition.id)  # TODO
+    background_tasks.add_task(
+        get_gocardless_payments, requisition.id, datetime.today() - timedelta(days=365)
+    )
     return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 
 
-@router.post("/initiative", response_model=s.InitiativeRead)
-async def create_initiative(
-    initiative: s.InitiativeCreate,
-    request: Request,
-    required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    auth.authorize(required_user, "create", ent.Initiative, oso)
-    initiative_db = await initiative_manager.create(initiative, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
-
-
-@router.get(
+@initiative_router.get(
     "/initiative/{initiative_id}",
     response_model=s.InitiativeReadLinked,
     response_model_exclude_unset=True,
@@ -362,7 +351,7 @@ async def create_initiative(
 async def get_initiative(
     initiative_id: int,
     optional_user=Depends(optional_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
@@ -370,7 +359,7 @@ async def get_initiative(
     return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}",
     response_model=s.InitiativeRead,
     response_model_exclude_unset=True,
@@ -380,7 +369,7 @@ async def update_initiative(
     initiative: s.InitiativeUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.min_load(initiative_id)
@@ -394,7 +383,7 @@ async def update_initiative(
     )
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/owners",
     response_model=s.UserReadList,
 )
@@ -403,7 +392,7 @@ async def link_initiative_owners(
     initiative: s.InitiativeOwnersUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
@@ -422,12 +411,12 @@ async def link_initiative_owners(
     return s.UserReadList(users=filtered_initiative_owners)
 
 
-@router.delete("/initiative/{initiative_id}")
+@initiative_router.delete("/initiative/{initiative_id}")
 async def delete_initiative(
     initiative_id: int,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.min_load(initiative_id)
@@ -436,7 +425,7 @@ async def delete_initiative(
     return Response(status_code=204)
 
 
-@router.get(
+@initiative_router.get(
     "/initiatives",
     response_model=s.InitiativeReadList,
     response_model_exclude_unset=True,
@@ -457,14 +446,16 @@ async def get_initiatives(
     return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
-@router.post("/initiative/{initiative_id}/activity", response_model=s.ActivityRead)
+@initiative_router.post(
+    "/initiative/{initiative_id}/activity", response_model=s.ActivityRead
+)
 async def create_activity(
     initiative_id: int,
     activity: s.ActivityCreate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.min_load(initiative_id)
@@ -475,7 +466,7 @@ async def create_activity(
     return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
 
 
-@router.get(
+@initiative_router.get(
     "/initiative/{initiative_id}/activity/{activity_id}",
     response_model=s.ActivityReadLinked,
     response_model_exclude_unset=True,
@@ -484,7 +475,7 @@ async def get_activity(
     initiative_id: int,
     activity_id: int,
     optional_user=Depends(optional_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(initiative_id, activity_id)
@@ -492,7 +483,7 @@ async def get_activity(
     return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}",
     response_model=s.ActivityRead,
     response_model_exclude_unset=True,
@@ -503,7 +494,7 @@ async def update_activity(
     activity: s.ActivityUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.min_load(initiative_id, activity_id)
@@ -516,7 +507,7 @@ async def update_activity(
     )
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}/owners",
     response_model=s.UserReadList,
 )
@@ -526,7 +517,7 @@ async def link_activity_owners(
     activity: s.ActivityOwnersUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(initiative_id, activity_id)
@@ -545,13 +536,13 @@ async def link_activity_owners(
     return s.UserReadList(users=filtered_activity_owners)
 
 
-@router.delete("/initiative/{initiative_id}/activity/{activity_id}")
+@initiative_router.delete("/initiative/{initiative_id}/activity/{activity_id}")
 async def delete_activity(
     initiative_id: int,
     activity_id: int,
     request: Request,
     required_user=Depends(required_login_dep),
-    activity_manager: am.ActivityManager = Depends(am.get_activity_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.min_load(initiative_id, activity_id)
@@ -560,7 +551,7 @@ async def delete_activity(
     return Response(status_code=204)
 
 
-@router.patch(
+@initiative_router.patch(
     "/initiative/{initiative_id}/debit-cards",
     response_model=s.DebitCardReadList,
 )
@@ -569,11 +560,11 @@ async def link_initiative_debit_cards(
     initiative: s.InitiativeDebitCardsUpdate,
     request: Request,
     required_user=Depends(required_login_dep),
-    initiative_manager: im.InitiativeManager = Depends(im.get_initiative_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
+    auth.authorize(required_user, "link_cards", initiative_db, oso)
     initiative_db = await initiative_manager.link_debit_cards(
         initiative_db,
         initiative.card_numbers,
@@ -589,6 +580,380 @@ async def link_initiative_debit_cards(
     return s.DebitCardReadList(debit_cards=filtered_debit_cards)
 
 
+@funder_router.post("/funder", response_model=s.FunderRead)
+async def create_funder(
+    funder: s.FunderCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    auth.authorize(required_user, "create", "Funder", oso)
+    funder_db = await funder_manager.create(funder, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", funder_db, oso)
+
+
+@funder_router.get(
+    "/funder/{funder_id}",
+    response_model=s.FunderReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_funder(
+    funder_id: int,
+    optional_user=Depends(optional_login_dep),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.detail_load(funder_id)
+    auth.authorize(optional_user, "read", funder_db, oso)
+    return auth.get_authorized_output_fields(optional_user, "read", funder_db, oso)
+
+
+@funder_router.patch(
+    "/funder/{funder_id}",
+    response_model=s.FunderRead,
+    response_model_exclude_unset=True,
+)
+async def update_funder(
+    funder_id: int,
+    funder: s.FunderUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.min_load(funder_id)
+    auth.authorize(required_user, "edit", funder_db, oso)
+    auth.authorize_input_fields(required_user, "edit", funder_db, funder)
+    edited_funder = await funder_manager.update(funder, funder_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_funder, oso)
+
+
+@funder_router.delete("/funder/{funder_id}")
+async def delete_funder(
+    funder_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.min_load(funder_id)
+    auth.authorize(required_user, "delete", funder_db, oso)
+    await funder_manager.delete(funder_db, request=request)
+    return Response(status_code=204)
+
+
+@funder_router.get(
+    "/funders",
+    response_model=s.FunderReadList,
+    response_model_exclude_unset=True,
+)
+async def get_funders(
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    # TODO: pagination.
+    q = auth.get_authorized_query(optional_user, "read", ent.Funder, oso)
+    funders_result = await async_session.execute(q)
+    funders_scalar = funders_result.scalars().all()
+    filtered_funders = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in funders_scalar
+    ]
+    return s.FunderReadList(funders=filtered_funders)
+
+
+@funder_router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
+async def create_regulation(
+    funder_id: int,
+    regulation: s.RegulationCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    funder_manager: m.FunderManager = Depends(m.get_funder_manager),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    funder_db = await funder_manager.min_load(funder_id)
+    auth.authorize(required_user, "create", "Regulation", oso)
+    regulation_db = await regulation_manager.create(
+        regulation, funder_id, request=request
+    )
+    return auth.get_authorized_output_fields(required_user, "read", regulation_db, oso)
+
+
+@funder_router.get(
+    "/funder/{funder_id}/regulation/{regulation_id}",
+    response_model=s.RegulationReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_regulation(
+    funder_id: int,
+    regulation_id: int,
+    optional_user=Depends(optional_login_dep),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.detail_load(regulation_id)
+    auth.authorize(optional_user, "read", regulation_db, oso)
+    return auth.get_authorized_output_fields(optional_user, "read", regulation_db, oso)
+
+
+@funder_router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}",
+    response_model=s.RegulationRead,
+    response_model_exclude_unset=True,
+)
+async def update_regulation(
+    funder_id: int,
+    regulation_id: int,
+    regulation: s.RegulationUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.min_load(regulation_id)
+    auth.authorize(required_user, "edit", regulation_db, oso)
+    auth.authorize_input_fields(required_user, "edit", regulation_db, regulation)
+    edited_regulation = await regulation_manager.update(
+        regulation, regulation_db, request=request
+    )
+    return auth.get_authorized_output_fields(
+        required_user, "read", edited_regulation, oso
+    )
+
+
+@funder_router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}/officers",
+    response_model=s.UserReadList,
+)
+async def link_officers(
+    funder_id: int,
+    regulation_id: int,
+    regulation: s.RegulationOfficersUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.detail_load(regulation_id)
+    auth.authorize(required_user, "edit", regulation_db, oso)
+    regulation_db = await regulation_manager.make_users_officer(
+        regulation_db,
+        regulation.user_ids,
+        regulation_role=regulation.role,
+        request=request,
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await regulation_manager.session.refresh(regulation_db)
+
+    officers = (
+        regulation_db.grant_officers
+        if regulation.role == ent.RegulationRole.GRANT_OFFICER
+        else regulation_db.policy_officers
+    )
+    filtered_officers = [
+        auth.get_authorized_output_fields(
+            required_user, "read", i, oso, ent.User.REL_FIELDS
+        )
+        for i in officers
+    ]
+    return s.UserReadList(users=filtered_officers)
+
+
+@funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}")
+async def delete_regulation(
+    funder_id: int,
+    regulation_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    regulation_db = await regulation_manager.min_load(regulation_id)
+    auth.authorize(required_user, "delete", regulation_db, oso)
+    await regulation_manager.delete(regulation_db, request=request)
+    return Response(status_code=204)
+
+
+@funder_router.get(
+    "/funder/{funder_id}/regulations",
+    response_model=s.RegulationReadList,
+    response_model_exclude_unset=True,
+)
+async def get_regulations(
+    funder_id: int,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    # TODO: pagination.
+    q = auth.get_authorized_query(optional_user, "read", ent.Regulation, oso)
+    q = q.where(ent.Regulation.funder_id == funder_id)
+    regulations_result = await async_session.execute(q)
+    regulations_scalar = regulations_result.scalars().all()
+    filtered_regulations = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in regulations_scalar
+    ]
+    return s.RegulationReadList(regulations=filtered_regulations)
+
+
+@funder_router.post(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant", response_model=s.GrantRead
+)
+async def create_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant: s.GrantCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    # TODO: What to do with funder_id?
+    regulation_db = await regulation_manager.min_load(regulation_id)
+    auth.authorize(required_user, "create_grant", regulation_db, oso)
+    grant_db = await grant_manager.create(grant, regulation_id, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", grant_db, oso)
+
+
+@funder_router.get(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}",
+    response_model=s.GrantReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    optional_user=Depends(optional_login_dep),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.detail_load(grant_id)
+    auth.authorize(optional_user, "read", grant_db, oso)
+    return auth.get_authorized_output_fields(optional_user, "read", grant_db, oso)
+
+
+@funder_router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}",
+    response_model=s.GrantRead,
+    response_model_exclude_unset=True,
+)
+async def update_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    grant: s.GrantUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.min_load(grant_id)
+    auth.authorize(required_user, "edit", grant_db, oso)
+    auth.authorize_input_fields(required_user, "edit", grant_db, grant)
+    # TODO: Pass id's for linking.
+    edited_grant = await grant_manager.update(grant, grant_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_grant, oso)
+
+
+@funder_router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
+    response_model=s.UserRead | None,
+)
+async def link_overseer(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    grant: s.GrantOverseerUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.detail_load(grant_id)
+    auth.authorize(required_user, "edit", grant_db, oso)
+    grant_db = await grant_manager.make_user_overseer(
+        grant_db, grant.user_id, request=request
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await grant_manager.session.refresh(grant_db)
+    return (
+        auth.get_authorized_output_fields(
+            required_user, "read", grant_db.overseer, oso, ent.User.REL_FIELDS
+        )
+        if grant_db.overseer is not None
+        else None
+    )
+
+
+@funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")
+async def delete_grant(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.min_load(grant_id)
+    auth.authorize(required_user, "delete", grant_db, oso)
+    await grant_manager.delete(grant_db, request=request)
+    return Response(status_code=204)
+
+
+@funder_router.get(
+    "/funder/{funder_id}/regulation/{regulation_id}/grants",
+    response_model=s.GrantReadList,
+    response_model_exclude_unset=True,
+)
+async def get_grants(
+    funder_id: int,
+    regulation_id: int,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    q = auth.get_authorized_query(optional_user, "read", ent.Grant, oso)
+    q = q.where(ent.Grant.regulation_id == regulation_id)
+    grants_result = await async_session.execute(q)
+    grants_scalar = grants_result.scalars().all()
+    filtered_grants = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in grants_scalar
+    ]
+    return s.GrantReadList(grants=filtered_grants)
+
+
+@funder_router.post(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/initiative",
+    response_model=s.InitiativeRead,
+)
+async def create_initiative(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    initiative: s.InitiativeCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.min_load(grant_id)
+    auth.authorize(required_user, "create_initiative", grant_db, oso)
+    # TODO: Validate funder_id, regulation_id and grant_id.
+    initiative_db = await initiative_manager.create(
+        initiative, grant_id, request=request
+    )
+    return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
+
+
 # ROUTES
 # POST "/initiative/{initiative_id}/activity/{activity_id}/payment",
 # PATCH "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}",
@@ -599,7 +964,4 @@ async def link_initiative_debit_cards(
 # PATCH "/initiative/{initiative_id}/payment/{payment_id}",
 # DELETE "/initiative/{initiative_id}/payment/{payment_id}"
 # GET "/initiative/{initiative_id}/payments"
-# POST /debit-card,
-# PATCH "/debit-card/{debit_card_id}",
-# GET "/initiative/{initiative_id}/debit-cards"
 # GET "/initiative/{initiative_id}/debit-cards/aggregate-numbers"

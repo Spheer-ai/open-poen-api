@@ -1,0 +1,62 @@
+[
+    {
+        "funder_id": 1,
+        "name": "Environmental Protection Act",
+        "description": "Regulation to safeguard the environment and promote sustainable practices."
+    },
+    {
+        "funder_id": 1,
+        "name": "Labor Standards Regulation",
+        "description": "Regulation to ensure fair labor practices and protect workers' rights."
+    },
+    {
+        "funder_id": 1,
+        "name": "Consumer Safety Guidelines",
+        "description": "Regulation to ensure the safety and quality of consumer products and services."
+    },
+    {
+        "funder_id": 1,
+        "name": "Data Privacy Policy",
+        "description": "Regulation to protect the privacy and security of personal data and information."
+    },
+    {
+        "funder_id": 1,
+        "name": "Renewable Energy Incentives",
+        "description": "Regulation to encourage the adoption of renewable energy sources and technologies."
+    },
+    {
+        "funder_id": 2,
+        "name": "Building Code Standards",
+        "description": "Regulation to establish safety and quality standards for construction and buildings."
+    },
+    {
+        "funder_id": 2,
+        "name": "Traffic Management Act",
+        "description": "Regulation to manage and regulate traffic flow and road safety."
+    },
+    {
+        "funder_id": 2,
+        "name": "Food Safety Guidelines",
+        "description": "Regulation to ensure the safety and quality of food products and handling."
+    },
+    {
+        "funder_id": 2,
+        "name": "Healthcare Quality Assurance",
+        "description": "Regulation to maintain and improve the quality of healthcare services."
+    },
+    {
+        "funder_id": 2,
+        "name": "Financial Reporting Standards",
+        "description": "Regulation to ensure transparent and accurate financial reporting."
+    },
+    {
+        "funder_id": 3,
+        "name": "National Security Act",
+        "description": "Regulation to safeguard the nation's security and protect against threats."
+    },
+    {
+        "funder_id": 3,
+        "name": "Intellectual Property Rights",
+        "description": "Regulation to protect and enforce intellectual property rights."
+    }
+]

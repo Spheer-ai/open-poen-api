@@ -21,7 +21,7 @@ class SqlAlchemyAdapter(DataAdapter):
             rec = typ.fields[rel.name]
             left = typ.cls
             right = types[rec.other_type].cls
-            return q.join(
+            return q.outerjoin(
                 right, getattr(left, rec.my_field) == getattr(right, rec.other_field)
             )
 

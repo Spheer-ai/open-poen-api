@@ -66,7 +66,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         user_create: schemas.UC,
         safe: bool = False,
         request: Request | None = None,
-    ) -> models.UP:
+    ) -> User:
         try:
             return await super().create(user_create, request=request)
         except UserAlreadyExists:
@@ -75,17 +75,17 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     async def update(
         self,
         user_update: schemas.UU,
-        user: models.UP,
+        user: User,
         safe: bool = False,
         request: Request | None = None,
-    ) -> models.UP:
+    ) -> User:
         try:
             return await super().update(user_update, user, request=request)
         except UserAlreadyExists:
             raise EntityAlreadyExists(message="Email address already in use")
 
     async def detail_load(self, id: int):
-        query_result = await self.session.execute(
+        query_result_q = await self.session.execute(
             select(User)
             .options(
                 selectinload(User.bng),
@@ -98,7 +98,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             )
             .where(User.id == id)
         )
-        query_result = query_result.scalars().first()
+        query_result = query_result_q.scalars().first()
         if query_result is None:
             raise EntityNotFound(message="User not found")
         return query_result

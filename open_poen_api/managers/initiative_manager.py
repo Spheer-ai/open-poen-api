@@ -7,20 +7,22 @@ from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from .base_manager import Manager
 
 
-class InitiativeManager:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
+class InitiativeManager(Manager):
     async def create(
-        self, initiative_create: InitiativeCreate, request: Request | None = None
+        self,
+        initiative_create: InitiativeCreate,
+        grant_id: int,
+        request: Request | None = None,
     ) -> Initiative:
-        initiative = Initiative(**initiative_create.dict())
-        self.session.add(initiative)
         try:
-            await self.session.commit()
+            initiative = await self.base_create(
+                initiative_create, Initiative, request, grant_id=grant_id
+            )
         except IntegrityError:
+            # TODO: Make sure this is not another IntegrityError.
             await self.session.rollback()
             raise EntityAlreadyExists(message="Name is already in use")
         return initiative
@@ -31,21 +33,19 @@ class InitiativeManager:
         initiative_db: Initiative,
         request: Request | None = None,
     ) -> Initiative:
-        for key, value in initiative_update.dict(exclude_unset=True).items():
-            setattr(initiative_db, key, value)
-        self.session.add(initiative_db)
         try:
-            await self.session.commit()
+            initiative = await self.base_update(
+                initiative_update, initiative_db, request
+            )
         except IntegrityError:
             await self.session.rollback()
             raise EntityAlreadyExists(message="Name is already in use")
-        return initiative_db
+        return initiative
 
     async def delete(
         self, initiative: Initiative, request: Request | None = None
     ) -> None:
-        await self.session.delete(initiative)
-        await self.session.commit()
+        await self.base_delete(initiative, request)
 
     async def make_users_owner(
         self,
@@ -163,11 +163,8 @@ class InitiativeManager:
             raise EntityNotFound(message="Initiative not found")
         return query_result
 
-    async def min_load(self, id: int):
-        query_result = await self.session.get(Initiative, id)
-        if query_result is None:
-            raise EntityNotFound(message="Initiative not found")
-        return query_result
+    async def min_load(self, id: int) -> Initiative:
+        return await self.base_min_load(Initiative, id)
 
 
 async def get_initiative_manager(session: AsyncSession = Depends(get_async_session)):

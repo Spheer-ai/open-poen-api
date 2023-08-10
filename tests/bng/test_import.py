@@ -9,7 +9,7 @@ from tests.conftest import superuser_info
 
 
 @pytest_asyncio.fixture(scope="function")
-async def as_with_bng_account(as_1):
+async def bng_session(dummy_session):
     # One user and one bng account.
     with open("./tests/bng/bng_data.json", "r") as file:
         data = json.load(file)
@@ -21,9 +21,9 @@ async def as_with_bng_account(as_1):
         last_import_on=datetime.fromisoformat(data["last_import_on"]),
         user_id=data["user_id"],
     )
-    as_1.add(bng)
-    await as_1.commit()
-    return as_1
+    dummy_session.add(bng)
+    await dummy_session.commit()
+    return dummy_session
 
 
 @pytest.mark.asyncio
@@ -34,5 +34,5 @@ async def as_with_bng_account(as_1):
     ],
     indirect=["get_mock_user"],
 )
-async def test_import(async_client, as_with_bng_account):
-    await get_bng_payments(as_with_bng_account)
+async def test_import(async_client, bng_session):
+    await get_bng_payments(bng_session)

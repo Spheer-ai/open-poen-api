@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Extra, validator
-from .mixins import TimeStampMixin, Money
+from .mixins import TimeStampMixin, Budget
 
 # from .models.entities import PaymentBase, Route, PaymentType
 # # from ..models import
@@ -42,7 +42,7 @@ class PaymentUpdateInitiativeOwner(PaymentUpdateActivityOwner, HiddenMixin):
 
 class PaymentUpdateFinancial(PaymentUpdateInitiativeOwner):
     booking_date: datetime | None
-    transaction_amount: Money | None
+    transaction_amount: Budget | None
     creditor_name: str | None
     creditor_account: str | None
     debtor_name: str | None
@@ -78,7 +78,7 @@ FORBIDDEN_NON_MANUAL_PAYMENT_FIELDS = [
 class PaymentOutputGuest(BaseModel):
     id: int
     booking_date: datetime
-    transaction_amount: Money
+    transaction_amount: Budget
     creditor_name: str
     creditor_account: str
     debtor_name: str
