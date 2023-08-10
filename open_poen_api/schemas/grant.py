@@ -25,6 +25,10 @@ class GrantCreate(BaseModel):
     budget: Budget
 
 
+class GrantOverseerUpdate(BaseModel):
+    user_id: int | None
+
+
 class GrantUpdate(NotNullValidatorMixin):
     NOT_NULL_FIELDS = ["name", "reference", "budget"]
 

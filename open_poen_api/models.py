@@ -640,10 +640,12 @@ class Grant(Base):
     initiatives: Mapped[list[Initiative]] = relationship(
         "Initiative", back_populates="grant", lazy="noload", cascade="all"
     )
-    overseer_role: Mapped[list[UserGrantRole]] = relationship(
+    overseer_role: Mapped[Optional[UserGrantRole]] = relationship(
         "UserGrantRole", lazy="noload", cascade="all", uselist=False
     )
-    overseer: AssociationProxy[User] = association_proxy("overseer_roles", "user")
+    overseer: AssociationProxy[Optional[User]] = association_proxy(
+        "overseer_role", "user"
+    )
 
 
 class Funder(Base):

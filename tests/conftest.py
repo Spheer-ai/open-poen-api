@@ -75,6 +75,12 @@ regulation_info = {
     "description": "Voor het bevorderen van sociale cohesie in de buurt.",
 }
 
+grant_info = {
+    "name": "Beschikking BBQ",
+    "reference": "AB1234",
+    "budget": 1000.01,
+}
+
 
 async def retrieve_token_from_last_sent_email():
     """Gets the last send email from Mailhog, assumes it's an email reply to a password

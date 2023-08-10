@@ -37,12 +37,12 @@ async def test_create_initiative(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code", [(superuser_info, 204)], indirect=["get_mock_user"]
 )
-async def test_delete_initiative(async_client, as_2, status_code):
+async def test_delete_initiative(async_client, dummy_session, status_code):
     initiative_id = 1
     response = await async_client.delete(f"/initiative/{initiative_id}")
     assert response.status_code == status_code
     if status_code == 204:
-        initiative = await as_2.get(Initiative, initiative_id)
+        initiative = await dummy_session.get(Initiative, initiative_id)
         assert initiative is None
 
 
@@ -50,14 +50,14 @@ async def test_delete_initiative(async_client, as_2, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
 )
-async def test_add_initiative_owner(async_client, as_2, status_code):
+async def test_add_initiative_owner(async_client, dummy_session, status_code):
     initiative_id = 1
     body = {"user_ids": [1]}
     response = await async_client.patch(
         f"/initiative/{initiative_id}/owners", json=body
     )
     assert response.status_code == status_code
-    im = await get_initiative_manager(as_2).__anext__()
+    im = await get_initiative_manager(dummy_session).__anext__()
     db_initiative = await im.detail_load(initiative_id)
     assert len(db_initiative.initiative_owners) == 1
     assert db_initiative.initiative_owners[0].email == "existing@user.com"
@@ -67,14 +67,14 @@ async def test_add_initiative_owner(async_client, as_2, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code", [(superuser_info, 200)], indirect=["get_mock_user"]
 )
-async def test_add_debit_cards(async_client, as_2, status_code):
+async def test_add_debit_cards(async_client, dummy_session, status_code):
     initiative_id = 1
     body = {"card_numbers": [6731924123456789012]}
     response = await async_client.patch(
         f"/initiative/{initiative_id}/debit-cards", json=body
     )
     assert response.status_code == status_code
-    im = await get_initiative_manager(as_2).__anext__()
+    im = await get_initiative_manager(dummy_session).__anext__()
     db_initiative = await im.detail_load(initiative_id)
     assert len(db_initiative.debit_cards) == 1
     assert db_initiative.debit_cards[0].card_number == str(6731924123456789012)
@@ -93,14 +93,12 @@ async def test_add_debit_cards(async_client, as_2, status_code):
     ],
     indirect=["get_mock_user"],
 )
-async def test_patch_initiative(async_client, as_3, body, status_code):
+async def test_patch_initiative(async_client, dummy_session, body, status_code):
     initiative_id = 1
     response = await async_client.patch(f"/initiative/{initiative_id}", json=body)
     assert response.status_code == status_code
     if status_code == 200:
-        initiative = await as_3.get(Initiative, initiative_id)
-        # Fix this. Apparently the session is not clean on every test invocation.
-        await as_3.refresh(initiative)
+        initiative = await dummy_session.get(Initiative, initiative_id)
         for key in body:
             assert getattr(initiative, key) == body[key]
 
@@ -111,7 +109,7 @@ async def test_patch_initiative(async_client, as_3, body, status_code):
     [(superuser_info, 200), (anon_info, 200)],
     indirect=["get_mock_user"],
 )
-async def test_get_initiatives_list(async_client, as_3, status_code):
+async def test_get_initiatives_list(async_client, dummy_session, status_code):
     response = await async_client.get("/initiatives")
     assert response.status_code == status_code
     assert len(response.json()["initiatives"]) == 1
@@ -123,7 +121,7 @@ async def test_get_initiatives_list(async_client, as_3, status_code):
     [(superuser_info, 200), (anon_info, 200)],
     indirect=["get_mock_user"],
 )
-async def test_get_linked_initiative_detail(async_client, as_3, status_code):
+async def test_get_linked_initiative_detail(async_client, dummy_session, status_code):
     initiative_id = 1
     response = await async_client.get(f"/initiative/{initiative_id}")
     assert response.status_code == status_code

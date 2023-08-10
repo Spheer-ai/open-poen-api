@@ -861,6 +861,36 @@ async def update_grant(
     return auth.get_authorized_output_fields(required_user, "read", edited_grant, oso)
 
 
+@funder_router.patch(
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
+    response_model=s.UserRead | None,
+)
+async def link_overseer(
+    funder_id: int,
+    regulation_id: int,
+    grant_id: int,
+    grant: s.GrantOverseerUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    grant_db = await grant_manager.detail_load(grant_id)
+    auth.authorize(required_user, "edit", grant_db, oso)
+    grant_db = await grant_manager.make_user_overseer(
+        grant_db, grant.user_id, request=request
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await grant_manager.session.refresh(grant_db)
+    return (
+        auth.get_authorized_output_fields(
+            required_user, "read", grant_db.overseer, oso, ent.User.REL_FIELDS
+        )
+        if grant_db.overseer is not None
+        else None
+    )
+
+
 @funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")
 async def delete_grant(
     funder_id: int,
@@ -890,6 +920,7 @@ async def get_grants(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     q = auth.get_authorized_query(optional_user, "read", ent.Grant, oso)
+    q = q.where(ent.Grant.regulation_id == regulation_id)
     grants_result = await async_session.execute(q)
     grants_scalar = grants_result.scalars().all()
     filtered_grants = [

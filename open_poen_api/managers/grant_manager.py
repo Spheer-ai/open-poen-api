@@ -1,6 +1,6 @@
 from .base_manager import Manager
 from ..schemas import GrantCreate, GrantUpdate
-from ..models import Grant
+from ..models import Grant, UserGrantRole, User
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
@@ -46,12 +46,34 @@ class GrantManager(Manager):
     async def delete(self, grant: Grant, request: Request | None = None):
         await self.base_delete(grant, request)
 
+    async def make_user_overseer(
+        self, grant: Grant, user_id: int | None, request: Request | None = None
+    ):
+        if user_id is None:
+            if grant.overseer_role is None:
+                return grant
+            else:
+                await self.session.delete(grant.overseer_role)
+        else:
+            q = await self.session.execute(select(User).where(User.id == user_id))
+            if q.scalars().first() is None:
+                raise EntityNotFound(message=f"There exists no User with id {user_id}")
+            if grant.overseer_role is None:
+                role = UserGrantRole(user_id=user_id, grant_id=grant.id)
+                self.session.add(role)
+            else:
+                grant.overseer_role.user_id = user_id
+                self.session.add(grant)
+        await self.session.commit()
+        return grant
+
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
             select(Grant)
             .options(
                 selectinload(Grant.regulation),
                 selectinload(Grant.initiatives),
+                selectinload(Grant.overseer_role).selectinload(UserGrantRole.user),
             )
             .where(Grant.id == id)
         )

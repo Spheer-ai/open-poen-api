@@ -95,7 +95,8 @@ OSO.register_class(
             other_type="Regulation",
             my_field="regulation_id",
             other_field="id",
-        )
+        ),
+        "user_id": int,
     },
 )
 OSO.register_class(
@@ -106,7 +107,8 @@ OSO.register_class(
             other_type="UserRegulationRole",
             my_field="id",
             other_field="regulation_id",
-        )
+        ),
+        "name": str,
     },
 )
 OSO.register_class(
