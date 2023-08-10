@@ -3,7 +3,14 @@ from open_poen_api.database import (
     asyng_engine,
 )
 from open_poen_api.app import app
-from open_poen_api.models import Base, User, Initiative, UserRole, Activity
+from open_poen_api.models import (
+    Base,
+    User,
+    Initiative,
+    UserRole,
+    Activity,
+    RegulationRole,
+)
 from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api.managers import user_manager as um
 import pytest
@@ -41,6 +48,10 @@ user_info = userowner_info.copy()
 user_info.update({"obj_id": 42})
 admin_info = user_info.copy()
 admin_info.update({"role": "administrator"})
+policy_officer_info = user_info.copy()
+policy_officer_info.update({"obj_id": 11})
+initiative_owner_info = user_info.copy()
+initiative_owner_info.update({"obj_id": 12})
 anon_info = user_info.copy()
 anon_info.update({"return_none": True})
 
@@ -212,6 +223,15 @@ async def dummy_session(async_session):
         initiative_id = act.pop("initiative_id")
         schema = ActivityCreate(**act)
         await activity_manager.create(schema, initiative_id, request=None)
+
+    # TODO: Fix magical constants.
+    regulation = await regulation_manager.min_load(6)
+    await regulation_manager.make_users_officer(
+        regulation, user_ids=[11], regulation_role=RegulationRole.POLICY_OFFICER
+    )
+    initiative = await initiative_manager.min_load(1)
+    await initiative_manager.make_users_owner(initiative, user_ids=[12])
+
     return async_session
 
 

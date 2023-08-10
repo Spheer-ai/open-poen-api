@@ -118,5 +118,29 @@
         "is_verified": true,
         "hidden": true,
         "password": "financial4password"
+    },
+    {
+        "email": "policy-officer1@example.com",
+        "first_name": "Bert",
+        "last_name": "Johnson",
+        "biography": "I'm a policy officer.",
+        "role": "user",
+        "is_active": true,
+        "is_superuser": false,
+        "is_verified": true,
+        "hidden": false,
+        "password": "policy-officer1password"
+    },
+    {
+        "email": "initiative-owner1@example.com",
+        "first_name": "Hayley",
+        "last_name": "Smith",
+        "biography": "I'm an initiative owner.",
+        "role": "user",
+        "is_active": true,
+        "is_superuser": false,
+        "is_verified": true,
+        "hidden": false,
+        "password": "initiative-owner1password"
     }
 ]

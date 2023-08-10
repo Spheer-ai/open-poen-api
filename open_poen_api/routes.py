@@ -564,7 +564,7 @@ async def link_initiative_debit_cards(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
+    auth.authorize(required_user, "link_cards", initiative_db, oso)
     initiative_db = await initiative_manager.link_debit_cards(
         initiative_db,
         initiative.card_numbers,
@@ -941,10 +941,12 @@ async def create_initiative(
     initiative: s.InitiativeCreate,
     request: Request,
     required_user=Depends(required_login_dep),
+    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(required_user, "create", "Initiative", oso)
+    grant_db = await grant_manager.min_load(grant_id)
+    auth.authorize(required_user, "create_initiative", grant_db, oso)
     # TODO: Validate funder_id, regulation_id and grant_id.
     initiative_db = await initiative_manager.create(
         initiative, grant_id, request=request

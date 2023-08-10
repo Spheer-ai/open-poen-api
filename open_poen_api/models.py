@@ -307,10 +307,11 @@ class LegalEntity(str, Enum):
 
 class Initiative(Base):
     __tablename__ = "initiative"
-    __table_args__ = (UniqueConstraint("name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(
+        String(length=64), nullable=False, index=True, unique=True
+    )
     description: Mapped[str] = mapped_column(String(length=512), nullable=False)
     purpose: Mapped[str] = mapped_column(String(length=64), nullable=False)
     target_audience: Mapped[str] = mapped_column(String(length=64), nullable=False)

@@ -219,7 +219,7 @@
         "kvk_registration": "1122334455",
         "location": "Cultural Heritage Center",
         "hidden_sponsors": false,
-        "hidden": false,
+        "hidden": true,
         "grant_id": 14,
         "budget": 1000.00
     },
@@ -235,7 +235,7 @@
         "kvk_registration": "8899776655",
         "location": "Smart City Innovation Hub",
         "hidden_sponsors": false,
-        "hidden": false,
+        "hidden": true,
         "grant_id": 15,
         "budget": 1000.00
     },

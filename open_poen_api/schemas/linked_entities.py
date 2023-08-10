@@ -20,7 +20,7 @@ class UserReadLinked(UserRead):
 class InitiativeReadLinked(InitiativeRead):
     initiative_owners: list[UserRead]
     activities: list[ActivityRead]
-    debit_cards: list[DebitCardRead]
+    debit_cards: list[DebitCardRead] | None
 
     @validator("initiative_owners", "activities", "debit_cards", pre=True)
     def apply_operation(cls, v):

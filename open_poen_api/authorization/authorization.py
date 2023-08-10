@@ -44,6 +44,12 @@ OSO.register_class(
             other_field="initiative_id",
         ),
         "hidden": bool,
+        "grant": Relation(
+            kind="one",
+            other_type="Grant",
+            my_field="grant_id",
+            other_field="id",
+        ),
     },
 )
 OSO.register_class(
@@ -111,6 +117,7 @@ OSO.register_class(
         "name": str,
     },
 )
+OSO.register_class(ent.UserGrantRole)
 OSO.register_class(
     ent.Grant,
     fields={
@@ -119,7 +126,13 @@ OSO.register_class(
             other_type="Regulation",
             my_field="regulation_id",
             other_field="id",
-        )
+        ),
+        "overseer_roles": Relation(
+            kind="many",
+            other_type="UserGrantRole",
+            my_field="id",
+            other_field="grant_id",
+        ),
     },
 )
 OSO.load_files(["open_poen_api/main.polar"])
