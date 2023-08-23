@@ -20,8 +20,8 @@ app.include_router(
 )
 
 app.include_router(user_router)
-app.include_router(initiative_router)
 app.include_router(funder_router)
+app.include_router(initiative_router)
 
 
 @app.exception_handler(CustomException)

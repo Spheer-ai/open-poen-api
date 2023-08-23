@@ -106,7 +106,7 @@ async def test_patch_user(async_client, dummy_session, body, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code, length",
-    [(superuser_info, 200, 10), (user_info, 200, 9), (anon_info, 200, 9)],
+    [(superuser_info, 200, 12), (user_info, 200, 11), (anon_info, 200, 11)],
     ids=["Superuser sees hidden", "User cannot see hidden", "Anon cannot see hidden"],
     indirect=["get_mock_user"],
 )

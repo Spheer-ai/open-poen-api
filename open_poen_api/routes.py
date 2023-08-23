@@ -7,6 +7,7 @@ from fastapi import (
     BackgroundTasks,
     Query,
 )
+from typing import Optional
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
@@ -863,7 +864,8 @@ async def update_grant(
 
 @funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
-    response_model=s.UserRead | None,
+    response_model=s.UserRead,
+    responses={204: {"description": "Grant overseer is removed"}},
 )
 async def link_overseer(
     funder_id: int,
@@ -882,13 +884,12 @@ async def link_overseer(
     )
     # Important for up to date relations. Has to be in this async context.
     await grant_manager.session.refresh(grant_db)
-    return (
-        auth.get_authorized_output_fields(
+    if grant_db.overseer is not None:
+        return auth.get_authorized_output_fields(
             required_user, "read", grant_db.overseer, oso, ent.User.REL_FIELDS
         )
-        if grant_db.overseer is not None
-        else None
-    )
+    else:
+        return Response(status_code=204)
 
 
 @funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")

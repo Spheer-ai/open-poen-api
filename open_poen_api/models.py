@@ -129,8 +129,12 @@ class UserGrantRole(Base):
         Integer, ForeignKey("grant.id", ondelete="CASCADE"), primary_key=True
     )
 
-    user: Mapped["User"] = relationship("User", uselist=False)
-    grant: Mapped["Grant"] = relationship("Grant", uselist=False)
+    user: Mapped["User"] = relationship(
+        "User", uselist=False, back_populates="overseer_roles"
+    )
+    grant: Mapped["Grant"] = relationship(
+        "Grant", uselist=False, back_populates="overseer_role"
+    )
 
 
 class UserRole(str, Enum):
@@ -232,6 +236,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 
     overseer_roles: Mapped[list[UserGrantRole]] = relationship(
         "UserGrantRole",
+        back_populates="user",
         lazy="noload",
         cascade="all",
     )
@@ -642,7 +647,11 @@ class Grant(Base):
         "Initiative", back_populates="grant", lazy="noload", cascade="all"
     )
     overseer_role: Mapped[Optional[UserGrantRole]] = relationship(
-        "UserGrantRole", lazy="noload", cascade="all", uselist=False
+        "UserGrantRole",
+        lazy="noload",
+        cascade="all",
+        uselist=False,
+        back_populates="grant",
     )
     overseer: AssociationProxy[Optional[User]] = association_proxy(
         "overseer_role", "user"

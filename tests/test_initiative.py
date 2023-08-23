@@ -182,6 +182,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     "get_mock_user, result_length, status_code",
     [
         (superuser_info, 24, 200),
+        (admin_info, 24, 200),
         (policy_officer_info, 23, 200),
         (initiative_owner_info, 22, 200),
         (user_info, 21, 200),
@@ -189,6 +190,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     ],
     ids=[
         "Superuser sees everything",
+        "Administrator sees everything",
         "Policy officer sees own hidden initiatives",
         "initiative_owner sees own hidden initiative",
         "User sees non hidden",
