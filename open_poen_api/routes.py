@@ -440,6 +440,8 @@ async def get_initiatives(
     q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
     initiatives_result = await async_session.execute(q)
     initiatives_scalar = initiatives_result.scalars().all()
+    # TODO: This part is resulting in a lot of extra separate queries for authorization.
+    # Check if this goes away if we join load the neccessary relationships.
     filtered_initiatives = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in initiatives_scalar

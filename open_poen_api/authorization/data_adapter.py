@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from polar.data.filter import Projection
 from polar.data.adapter import DataAdapter
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 
 class SqlAlchemyAdapter(DataAdapter):
@@ -15,12 +15,21 @@ class SqlAlchemyAdapter(DataAdapter):
     @staticmethod
     def build_query(filter):
         types = filter.types
+        encountered_classes = set()  # To keep track of encountered classes
 
         def re(q, rel):
             typ = types[rel.left]
             rec = typ.fields[rel.name]
             left = typ.cls
-            right = types[rec.other_type].cls
+            right_cls = types[rec.other_type].cls
+
+            # Check if the right class has been encountered before
+            if right_cls in encountered_classes:
+                right = aliased(right_cls)  # Create an alias for the class
+            else:
+                right = right_cls
+                encountered_classes.add(right_cls)  # Add the class to the set
+
             return q.outerjoin(
                 right, getattr(left, rec.my_field) == getattr(right, rec.other_field)
             )
