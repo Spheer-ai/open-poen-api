@@ -127,7 +127,7 @@ async def get_users(
 ):
     # TODO: Enable searching by email.
     # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "list_read", ent.User, oso)
+    q = auth.get_authorized_query(optional_user, "read", ent.User, oso)
     users_result = await session.execute(q)
     users_scalar = users_result.scalars().all()
     filtered_users = [

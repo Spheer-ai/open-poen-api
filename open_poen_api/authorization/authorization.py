@@ -21,7 +21,7 @@ OSO.register_class(
         "is_superuser": bool,
         "role": str,
         "hidden": bool,
-        "unq_name": Relation(
+        "initiative_roles": Relation(
             kind="many",
             other_type="UserInitiativeRole",
             my_field="id",
