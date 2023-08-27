@@ -5,6 +5,7 @@ from tests.conftest import (
     admin_info,
     anon_info,
     grant_info,
+    policy_officer_info,
 )
 from open_poen_api.models import Grant
 from open_poen_api.managers import get_grant_manager
@@ -13,12 +14,24 @@ from open_poen_api.managers import get_grant_manager
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (user_info, 403), (admin_info, 200), (anon_info, 403)],
-    ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
+    [
+        (superuser_info, 200),
+        (user_info, 403),
+        (admin_info, 200),
+        (policy_officer_info, 200),
+        (anon_info, 403),
+    ],
+    ids=[
+        "Superuser can",
+        "User cannot",
+        "Administrator can",
+        "Policy officer can",
+        "Anon cannot",
+    ],
     indirect=["get_mock_user"],
 )
 async def test_create_grant(async_client, dummy_session, status_code):
-    funder_id, regulation_id = 1, 1
+    funder_id, regulation_id = 2, 6
     body = grant_info
     response = await async_client.post(
         f"/funder/{funder_id}/regulation/{regulation_id}/grant", json=body
@@ -34,18 +47,30 @@ async def test_create_grant(async_client, dummy_session, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 204), (user_info, 403), (admin_info, 204), (anon_info, 403)],
-    ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
+    [
+        (superuser_info, 204),
+        (user_info, 403),
+        (admin_info, 204),
+        (policy_officer_info, 204),
+        (anon_info, 403),
+    ],
+    ids=[
+        "Superuser can",
+        "User cannot",
+        "Administrator can",
+        "Policy officer can",
+        "Anon cannot",
+    ],
     indirect=["get_mock_user"],
 )
 async def test_delete_grant(async_client, dummy_session, status_code):
-    funder_id, regulation_id, grant_id = 1, 1, 1
+    funder_id, regulation_id, grant_id = 2, 6, 1
     response = await async_client.delete(
         f"/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}"
     )
     assert response.status_code == status_code
     if status_code == 204:
-        grant = await dummy_session.get(Grant, funder_id)
+        grant = await dummy_session.get(Grant, grant_id)
         assert grant is None
 
 
@@ -79,10 +104,18 @@ async def test_add_overseer(async_client, dummy_session, status_code, user_id):
     "get_mock_user, body, status_code",
     [
         (superuser_info, {"name": "Another Name"}, 200),
+        (admin_info, {"name": "Another Name"}, 200),
         (user_info, {"name": "Another Name"}, 403),
+        (policy_officer_info, {"name": "Another name"}, 200),
         (superuser_info, {"name": "Cultural Heritage Preservation Fund"}, 400),
     ],
-    ids=["Superuser can", "User cannot", "Duplicate name fails"],
+    ids=[
+        "Superuser can",
+        "Admin can",
+        "User cannot",
+        "Policy officer can",
+        "Duplicate name fails",
+    ],
     indirect=["get_mock_user"],
 )
 async def test_patch_grant(async_client, dummy_session, body, status_code):
