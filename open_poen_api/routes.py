@@ -24,6 +24,7 @@ from .bng import get_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select, and_
 from requests import RequestException
 from datetime import datetime, timedelta, date
@@ -44,11 +45,26 @@ user_router = APIRouter(tags=["user"])
 initiative_router = APIRouter(tags=["initiative"])
 funder_router = APIRouter(tags=["funder"])
 
+
+def with_joins(original_dependency):
+    async def _user_with_extra_joins(
+        user=Depends(original_dependency),
+        user_manager: m.UserManager = Depends(m.get_user_manager),
+    ):
+        if user is None:
+            return None
+
+        detail_user = await user_manager.detail_load(user.id)
+        return detail_user
+
+    return _user_with_extra_joins
+
+
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
-superuser_dep = m.fastapi_users.current_user(superuser=True)
-required_login_dep = m.fastapi_users.current_user(optional=False)
-optional_login_dep = m.fastapi_users.current_user(optional=True)
+superuser_dep = with_joins(m.fastapi_users.current_user(superuser=True))
+required_login_dep = with_joins(m.fastapi_users.current_user(optional=False))
+optional_login_dep = with_joins(m.fastapi_users.current_user(optional=True))
 
 
 @user_router.post("/user", response_model=s.UserRead)

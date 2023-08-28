@@ -1,6 +1,13 @@
 from fastapi import Depends, Request
 from ..database import get_user_db, get_async_session
-from ..models import User, UserInitiativeRole, UserActivityRole
+from ..models import (
+    User,
+    UserInitiativeRole,
+    UserActivityRole,
+    UserBankAccountRole,
+    UserRegulationRole,
+    UserGrantRole,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from ..utils.email import MessageSchema, conf, env
@@ -85,16 +92,34 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             raise EntityAlreadyExists(message="Email address already in use")
 
     async def detail_load(self, id: int):
+        # TODO: Use joinedload?
         query_result_q = await self.session.execute(
             select(User)
             .options(
                 selectinload(User.bng),
+                selectinload(User.requisitions),
                 selectinload(User.initiative_roles).selectinload(
                     UserInitiativeRole.initiative
                 ),
                 selectinload(User.activity_roles).selectinload(
                     UserActivityRole.activity
                 ),
+                selectinload(User.user_bank_account_roles).selectinload(
+                    UserBankAccountRole.bank_account
+                ),
+                selectinload(User.user_bank_account_roles).selectinload(
+                    UserBankAccountRole.bank_account
+                ),
+                selectinload(User.owner_bank_account_role).selectinload(
+                    UserBankAccountRole.bank_account
+                ),
+                selectinload(User.grant_officer_regulation_roles).selectinload(
+                    UserRegulationRole.regulation
+                ),
+                selectinload(User.policy_officer_regulation_roles).selectinload(
+                    UserRegulationRole.regulation
+                ),
+                selectinload(User.overseer_roles).selectinload(UserGrantRole.grant),
             )
             .where(User.id == id)
         )

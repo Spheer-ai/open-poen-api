@@ -7,6 +7,10 @@ import contextlib
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+import logging
+
+# logging.basicConfig()
+# logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 # TODO: Configure this with environment variables.
 ASYNC_DATABASE_URL = "postgresql+asyncpg://mark:mark@localhost:5432/open-poen-dev"
