@@ -1,11 +1,11 @@
 import pytest
 from tests.conftest import (
-    superuser_info,
-    user_info,
-    admin_info,
-    anon_info,
+    superuser,
+    user,
+    admin,
+    anon,
     grant_info,
-    policy_officer_info,
+    policy_officer,
 )
 from open_poen_api.models import Grant
 from open_poen_api.managers import get_grant_manager
@@ -15,11 +15,11 @@ from open_poen_api.managers import get_grant_manager
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
-        (superuser_info, 200),
-        (user_info, 403),
-        (admin_info, 200),
-        (policy_officer_info, 200),
-        (anon_info, 403),
+        (superuser, 200),
+        (user, 403),
+        (admin, 200),
+        (policy_officer, 200),
+        (anon, 403),
     ],
     ids=[
         "Superuser can",
@@ -48,11 +48,11 @@ async def test_create_grant(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
-        (superuser_info, 204),
-        (user_info, 403),
-        (admin_info, 204),
-        (policy_officer_info, 204),
-        (anon_info, 403),
+        (superuser, 204),
+        (user, 403),
+        (admin, 204),
+        (policy_officer, 204),
+        (anon, 403),
     ],
     ids=[
         "Superuser can",
@@ -78,7 +78,7 @@ async def test_delete_grant(async_client, dummy_session, status_code):
 @pytest.mark.parametrize("user_id", [1, None], ids=["Add", "Remove"])
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (user_info, 403), (admin_info, 200), (anon_info, 403)],
+    [(superuser, 200), (user, 403), (admin, 200), (anon, 403)],
     ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
@@ -103,11 +103,11 @@ async def test_add_overseer(async_client, dummy_session, status_code, user_id):
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
-        (superuser_info, {"name": "Another Name"}, 200),
-        (admin_info, {"name": "Another Name"}, 200),
-        (user_info, {"name": "Another Name"}, 403),
-        (policy_officer_info, {"name": "Another name"}, 200),
-        (superuser_info, {"name": "Cultural Heritage Preservation Fund"}, 400),
+        (superuser, {"name": "Another Name"}, 200),
+        (admin, {"name": "Another Name"}, 200),
+        (user, {"name": "Another Name"}, 403),
+        (policy_officer, {"name": "Another name"}, 200),
+        (superuser, {"name": "Cultural Heritage Preservation Fund"}, 400),
     ],
     ids=[
         "Superuser can",
@@ -133,7 +133,7 @@ async def test_patch_grant(async_client, dummy_session, body, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (anon_info, 200)],
+    [(superuser, 200), (anon, 200)],
     ids=["Superuser sees everything", "Anon sees everything"],
     indirect=["get_mock_user"],
 )
@@ -149,7 +149,7 @@ async def test_get_grants_list(async_client, dummy_session, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (anon_info, 200)],
+    [(superuser, 200), (anon, 200)],
     ids=["Superuser can", "Anon can"],
     indirect=["get_mock_user"],
 )

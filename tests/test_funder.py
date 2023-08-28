@@ -1,9 +1,12 @@
 import pytest
 from tests.conftest import (
-    superuser_info,
-    user_info,
-    admin_info,
-    anon_info,
+    superuser,
+    userowner,
+    user,
+    admin,
+    policy_officer,
+    initiative_owner,
+    anon,
     funder_info,
 )
 from open_poen_api.models import Funder
@@ -13,7 +16,7 @@ from open_poen_api.managers import get_funder_manager
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (user_info, 403), (admin_info, 200), (anon_info, 403)],
+    [(superuser, 200), (user, 403), (admin, 200), (anon, 403)],
     ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
@@ -31,7 +34,7 @@ async def test_create_funder(async_client, dummy_session, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 204), (user_info, 403), (admin_info, 204), (anon_info, 403)],
+    [(superuser, 204), (user, 403), (admin, 204), (anon, 403)],
     ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
@@ -48,9 +51,9 @@ async def test_delete_funder(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
-        (superuser_info, {"name": "Another Name"}, 200),
-        (user_info, {"name": "Another Name"}, 403),
-        (superuser_info, {"name": "EcoFuture Fund"}, 400),
+        (superuser, {"name": "Another Name"}, 200),
+        (user, {"name": "Another Name"}, 403),
+        (superuser, {"name": "EcoFuture Fund"}, 400),
     ],
     ids=["Superuser can", "User cannot", "Duplicate name fails"],
     indirect=["get_mock_user"],
@@ -68,7 +71,7 @@ async def test_patch_funder(async_client, dummy_session, body, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (anon_info, 200)],
+    [(superuser, 200), (anon, 200)],
     ids=["Superuser sees everything", "Anon sees everything"],
     indirect=["get_mock_user"],
 )
@@ -81,7 +84,7 @@ async def test_get_funders_list(async_client, dummy_session, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 200), (anon_info, 200)],
+    [(superuser, 200), (anon, 200)],
     ids=["Superuser can", "Anon can"],
     indirect=["get_mock_user"],
 )

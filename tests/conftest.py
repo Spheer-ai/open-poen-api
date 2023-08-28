@@ -32,28 +32,13 @@ from open_poen_api.schemas import (
 import json
 
 
-superuser_info = {
-    "obj_id": 42,
-    "role": UserRole.USER,
-    "email": "test@example.com",
-    "is_active": True,
-    "is_superuser": True,
-    "is_verified": True,
-    "return_none": False,
-}
-userowner_info = superuser_info.copy()
-userowner_info.update({"obj_id": 1})
-userowner_info.update({"is_superuser": False})
-user_info = userowner_info.copy()
-user_info.update({"obj_id": 42})
-admin_info = user_info.copy()
-admin_info.update({"role": "administrator"})
-policy_officer_info = user_info.copy()
-policy_officer_info.update({"obj_id": 11})
-initiative_owner_info = user_info.copy()
-initiative_owner_info.update({"obj_id": 12})
-anon_info = user_info.copy()
-anon_info.update({"return_none": True})
+superuser = 6
+userowner = 1
+user = 7
+admin = 5
+policy_officer = 11
+initiative_owner = 12
+anon = None
 
 initiative_info = {
     "name": "Piets Buurtbarbeque",
@@ -122,36 +107,6 @@ async def retrieve_token_from_last_sent_email():
 
 
 @pytest_asyncio.fixture
-async def get_mock_user(request):
-    user_info = request.param
-    if user_info["return_none"]:
-        val = None
-    else:
-        val = User(
-            id=user_info["obj_id"],
-            role=user_info["role"],
-            email=user_info["email"],
-            is_active=user_info["is_active"],
-            is_superuser=user_info["is_superuser"],
-            is_verified=user_info["is_verified"],
-        )
-
-    async def func():
-        return val
-
-    return func
-
-
-@pytest_asyncio.fixture
-async def overridden_app(get_mock_user):
-    app.dependency_overrides[superuser_dep] = get_mock_user
-    app.dependency_overrides[required_login_dep] = get_mock_user
-    app.dependency_overrides[optional_login_dep] = get_mock_user
-    yield app
-    app.dependency_overrides = {}
-
-
-@pytest_asyncio.fixture
 async def async_client(event_loop, overridden_app):
     async with AsyncClient(
         app=overridden_app, base_url="http://localhost:8000"
@@ -184,6 +139,15 @@ def load_json(json_file_path):
     with open(json_file_path, "r") as file:
         data = json.load(file)
     return data
+
+
+@pytest_asyncio.fixture
+async def overridden_app(get_mock_user):
+    app.dependency_overrides[superuser_dep] = get_mock_user
+    app.dependency_overrides[required_login_dep] = get_mock_user
+    app.dependency_overrides[optional_login_dep] = get_mock_user
+    yield app
+    app.dependency_overrides = {}
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -233,6 +197,21 @@ async def dummy_session(async_session):
     await initiative_manager.make_users_owner(initiative, user_ids=[12])
 
     return async_session
+
+
+@pytest_asyncio.fixture
+async def get_mock_user(request, dummy_session):
+    if request.param is None:
+        return lambda: None
+
+    user_db = await get_user_db(dummy_session).__anext__()
+    user_manager = await m.get_user_manager(user_db, dummy_session).__anext__()
+    user_instance = await user_manager.detail_load(request.param)
+
+    async def func():
+        return user_instance
+
+    return func
 
 
 @pytest_asyncio.fixture(scope="function")
