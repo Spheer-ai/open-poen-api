@@ -38,6 +38,7 @@ user = 7
 admin = 5
 policy_officer = 11
 initiative_owner = 12
+activity_owner = 13
 anon = None
 
 initiative_info = {
@@ -59,6 +60,7 @@ activity_info = {
     "description": "Een fantastische picnic in het park.",
     "purpose": "Bevorderen buurtgevoel.",
     "target_audience": "Mensen uit buurt De Florijn",
+    "budget": 100.00,
 }
 
 funder_info = {
@@ -193,8 +195,12 @@ async def dummy_session(async_session):
     await regulation_manager.make_users_officer(
         regulation, user_ids=[11], regulation_role=RegulationRole.POLICY_OFFICER
     )
+
     initiative = await initiative_manager.min_load(1)
     await initiative_manager.make_users_owner(initiative, user_ids=[12])
+
+    activity = await activity_manager.min_load(1, 1)
+    await activity_manager.make_users_owner(activity, user_ids=[13])
 
     return async_session
 

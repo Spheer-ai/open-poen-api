@@ -518,6 +518,7 @@ async def update_activity(
 ):
     activity_db = await activity_manager.min_load(initiative_id, activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
+    auth.authorize_input_fields(required_user, "edit", activity_db, activity)
     edited_activity = await activity_manager.update(
         activity, activity_db, request=request
     )
@@ -540,7 +541,7 @@ async def link_activity_owners(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(initiative_id, activity_id)
-    auth.authorize(required_user, "edit", activity_db, oso)
+    auth.authorize(required_user, "link_owners", activity_db, oso)
     activity_db = await activity_manager.make_users_owner(
         activity_db, activity.user_ids, request=request
     )
