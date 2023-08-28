@@ -555,6 +555,7 @@ class BankAccount(Base):
         back_populates="bank_accounts",
         lazy="noload",
         secondary=requisition_bankaccount,
+        cascade="all, delete-orphan",
     )
 
     user_roles: Mapped[list[UserBankAccountRole]] = relationship(
@@ -562,6 +563,7 @@ class BankAccount(Base):
         lazy="noload",
         primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
         overlaps="owner_role, bank_account",
+        cascade="all, delete-orphan",
     )
     users: AssociationProxy[list[User]] = association_proxy("user_roles", "user")
 
@@ -571,6 +573,7 @@ class BankAccount(Base):
         primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
         uselist=False,
         overlaps="user_roles, bank_account",
+        cascade="all, delete-orphan",
     )
     owner: AssociationProxy[User] = association_proxy("owner_role", "user")
 

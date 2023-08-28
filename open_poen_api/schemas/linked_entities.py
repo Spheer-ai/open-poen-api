@@ -5,6 +5,7 @@ from .funder import FunderRead
 from .regulation import RegulationRead
 from .debit_card import DebitCardRead
 from .grant import GrantRead
+from .bank_account import BankAccountRead
 from pydantic import validator
 
 
@@ -54,3 +55,8 @@ class RegulationReadLinked(RegulationRead):
 class GrantReadLinked(GrantRead):
     regulation: RegulationRead
     initiatives: list[InitiativeRead]
+
+
+class BankAccountReadLinked(BankAccountRead):
+    users: list[UserRead]
+    owner: UserRead

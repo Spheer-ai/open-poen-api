@@ -360,6 +360,84 @@ async def gocardless_callback(
     return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
 
 
+@user_router.get(
+    "/user/{user_id}/bank_account/{bank_account_id}",
+    response_model=s.BankAccountReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_bank_account(
+    user_id: int,
+    bank_account_id: int,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "read", bank_account_db, oso)
+    return auth.get_authorized_output_fields(
+        required_user, "read", bank_account_db, oso
+    )
+
+
+@user_router.delete("/user/{user_id}/bank_account/{bank_account_id}")
+async def delete_bank_account(
+    user_id: int,
+    bank_account_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "delete", bank_account_db, oso)
+    await bank_account_manager.delete(bank_account_db, request=request)
+    return Response(status_code=204)
+
+
+@user_router.patch(
+    "/user/{user_id}/bank_account/{bank_account_id}/users",
+    response_model=s.UserReadList,
+)
+async def link_bank_account_users(
+    user_id: int,
+    bank_account_id: int,
+    bank_account: s.BankAccountUsersUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "link_users", bank_account_db, oso)
+    bank_account_db = await bank_account_manager.make_users_user(
+        bank_account_db, bank_account.user_ids, request=request
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await bank_account_manager.session.refresh(bank_account_db)
+    filtered_bank_account_users = [
+        auth.get_authorized_output_fields(
+            required_user, "read", i, oso, ent.User.REL_FIELDS
+        )
+        for i in bank_account_db.users
+    ]
+    return s.UserReadList(users=filtered_bank_account_users)
+
+
+@user_router.delete("/user/{user_id}/requisition/{requisition_id}")
+async def delete_requisition(
+    user_id: int,
+    requisition_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    requisition_manager: m.RequisitionManager = Depends(m.get_requisition_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    requisition_db = await requisition_manager.min_load(requisition_id)
+    auth.authorize(required_user, "delete", requisition_db, oso)
+    await requisition_manager.delete(requisition_db, request=request)
+    return Response(status_code=204)
+
+
 @initiative_router.get(
     "/initiative/{initiative_id}",
     response_model=s.InitiativeReadLinked,
