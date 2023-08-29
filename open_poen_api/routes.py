@@ -7,6 +7,7 @@ from fastapi import (
     BackgroundTasks,
     Query,
 )
+from typing import Optional
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
@@ -23,6 +24,7 @@ from .bng import get_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select, and_
 from requests import RequestException
 from datetime import datetime, timedelta, date
@@ -43,11 +45,26 @@ user_router = APIRouter(tags=["user"])
 initiative_router = APIRouter(tags=["initiative"])
 funder_router = APIRouter(tags=["funder"])
 
+
+def with_joins(original_dependency):
+    async def _user_with_extra_joins(
+        user=Depends(original_dependency),
+        user_manager: m.UserManager = Depends(m.get_user_manager),
+    ):
+        if user is None:
+            return None
+
+        detail_user = await user_manager.detail_load(user.id)
+        return detail_user
+
+    return _user_with_extra_joins
+
+
 # We define dependencies this way because we can otherwise not override them
 # easily during testing.
-superuser_dep = m.fastapi_users.current_user(superuser=True)
-required_login_dep = m.fastapi_users.current_user(optional=False)
-optional_login_dep = m.fastapi_users.current_user(optional=True)
+superuser_dep = with_joins(m.fastapi_users.current_user(superuser=True))
+required_login_dep = with_joins(m.fastapi_users.current_user(optional=False))
+optional_login_dep = with_joins(m.fastapi_users.current_user(optional=True))
 
 
 @user_router.post("/user", response_model=s.UserRead)
@@ -258,6 +275,8 @@ async def bng_callback(
 async def gocardless_initiatite(
     user_id: int,
     institution_id: str = Depends(s.validate_institution_id),
+    n_days_access: int = Depends(s.validate_n_days_access),
+    n_days_history: int = Depends(s.validate_n_days_history),
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
     user_manager: m.UserManager = Depends(m.get_user_manager),
@@ -282,7 +301,8 @@ async def gocardless_initiatite(
         redirect_uri=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/gocardless-callback",
         institution_id=institution_id,
         reference_id=token,
-        max_historical_days=INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS[institution_id],
+        max_historical_days=n_days_history,
+        access_valid_for_days=n_days_access,
     )
 
     requisition_db = ent.Requisition(
@@ -291,6 +311,8 @@ async def gocardless_initiatite(
         api_requisition_id=init.requisition_id,
         reference_id=reference_id,
         status=ent.ReqStatus.CREATED,
+        n_days_history=n_days_history,
+        n_days_access=n_days_access,
     )
     session.add(requisition_db)
     await session.commit()
@@ -338,9 +360,94 @@ async def gocardless_callback(
     await session.commit()
 
     background_tasks.add_task(
-        get_gocardless_payments, requisition.id, datetime.today() - timedelta(days=365)
+        get_gocardless_payments,
+        requisition.id,
+        datetime.today() - timedelta(days=requisition.n_days_history + 1),
     )
-    return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
+    return RedirectResponse(url=os.environ["SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"])
+
+
+@user_router.get(
+    "/user/{user_id}/bank_account/{bank_account_id}",
+    response_model=s.BankAccountReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_bank_account(
+    user_id: int,
+    bank_account_id: int,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "read", bank_account_db, oso)
+    return auth.get_authorized_output_fields(
+        required_user, "read", bank_account_db, oso
+    )
+
+
+@user_router.patch(
+    "/user/{user_id}/bank_account/{bank_account_id}",
+    response_model=s.BankAccountRead,
+)
+async def finish_bank_account(
+    user_id: int,
+    bank_account_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "finish", bank_account_db, oso)
+    bank_account_db = await bank_account_manager.finish(
+        bank_account_db, request=request
+    )
+    return bank_account_db
+
+
+@user_router.delete("/user/{user_id}/bank_account/{bank_account_id}")
+async def delete_bank_account(
+    user_id: int,
+    bank_account_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "delete", bank_account_db, oso)
+    await bank_account_manager.delete(bank_account_db, request=request)
+    return Response(status_code=204)
+
+
+@user_router.patch(
+    "/user/{user_id}/bank_account/{bank_account_id}/users",
+    response_model=s.UserReadList,
+)
+async def link_bank_account_users(
+    user_id: int,
+    bank_account_id: int,
+    bank_account: s.BankAccountUsersUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "link_users", bank_account_db, oso)
+    bank_account_db = await bank_account_manager.make_users_user(
+        bank_account_db, bank_account.user_ids, request=request
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await bank_account_manager.session.refresh(bank_account_db)
+    filtered_bank_account_users = [
+        auth.get_authorized_output_fields(
+            required_user, "read", i, oso, ent.User.REL_FIELDS
+        )
+        for i in bank_account_db.users
+    ]
+    return s.UserReadList(users=filtered_bank_account_users)
 
 
 @initiative_router.get(
@@ -439,6 +546,8 @@ async def get_initiatives(
     q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
     initiatives_result = await async_session.execute(q)
     initiatives_scalar = initiatives_result.scalars().all()
+    # TODO: This part is resulting in a lot of extra separate queries for authorization.
+    # Check if this goes away if we join load the neccessary relationships.
     filtered_initiatives = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in initiatives_scalar
@@ -499,6 +608,7 @@ async def update_activity(
 ):
     activity_db = await activity_manager.min_load(initiative_id, activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
+    auth.authorize_input_fields(required_user, "edit", activity_db, activity)
     edited_activity = await activity_manager.update(
         activity, activity_db, request=request
     )
@@ -521,7 +631,7 @@ async def link_activity_owners(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(initiative_id, activity_id)
-    auth.authorize(required_user, "edit", activity_db, oso)
+    auth.authorize(required_user, "link_owners", activity_db, oso)
     activity_db = await activity_manager.make_users_owner(
         activity_db, activity.user_ids, request=request
     )
@@ -863,7 +973,8 @@ async def update_grant(
 
 @funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
-    response_model=s.UserRead | None,
+    response_model=s.UserRead,
+    responses={204: {"description": "Grant overseer is removed"}},
 )
 async def link_overseer(
     funder_id: int,
@@ -882,13 +993,12 @@ async def link_overseer(
     )
     # Important for up to date relations. Has to be in this async context.
     await grant_manager.session.refresh(grant_db)
-    return (
-        auth.get_authorized_output_fields(
+    if grant_db.overseer is not None:
+        return auth.get_authorized_output_fields(
             required_user, "read", grant_db.overseer, oso, ent.User.REL_FIELDS
         )
-        if grant_db.overseer is not None
-        else None
-    )
+    else:
+        return Response(status_code=204)
 
 
 @funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")

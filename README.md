@@ -43,7 +43,7 @@ set token (http --form POST ":8000/auth/jwt/login" username=mark@groningen.nl pa
 
 Initiate Gocardless.
 ```
-http GET ":8000/users/1/gocardless-initiate?institution_id=ING_INGBNL2A" "Authorization: Bearer $token"
+http GET ":8000/users/1/gocardless-initiate?institution_id=ING_INGBNL2A&n_days_access=7&n_days_history=14" "Authorization: Bearer $token"
 ```
 
 Create a new user (Loeki) with role 'administrator":

@@ -22,6 +22,7 @@ EXCLUDED_STATUSES = [
     ent.ReqStatus.SUSPENDED,
     ent.ReqStatus.EXPIRED,
     ent.ReqStatus.CONFLICTED,
+    ent.ReqStatus.REVOKED,
 ]
 
 

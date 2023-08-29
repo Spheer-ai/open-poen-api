@@ -1,12 +1,12 @@
 import pytest
 from tests.conftest import (
-    superuser_info,
-    initiative_owner_info,
-    user_info,
-    admin_info,
-    anon_info,
+    superuser,
+    initiative_owner,
+    user,
+    admin,
+    anon,
     initiative_info,
-    policy_officer_info,
+    policy_officer,
 )
 from open_poen_api.models import Initiative
 from open_poen_api.managers import get_initiative_manager
@@ -16,11 +16,11 @@ from open_poen_api.managers import get_initiative_manager
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
-        (superuser_info, 200),
-        (user_info, 403),
-        (admin_info, 200),
-        (anon_info, 403),
-        (policy_officer_info, 200),
+        (superuser, 200),
+        (user, 403),
+        (admin, 200),
+        (anon, 403),
+        (policy_officer, 200),
     ],
     ids=[
         "Superuser can",
@@ -50,11 +50,11 @@ async def test_create_initiative(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
-        (superuser_info, 204),
-        (user_info, 403),
-        (admin_info, 204),
-        (anon_info, 403),
-        (policy_officer_info, 204),
+        (superuser, 204),
+        (user, 403),
+        (admin, 204),
+        (anon, 403),
+        (policy_officer, 204),
     ],
     ids=[
         "Superuser can",
@@ -78,11 +78,11 @@ async def test_delete_initiative(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
-        (superuser_info, 200),
-        (user_info, 403),
-        (admin_info, 200),
-        (anon_info, 403),
-        (policy_officer_info, 200),
+        (superuser, 200),
+        (user, 403),
+        (admin, 200),
+        (anon, 403),
+        (policy_officer, 200),
     ],
     ids=[
         "Superuser can",
@@ -111,11 +111,11 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
-        (superuser_info, 200),
-        (user_info, 403),
-        (admin_info, 200),
-        (anon_info, 403),
-        (policy_officer_info, 403),
+        (superuser, 200),
+        (user, 403),
+        (admin, 200),
+        (anon, 403),
+        (policy_officer, 403),
     ],
     ids=[
         "Superuser can",
@@ -144,15 +144,15 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
-        (superuser_info, {"location": "Groningen"}, 200),
-        (policy_officer_info, {"location": "Groningen"}, 200),
-        (initiative_owner_info, {"location": "Groningen"}, 403),
-        (user_info, {"location": "Groningen"}, 403),
-        (superuser_info, {"hidden": True}, 200),
-        (policy_officer_info, {"hidden": True}, 200),
-        (initiative_owner_info, {"hidden": True}, 403),
-        (user_info, {"hidden": True}, 403),
-        (superuser_info, {"name": "Community Health Initiative"}, 400),
+        (superuser, {"location": "Groningen"}, 200),
+        (policy_officer, {"location": "Groningen"}, 200),
+        (initiative_owner, {"location": "Groningen"}, 403),
+        (user, {"location": "Groningen"}, 403),
+        (superuser, {"hidden": True}, 200),
+        (policy_officer, {"hidden": True}, 200),
+        (initiative_owner, {"hidden": True}, 403),
+        (user, {"hidden": True}, 403),
+        (superuser, {"name": "Community Health Initiative"}, 400),
     ],
     ids=[
         "Superuser edits loc",
@@ -181,14 +181,16 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, result_length, status_code",
     [
-        (superuser_info, 24, 200),
-        (policy_officer_info, 23, 200),
-        (initiative_owner_info, 22, 200),
-        (user_info, 21, 200),
-        (anon_info, 21, 200),
+        (superuser, 24, 200),
+        (admin, 24, 200),
+        (policy_officer, 23, 200),
+        (initiative_owner, 22, 200),
+        (user, 21, 200),
+        (anon, 21, 200),
     ],
     ids=[
         "Superuser sees everything",
+        "Administrator sees everything",
         "Policy officer sees own hidden initiatives",
         "initiative_owner sees own hidden initiative",
         "User sees non hidden",
@@ -212,11 +214,11 @@ async def test_get_initiatives_list(
 @pytest.mark.parametrize(
     "get_mock_user, field, present, status_code",
     [
-        (superuser_info, "address_applicant", True, 200),
-        (policy_officer_info, "address_applicant", True, 200),
-        (initiative_owner_info, "address_applicant", True, 200),
-        (user_info, "address_applicant", False, 200),
-        (anon_info, "address_applicant", False, 200),
+        (superuser, "address_applicant", True, 200),
+        (policy_officer, "address_applicant", True, 200),
+        (initiative_owner, "address_applicant", True, 200),
+        (user, "address_applicant", False, 200),
+        (anon, "address_applicant", False, 200),
     ],
     ids=[
         "Superuser can see address",

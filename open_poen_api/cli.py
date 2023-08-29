@@ -57,6 +57,14 @@ def list_agreements(limit: int = 100, offset: int = 0):
 
 
 @app.command()
+def delete_all_agreements(limit: int = 100, offset: int = 0):
+    asyncio.run(refresh_tokens())
+    agreements = client.agreement.get_agreements(limit, offset)
+    for a in agreements["results"]:
+        client.agreement.delete_agreement(a["id"])
+
+
+@app.command()
 def list_requisitions(limit: int = 100, offset: int = 0):
     asyncio.run(refresh_tokens())
     requisitions = client.requisition.get_requisitions(limit, offset)

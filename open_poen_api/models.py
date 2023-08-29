@@ -17,7 +17,7 @@ from sqlalchemy_utils import ChoiceType
 
 # from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func, case
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -32,14 +32,27 @@ from decimal import Decimal
 from sqlalchemy.dialects import postgresql as pg
 import uuid
 from sqlalchemy.ext.asyncio import AsyncAttrs
+from sqlalchemy_utils import aggregated
+
+
+class TimeStampMixin:
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
 
 
 class Base(DeclarativeBase):
     PROXIES: list[str] = []
 
 
-requisition_bankaccount = Table(
-    "requisition_bankaccount",
+requisition_bank_account = Table(
+    "requisition_bank_account",
     Base.metadata,
     Column("requisition_id", Integer, ForeignKey("requisition.id"), primary_key=True),
     Column("bank_account_id", Integer, ForeignKey("bank_account.id"), primary_key=True),
@@ -129,8 +142,12 @@ class UserGrantRole(Base):
         Integer, ForeignKey("grant.id", ondelete="CASCADE"), primary_key=True
     )
 
-    user: Mapped["User"] = relationship("User", uselist=False)
-    grant: Mapped["Grant"] = relationship("Grant", uselist=False)
+    user: Mapped["User"] = relationship(
+        "User", uselist=False, back_populates="overseer_roles"
+    )
+    grant: Mapped["Grant"] = relationship(
+        "Grant", uselist=False, back_populates="overseer_role"
+    )
 
 
 class UserRole(str, Enum):
@@ -232,6 +249,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
 
     overseer_roles: Mapped[list[UserGrantRole]] = relationship(
         "UserGrantRole",
+        back_populates="user",
         lazy="noload",
         cascade="all",
     )
@@ -501,12 +519,15 @@ class ReqStatus(str, Enum):
     LINKED = "LN"
     SUSPENDED = "SU"
     EXPIRED = "EX"
-    # Defined by us, not Gocardless. Indicates that the requisition was done for a bank
-    # account that was requisitioned earlier by another user.
+    # Defined by us, not Gocardless.
+    # Indicates that the requisition was done for a bank account that was requisitioned
+    # earlier by another user.
     CONFLICTED = "CO"
+    # Indicates that the user revoked his bank account.
+    REVOKED = "RV"
 
 
-class Requisition(Base):
+class Requisition(Base, TimeStampMixin):
     __tablename__ = "requisition"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -519,6 +540,8 @@ class Requisition(Base):
     status: Mapped[ReqStatus] = mapped_column(
         ChoiceType(ReqStatus, impl=VARCHAR(length=32))
     )
+    n_days_history: Mapped[int] = mapped_column(Integer, nullable=False)
+    n_days_access: Mapped[int] = mapped_column(Integer, nullable=False)
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=False
@@ -531,7 +554,7 @@ class Requisition(Base):
         "BankAccount",
         back_populates="requisitions",
         lazy="noload",
-        secondary=requisition_bankaccount,
+        secondary=requisition_bank_account,
     )
 
 
@@ -545,11 +568,20 @@ class BankAccount(Base):
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+    linked_requisitions: Mapped[int] = mapped_column(Integer, nullable=True)
+
+    @aggregated("requisitions", column="linked_requisitions")
+    def _set_linked_requisitions(self):
+        return func.coalesce(
+            func.sum(case((Requisition.status == ReqStatus.LINKED.value, 1), else_=0)),
+            0,
+        )
+
     requisitions: Mapped[list[Requisition]] = relationship(
         "Requisition",
         back_populates="bank_accounts",
         lazy="noload",
-        secondary=requisition_bankaccount,
+        secondary=requisition_bank_account,
     )
 
     user_roles: Mapped[list[UserBankAccountRole]] = relationship(
@@ -557,6 +589,7 @@ class BankAccount(Base):
         lazy="noload",
         primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
         overlaps="owner_role, bank_account",
+        cascade="all, delete-orphan",
     )
     users: AssociationProxy[list[User]] = association_proxy("user_roles", "user")
 
@@ -566,6 +599,7 @@ class BankAccount(Base):
         primaryjoin=f"and_(BankAccount.id==UserBankAccountRole.bank_account_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
         uselist=False,
         overlaps="user_roles, bank_account",
+        cascade="all, delete-orphan",
     )
     owner: AssociationProxy[User] = association_proxy("owner_role", "user")
 
@@ -642,7 +676,11 @@ class Grant(Base):
         "Initiative", back_populates="grant", lazy="noload", cascade="all"
     )
     overseer_role: Mapped[Optional[UserGrantRole]] = relationship(
-        "UserGrantRole", lazy="noload", cascade="all", uselist=False
+        "UserGrantRole",
+        lazy="noload",
+        cascade="all",
+        uselist=False,
+        back_populates="grant",
     )
     overseer: AssociationProxy[Optional[User]] = association_proxy(
         "overseer_role", "user"

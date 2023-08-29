@@ -142,5 +142,17 @@
         "is_verified": true,
         "hidden": false,
         "password": "initiative-owner1password"
+    },
+    {
+        "email": "activity-owner1@example.com",
+        "first_name": "Alex",
+        "last_name": "Johnson",
+        "biography": "I'm an activity owner.",
+        "role": "user",
+        "is_active": true,
+        "is_superuser": false,
+        "is_verified": true,
+        "hidden": false,
+        "password": "activity-owner1password"
     }
 ]

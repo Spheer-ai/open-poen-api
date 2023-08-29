@@ -21,6 +21,12 @@ OSO.register_class(
         "is_superuser": bool,
         "role": str,
         "hidden": bool,
+        "initiative_roles": Relation(
+            kind="many",
+            other_type="UserInitiativeRole",
+            my_field="id",
+            other_field="user_id",
+        ),
     },
 )
 OSO.register_class(
@@ -32,6 +38,31 @@ OSO.register_class(
             my_field="initiative_id",
             other_field="id",
         )
+    },
+)
+OSO.register_class(
+    ent.UserActivityRole,
+    fields={
+        "activity": Relation(
+            kind="one",
+            other_type="Activity",
+            my_field="activity_id",
+            other_field="id",
+        )
+    },
+)
+OSO.register_class(
+    ent.UserRegulationRole,
+    fields={
+        "regulation": Relation(
+            kind="one",
+            other_type="Regulation",
+            my_field="regulation_id",
+            other_field="id",
+        ),
+        "user_id": int,
+        "regulation_id": int,
+        "role": str,
     },
 )
 OSO.register_class(
@@ -50,17 +81,6 @@ OSO.register_class(
             my_field="grant_id",
             other_field="id",
         ),
-    },
-)
-OSO.register_class(
-    ent.UserActivityRole,
-    fields={
-        "activity": Relation(
-            kind="one",
-            other_type="Activity",
-            my_field="activity_id",
-            other_field="id",
-        )
     },
 )
 OSO.register_class(
@@ -94,21 +114,9 @@ OSO.register_class(
 )
 OSO.register_class(ent.Funder)
 OSO.register_class(
-    ent.UserRegulationRole,
-    fields={
-        "regulation": Relation(
-            kind="one",
-            other_type="Regulation",
-            my_field="regulation_id",
-            other_field="id",
-        ),
-        "user_id": int,
-    },
-)
-OSO.register_class(
     ent.Regulation,
     fields={
-        "policy_officer_roles": Relation(
+        "policy_roles": Relation(
             kind="many",
             other_type="UserRegulationRole",
             my_field="id",
