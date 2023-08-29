@@ -27,9 +27,7 @@ class BankAccountManager(Manager):
         self.client = client
         super().__init__(session)
 
-    async def delete(self, bank_account: BankAccount, request: Request | None) -> None:
-        # Delete all payments of this bank account that have not been assigned to an
-        # initiative yet.
+    async def finish(self, bank_account: BankAccount, request: Request | None):
         await self.session.execute(
             delete(Payment).where(
                 and_(
@@ -48,6 +46,24 @@ class BankAccountManager(Manager):
             self.session.add(req)
 
         await self.session.commit()
+        await self.session.refresh(bank_account)
+        return bank_account
+
+    async def delete(self, bank_account: BankAccount, request: Request | None):
+        await self.session.execute(
+            delete(Payment).where(Payment.bank_account_id == bank_account.id)
+        )
+
+        for req in bank_account.requisitions:
+            api_req = await self._get_requisition_in_thread(req.api_requisition_id)
+            for api_user_agreement_id in api_req.agreements:
+                await self._delete_user_agreement_in_thread(api_user_agreement_id)
+            await self._delete_requisition_in_thread(req.api_requisition_id)
+            req.status = ReqStatus.REVOKED
+            self.session.add(req)
+
+        await self.session.commit()
+        await self.base_delete(bank_account, request=request)
 
     async def _delete_requisition_in_thread(self, api_requisition_id):
         loop = asyncio.get_running_loop()

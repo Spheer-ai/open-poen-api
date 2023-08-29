@@ -5,5 +5,4 @@ from .funder_manager import FunderManager, get_funder_manager
 from .regulation_manager import RegulationManager, get_regulation_manager
 from .grant_manager import GrantManager, get_grant_manager
 from .bank_account_manager import BankAccountManager, get_bank_account_manager
-from .requisition_manager import RequisitionManager, get_requisition_manager
 from .exc import CustomException, EntityAlreadyExists, EntityNotFound

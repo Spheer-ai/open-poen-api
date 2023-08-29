@@ -380,6 +380,26 @@ async def get_bank_account(
     )
 
 
+@user_router.patch(
+    "/user/{user_id}/bank_account/{bank_account_id}",
+    response_model=s.BankAccountRead,
+)
+async def finish_bank_account(
+    user_id: int,
+    bank_account_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    bank_account_db = await bank_account_manager.detail_load(bank_account_id)
+    auth.authorize(required_user, "finish", bank_account_db, oso)
+    bank_account_db = await bank_account_manager.finish(
+        bank_account_db, request=request
+    )
+    return bank_account_db
+
+
 @user_router.delete("/user/{user_id}/bank_account/{bank_account_id}")
 async def delete_bank_account(
     user_id: int,
@@ -422,21 +442,6 @@ async def link_bank_account_users(
         for i in bank_account_db.users
     ]
     return s.UserReadList(users=filtered_bank_account_users)
-
-
-@user_router.delete("/user/{user_id}/requisition/{requisition_id}")
-async def delete_requisition(
-    user_id: int,
-    requisition_id: int,
-    request: Request,
-    required_user=Depends(required_login_dep),
-    requisition_manager: m.RequisitionManager = Depends(m.get_requisition_manager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    requisition_db = await requisition_manager.min_load(requisition_id)
-    auth.authorize(required_user, "delete", requisition_db, oso)
-    await requisition_manager.delete(requisition_db, request=request)
-    return Response(status_code=204)
 
 
 @initiative_router.get(
