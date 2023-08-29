@@ -35,12 +35,24 @@ from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy_utils import aggregated
 
 
+class TimeStampMixin:
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
 class Base(DeclarativeBase):
     PROXIES: list[str] = []
 
 
-requisition_bankaccount = Table(
-    "requisition_bankaccount",
+requisition_bank_account = Table(
+    "requisition_bank_account",
     Base.metadata,
     Column("requisition_id", Integer, ForeignKey("requisition.id"), primary_key=True),
     Column("bank_account_id", Integer, ForeignKey("bank_account.id"), primary_key=True),
@@ -515,7 +527,7 @@ class ReqStatus(str, Enum):
     REVOKED = "RV"
 
 
-class Requisition(Base):
+class Requisition(Base, TimeStampMixin):
     __tablename__ = "requisition"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -528,6 +540,8 @@ class Requisition(Base):
     status: Mapped[ReqStatus] = mapped_column(
         ChoiceType(ReqStatus, impl=VARCHAR(length=32))
     )
+    n_days_history: Mapped[int] = mapped_column(Integer, nullable=False)
+    n_days_access: Mapped[int] = mapped_column(Integer, nullable=False)
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=False
@@ -540,7 +554,7 @@ class Requisition(Base):
         "BankAccount",
         back_populates="requisitions",
         lazy="noload",
-        secondary=requisition_bankaccount,
+        secondary=requisition_bank_account,
     )
 
 
@@ -554,12 +568,12 @@ class BankAccount(Base):
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    linked_requisitions: Mapped[int] = mapped_column(Integer)
+    linked_requisitions: Mapped[int] = mapped_column(Integer, nullable=True)
 
     @aggregated("requisitions", column="linked_requisitions")
     def _set_linked_requisitions(self):
         return func.coalesce(
-            func.sum(case((Requisition.status == ReqStatus.LINKED.value, 0), else_=1)),
+            func.sum(case((Requisition.status == ReqStatus.LINKED.value, 1), else_=0)),
             0,
         )
 
@@ -567,7 +581,7 @@ class BankAccount(Base):
         "Requisition",
         back_populates="bank_accounts",
         lazy="noload",
-        secondary=requisition_bankaccount,
+        secondary=requisition_bank_account,
     )
 
     user_roles: Mapped[list[UserBankAccountRole]] = relationship(

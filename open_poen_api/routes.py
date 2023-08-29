@@ -275,6 +275,8 @@ async def bng_callback(
 async def gocardless_initiatite(
     user_id: int,
     institution_id: str = Depends(s.validate_institution_id),
+    n_days_access: int = Depends(s.validate_n_days_access),
+    n_days_history: int = Depends(s.validate_n_days_history),
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(required_login_dep),
     user_manager: m.UserManager = Depends(m.get_user_manager),
@@ -299,8 +301,8 @@ async def gocardless_initiatite(
         redirect_uri=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/gocardless-callback",
         institution_id=institution_id,
         reference_id=token,
-        # TODO: Make this configurable.
-        max_historical_days=INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS[institution_id],
+        max_historical_days=n_days_history,
+        access_valid_for_days=n_days_access,
     )
 
     requisition_db = ent.Requisition(
@@ -309,6 +311,8 @@ async def gocardless_initiatite(
         api_requisition_id=init.requisition_id,
         reference_id=reference_id,
         status=ent.ReqStatus.CREATED,
+        n_days_history=n_days_history,
+        n_days_access=n_days_access,
     )
     session.add(requisition_db)
     await session.commit()
@@ -356,9 +360,11 @@ async def gocardless_callback(
     await session.commit()
 
     background_tasks.add_task(
-        get_gocardless_payments, requisition.id, datetime.today() - timedelta(days=365)
+        get_gocardless_payments,
+        requisition.id,
+        datetime.today() - timedelta(days=requisition.n_days_history + 1),
     )
-    return RedirectResponse(url=os.environ.get("SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"))
+    return RedirectResponse(url=os.environ["SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"])
 
 
 @user_router.get(
