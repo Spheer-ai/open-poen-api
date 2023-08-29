@@ -17,7 +17,7 @@ from sqlalchemy_utils import ChoiceType
 
 # from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func, case
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -32,6 +32,7 @@ from decimal import Decimal
 from sqlalchemy.dialects import postgresql as pg
 import uuid
 from sqlalchemy.ext.asyncio import AsyncAttrs
+from sqlalchemy_utils import aggregated
 
 
 class Base(DeclarativeBase):
@@ -506,9 +507,12 @@ class ReqStatus(str, Enum):
     LINKED = "LN"
     SUSPENDED = "SU"
     EXPIRED = "EX"
-    # Defined by us, not Gocardless. Indicates that the requisition was done for a bank
-    # account that was requisitioned earlier by another user.
+    # Defined by us, not Gocardless.
+    # Indicates that the requisition was done for a bank account that was requisitioned
+    # earlier by another user.
     CONFLICTED = "CO"
+    # Indicates that the user revoked his bank account.
+    REVOKED = "RV"
 
 
 class Requisition(Base):
@@ -550,12 +554,20 @@ class BankAccount(Base):
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+    linked_requisitions: Mapped[int] = mapped_column(Integer)
+
+    @aggregated("requisitions", column="linked_requisitions")
+    def _set_linked_requisitions(self):
+        return func.coalesce(
+            func.sum(case((Requisition.status == ReqStatus.LINKED.value, 0), else_=1)),
+            0,
+        )
+
     requisitions: Mapped[list[Requisition]] = relationship(
         "Requisition",
         back_populates="bank_accounts",
         lazy="noload",
         secondary=requisition_bankaccount,
-        cascade="all, delete-orphan",
     )
 
     user_roles: Mapped[list[UserBankAccountRole]] = relationship(

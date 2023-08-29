@@ -2,7 +2,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
 from ..schemas import ActivityCreate, ActivityUpdate
-from ..models import BankAccount, Payment, UserBankAccountRole, User, BankAccountRole
+from ..models import (
+    BankAccount,
+    Payment,
+    UserBankAccountRole,
+    User,
+    BankAccountRole,
+    ReqStatus,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
@@ -11,17 +18,18 @@ from .exc import EntityAlreadyExists, EntityNotFound
 from .base_manager import Manager
 import asyncio
 from ..gocardless import client
+from nordigen import NordigenClient
+from nordigen.types import Requisition
 
 
 class BankAccountManager(Manager):
-    def __init__(self, session: AsyncSession, client):
+    def __init__(self, session: AsyncSession, client: NordigenClient):
         self.client = client
         super().__init__(session)
 
     async def delete(self, bank_account: BankAccount, request: Request | None) -> None:
         # Delete all payments of this bank account that have not been assigned to an
-        # initiative yet. (Payments assigned to an activity also have the initiative
-        # relationship).
+        # initiative yet.
         await self.session.execute(
             delete(Payment).where(
                 and_(
@@ -30,16 +38,33 @@ class BankAccountManager(Manager):
                 )
             )
         )
-        # Revoke all requisitions through the api for this bank account.
+
         for req in bank_account.requisitions:
+            api_req = await self._get_requisition_in_thread(req.api_requisition_id)
+            for api_user_agreement_id in api_req.agreements:
+                await self._delete_user_agreement_in_thread(api_user_agreement_id)
             await self._delete_requisition_in_thread(req.api_requisition_id)
-        # This will delete the requisitions through a cascade.
-        await self.base_delete(bank_account, request=request)
+            req.status = ReqStatus.REVOKED
+            self.session.add(req)
+
+        await self.session.commit()
 
     async def _delete_requisition_in_thread(self, api_requisition_id):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None, self.client.requisition.delete_requisition, api_requisition_id
+        )
+
+    async def _get_requisition_in_thread(self, api_requisition_id) -> Requisition:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, self.client.requisition.get_requisition_by_id, api_requisition_id
+        )
+
+    async def _delete_user_agreement_in_thread(self, api_user_agreement_id):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, self.client.agreement.delete_agreement, api_user_agreement_id
         )
 
     async def make_users_user(

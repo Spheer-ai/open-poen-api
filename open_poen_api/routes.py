@@ -299,6 +299,7 @@ async def gocardless_initiatite(
         redirect_uri=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/gocardless-callback",
         institution_id=institution_id,
         reference_id=token,
+        # TODO: Make this configurable.
         max_historical_days=INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS[institution_id],
     )
 

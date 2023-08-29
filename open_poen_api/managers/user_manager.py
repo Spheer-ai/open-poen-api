@@ -107,9 +107,6 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
                 selectinload(User.user_bank_account_roles).selectinload(
                     UserBankAccountRole.bank_account
                 ),
-                selectinload(User.user_bank_account_roles).selectinload(
-                    UserBankAccountRole.bank_account
-                ),
                 selectinload(User.owner_bank_account_role).selectinload(
                     UserBankAccountRole.bank_account
                 ),
