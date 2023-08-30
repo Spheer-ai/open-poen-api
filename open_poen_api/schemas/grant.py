@@ -30,7 +30,7 @@ class GrantOverseerUpdate(BaseModel):
 
 
 class GrantUpdate(NotNullValidatorMixin):
-    NOT_NULL_FIELDS = ["name", "reference", "budget"]
+    NOT_NULL_FIELDS: list[str] = ["name", "reference", "budget"]
 
     name: str | None
     reference: str | None

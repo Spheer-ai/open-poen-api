@@ -24,7 +24,7 @@ class FunderCreate(BaseModel):
 
 
 class FunderUpdate(NotNullValidatorMixin):
-    NOT_NULL_FIELDS = ["name", "url"]
+    NOT_NULL_FIELDS: list[str] = ["name", "url"]
 
     name: str | None
     url: HttpUrl | None

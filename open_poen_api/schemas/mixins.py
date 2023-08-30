@@ -10,28 +10,12 @@ def validate_iban(iban: str = Query(...)):
     return iban
 
 
-# class TimeStampMixin(BaseModel):
-#     created_at: datetime | None = Field(
-#         sa_column=Column(
-#             DateTime,
-#             default=datetime.utcnow,
-#             nullable=False,
-#         )
-#     )
-
-#     updated_at: datetime | None = Field(
-#         sa_column=Column(
-#             DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-#         )
-#     )
-
-
 class NotNullValidatorMixin(BaseModel):
     """This validator helps enforce the condition that certain fields cannot be set to `None`. This is useful
     in situations where you want to distinguish between a field being omitted from a request (which is allowed)
     and a field being explicitly set to `None` (which is not allowed)."""
 
-    NOT_NULL_FIELDS = []
+    NOT_NULL_FIELDS: list[str] = []
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -46,3 +30,8 @@ class Budget(ConstrainedDecimal):
     max_digits = 10
     decimal_places = 2
     gt = 0
+
+
+class TransactionAmount(ConstrainedDecimal):
+    max_digits = 10
+    decimal_places = 2

@@ -171,8 +171,9 @@ async def bng_initiate(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    existing_bng = await session.execute(select(ent.BNG))
-    if existing_bng.first():
+    existing_bng_q = await session.execute(select(ent.BNG))
+    existing_bng = existing_bng_q.scalars().first()
+    if existing_bng:
         raise HTTPException(
             status_code=400,
             detail=f"A BNG Account with IBAN {existing_bng.iban} is already linked.",
@@ -181,7 +182,7 @@ async def bng_initiate(
         consent_id, oauth_url = create_consent(
             iban=iban,
             valid_until=expires_on,
-            redirect_url=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/bng-callback",
+            redirect_url=f"https://{os.environ['DOMAIN_NAME']}/users/{user_id}/bng-callback",
             requester_ip=requester_ip,
         )
     except RequestException as e:
@@ -245,7 +246,7 @@ async def bng_callback(
     await session.commit()
     # TODO: On first import, import the entire history.
     # background_tasks.add_task(get_bng_payments, session)  # TODO
-    return RedirectResponse(url=os.environ.get("SPA_BNG_CALLBACK_REDIRECT_URL"))
+    return RedirectResponse(url=os.environ["SPA_BNG_CALLBACK_REDIRECT_URL"])
 
 
 # @user_router.delete("/users/{user_id}/bng-connection")
@@ -1164,6 +1165,20 @@ async def link_activity(
     # Important for up to date relations. Has to be in this async context.
     await payment_manager.session.refresh(payment_db)
     return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+
+@payment_router.delete("/payment/{payment_id}")
+async def delete_payment(
+    payment_id: int,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.min_load(payment_id)
+    auth.authorize(required_user, "delete", payment_db, oso)
+    await payment_manager.delete(payment_db, request=request)
+    return Response(status_code=204)
 
 
 @payment_router.get(

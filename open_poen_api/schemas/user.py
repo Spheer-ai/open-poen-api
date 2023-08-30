@@ -46,7 +46,7 @@ class UserCreateWithPassword(UserCreate):
 
 
 class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
-    NOT_NULL_FIELDS = [
+    NOT_NULL_FIELDS: list[str] = [
         "role",
         "password",
         "email",

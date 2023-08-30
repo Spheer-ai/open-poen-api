@@ -47,7 +47,7 @@ class InitiativeCreate(BaseModel):
 
 
 class InitiativeUpdate(NotNullValidatorMixin):
-    NOT_NULL_FIELDS = [
+    NOT_NULL_FIELDS: list[str] = [
         "name",
         "description",
         "purpose" "target_audience",

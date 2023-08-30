@@ -2,7 +2,7 @@ import json
 import uuid
 import requests
 from wsgiref.handlers import format_date_time
-from datetime import datetime
+from datetime import datetime, date
 from time import mktime
 import hashlib
 import base64
@@ -109,7 +109,7 @@ def make_headers(
 
 
 def create_consent(
-    iban: str, valid_until: datetime, redirect_url: str, requester_ip: str = ""
+    iban: str, valid_until: date, redirect_url: str, requester_ip: str = ""
 ) -> tuple[str, str]:
     body = {
         "access": {

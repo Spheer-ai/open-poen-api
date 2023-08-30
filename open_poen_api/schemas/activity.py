@@ -34,7 +34,7 @@ class ActivityCreate(BaseModel):
 
 
 class ActivityUpdate(NotNullValidatorMixin):
-    NOT_NULL_FIELDS = [
+    NOT_NULL_FIELDS: list[str] = [
         "name",
         "description",
         "purpose",
