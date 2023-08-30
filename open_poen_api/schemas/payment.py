@@ -54,12 +54,12 @@ class PaymentUpdate(BaseModel):
 
 
 class PaymentInitiativeUpdate(BaseModel):
-    initiative_id: int
+    initiative_id: int | None
 
 
 class PaymentActivityUpdate(BaseModel):
     initiative_id: int
-    activity_id: int
+    activity_id: int | None
 
 
 class PaymentReadList(BaseModel):
