@@ -27,6 +27,7 @@ class BankAccountManager(Manager):
         self.client = client
         super().__init__(session)
 
+    # TODO: Prevent blocking of event loop here.
     async def finish(self, bank_account: BankAccount, request: Request | None):
         await self.session.execute(
             delete(Payment).where(

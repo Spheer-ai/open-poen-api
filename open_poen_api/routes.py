@@ -42,8 +42,9 @@ import uuid
 
 
 user_router = APIRouter(tags=["user"])
-initiative_router = APIRouter(tags=["initiative"])
 funder_router = APIRouter(tags=["funder"])
+initiative_router = APIRouter(tags=["initiative"])
+payment_router = APIRouter(tags=["payment"])
 
 
 def with_joins(original_dependency):
@@ -966,7 +967,6 @@ async def update_grant(
     grant_db = await grant_manager.min_load(grant_id)
     auth.authorize(required_user, "edit", grant_db, oso)
     auth.authorize_input_fields(required_user, "edit", grant_db, grant)
-    # TODO: Pass id's for linking.
     edited_grant = await grant_manager.update(grant, grant_db, request=request)
     return auth.get_authorized_output_fields(required_user, "read", edited_grant, oso)
 
@@ -1064,14 +1064,127 @@ async def create_initiative(
     return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
 
-# ROUTES
-# POST "/initiative/{initiative_id}/activity/{activity_id}/payment",
-# PATCH "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}",
-# DELETE "/initiative/{initiative_id}/activity/{activity_id}/payment/{payment_id}",
-# GET "/initiative/{initiative_id}/activity/{activity_id}/payments"
-# GET "/initiatives/aggregate-numbers"
-# POST "/initiative/{initiative_id}/payment",
-# PATCH "/initiative/{initiative_id}/payment/{payment_id}",
-# DELETE "/initiative/{initiative_id}/payment/{payment_id}"
-# GET "/initiative/{initiative_id}/payments"
-# GET "/initiative/{initiative_id}/debit-cards/aggregate-numbers"
+@payment_router.post(
+    "/payment",
+    response_model=s.PaymentRead,
+)
+async def create_payment(
+    payment: s.PaymentCreate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    if payment.activity_id is not None:
+        activity_db = await activity_manager.min_load(
+            payment.initiative_id, payment.activity_id
+        )
+        auth.authorize(required_user, "create_payment", activity_db, oso)
+    else:
+        initiative_db = await initiative_manager.min_load(payment.initiative_id)
+        auth.authorize(required_user, "create_payment", initiative_db, oso)
+
+    payment_db = await payment_manager.create(
+        payment, payment.initiative_id, payment.activity_id, request=request
+    )
+    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+
+@payment_router.patch(
+    "/payment/{payment_id}",
+    response_model=s.PaymentRead,
+    response_model_exclude_unset=True,
+)
+async def update_payment(
+    payment_id: int,
+    payment: s.PaymentUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.min_load(payment_id)
+    auth.authorize(required_user, "edit", payment_db, oso)
+    auth.authorize_input_fields(required_user, "edit", payment_db, payment)
+    edited_payment = await payment_manager.update(payment, payment_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_payment, oso)
+
+
+@payment_router.patch(
+    "/payment/{payment_id}/initiative",
+    response_model=s.PaymentRead,
+)
+async def link_initiative(
+    payment_id: int,
+    payment: s.PaymentInitiativeUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
+    initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    initiative_db = await initiative_manager.detail_load(payment.initiative_id)
+    auth.authorize(required_user, "link_initiative", payment_db, oso)
+    auth.authorize(required_user, "link_payment", initiative_db, oso)
+    payment_db = await payment_manager.assign_payment_to_initiative(
+        payment_db,
+        payment.initiative_id,
+        request=request,
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await payment_manager.session.refresh(payment_db)
+    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+
+@payment_router.patch(
+    "/payment/{payment_id}/activity",
+    response_model=s.PaymentRead,
+)
+async def link_activity(
+    payment_id: int,
+    payment: s.PaymentActivityUpdate,
+    request: Request,
+    required_user=Depends(required_login_dep),
+    payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
+    activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    activity_db = await activity_manager.detail_load(
+        payment.initiative_id, payment.activity_id
+    )
+    auth.authorize(required_user, "link_activity", payment_db, oso)
+    auth.authorize(required_user, "link_payment", activity_db, oso)
+    payment_db = await payment_manager.assign_payment_to_activity(
+        payment_db, payment.activity_id, request=request
+    )
+    # Important for up to date relations. Has to be in this async context.
+    await payment_manager.session.refresh(payment_db)
+    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+
+@payment_router.get(
+    "/payments", response_model=s.PaymentReadList, response_model_exclude_unset=True
+)
+async def get_payments(
+    user_id: int | None,
+    initiative_id: int | None,
+    activity_id: int | None,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    if user_id is not None and initiative_id is None and activity_id is None:
+        # Get payments on user level.
+        pass
+
+    if initiative_id is not None and activity_id is None:
+        # Get payments on initiative level.
+        pass
+
+    if activity_id is not None:
+        # Get payments on activity level.
+        pass

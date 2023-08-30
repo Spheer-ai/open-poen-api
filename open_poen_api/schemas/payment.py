@@ -1,123 +1,25 @@
-from pydantic import BaseModel, Extra, validator
-from .mixins import TimeStampMixin, Budget
-
-# from .models.entities import PaymentBase, Route, PaymentType
-# # from ..models import
-from .mixins import NotNullValidatorMixin, HiddenMixin
-from datetime import datetime
+from pydantic import BaseModel
 
 
-class PaymentCreateFinancial(PaymentBase):
-    pass
-
-    class Config:
-        title = "PaymentCreate"
-        extra = Extra.forbid
-
-
-class PaymentUpdateActivityOwner(BaseModel, NotNullValidatorMixin):
-    short_user_description: str | None
-    long_user_description: str | None
-
-    @validator("short_user_description", "long_user_description")
-    def val_descriptions(cls, value, field):
-        return cls.not_null(value, field)
-
-    class Config:
-        extra = Extra.forbid
-        orm_mode = True
-
-
-class PaymentUpdateInitiativeOwner(PaymentUpdateActivityOwner, HiddenMixin):
-    route: Route | None
-
-    @validator("route", "hidden")
-    def val_route_and_hidden(cls, value, field):
-        return cls.not_null(value, field)
-
-    class Config:
-        extra = Extra.forbid
-        orm_mode = True
-
-
-class PaymentUpdateFinancial(PaymentUpdateInitiativeOwner):
-    booking_date: datetime | None
-    transaction_amount: Budget | None
-    creditor_name: str | None
-    creditor_account: str | None
-    debtor_name: str | None
-    debtor_account: str | None
-
-    @validator(
-        "booking_date",
-        "transaction_amount",
-        "creditor_name",
-        "creditor_account",
-        "debtor_name",
-        "debtor_account",
-    )
-    def val_fields(cls, value, field):
-        return cls.not_null(value, field)
-
-    class Config:
-        title = "PaymentUpdate"
-        extra = Extra.forbid
-        orm_mode = True
-
-
-FORBIDDEN_NON_MANUAL_PAYMENT_FIELDS = [
-    "booking_date",
-    "transaction_amount",
-    "creditor_name",
-    "credtor_account",
-    "debtor_name",
-    "debtor_account",
-]
-
-
-class PaymentOutputGuest(BaseModel):
-    id: int
-    booking_date: datetime
-    transaction_amount: Budget
-    creditor_name: str
-    creditor_account: str
-    debtor_name: str
-    debtor_account: str
-    route: Route
-    short_user_description: str | None
-    long_user_description: str | None
-    remittance_information_unstructured: str | None
-    remittance_information_structured: str | None
-    type: PaymentType
-
-
-class PaymentOutputInitiativeOwner(PaymentOutputGuest, TimeStampMixin, HiddenMixin):
+class PaymentRead(BaseModel):
     pass
 
 
-class PaymentOutputFinancial(PaymentOutputInitiativeOwner):
+class PaymentCreate(BaseModel):
     pass
 
-    class Config:
-        title = "PaymentOutput"
+
+class PaymentUpdate(BaseModel):
+    pass
 
 
-class PaymentOutputGuestList(BaseModel):
-    payments: list[PaymentOutputGuest]
-
-    class Config:
-        orm_mode = True
+class PaymentInitiativeUpdate(BaseModel):
+    pass
 
 
-class PaymentOutputInitiatitveOwnerList(BaseModel):
-    payments: list[PaymentOutputInitiativeOwner]
-
-    class Config:
-        orm_mode = True
+class PaymentActivityUpdate(BaseModel):
+    pass
 
 
-class PaymentOutputFinancialList(BaseModel):
-    payments: list[PaymentOutputFinancial]
-
-    class Config:
-        orm_mode = True
+class PaymentReadList(BaseModel):
+    payments: list[PaymentRead]
