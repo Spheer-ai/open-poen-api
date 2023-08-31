@@ -464,25 +464,25 @@ class Payment(Base):
         String(length=128), nullable=True
     )
 
-    activity_id: Mapped[int] = mapped_column(
+    activity_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("activity.id", ondelete="SET NULL"), nullable=True
     )
     activity: Mapped[Optional[Activity]] = relationship(
         "Activity", back_populates="payments", lazy="noload", uselist=False
     )
-    initiative_id: Mapped[int] = mapped_column(
+    initiative_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
     initiative: Mapped[Optional[Initiative]] = relationship(
         "Initiative", back_populates="payments", lazy="noload", uselist=False
     )
-    debit_card_id: Mapped[int] = mapped_column(
+    debit_card_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("debitcard.id"), nullable=True
     )
     debit_card: Mapped[Optional["DebitCard"]] = relationship(
         "DebitCard", back_populates="payments", lazy="noload", uselist=False
     )
-    bank_account_id: Mapped[int] = mapped_column(
+    bank_account_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("bank_account.id"), nullable=True
     )
     bank_account: Mapped[Optional["BankAccount"]] = relationship(

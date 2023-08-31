@@ -1106,9 +1106,17 @@ async def link_initiative(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    initiative_db = await initiative_manager.detail_load(payment.initiative_id)
+    if payment_db.activity_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Payment is still linked to an activity. First decouple it.",
+        )
     auth.authorize(required_user, "link_initiative", payment_db, oso)
-    auth.authorize(required_user, "link_payment", initiative_db, oso)
+
+    if payment.initiative_id is not None:
+        initiative_db = await initiative_manager.detail_load(payment.initiative_id)
+        auth.authorize(required_user, "link_payment", initiative_db, oso)
+
     payment_db = await payment_manager.assign_payment_to_initiative(
         payment_db,
         payment.initiative_id,
@@ -1133,11 +1141,19 @@ async def link_activity(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    activity_db = await activity_manager.detail_load(
-        payment.initiative_id, payment.activity_id
-    )
+    if payment_db.initiative_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Payment is not linked to an initiative. First couple it.",
+        )
     auth.authorize(required_user, "link_activity", payment_db, oso)
-    auth.authorize(required_user, "link_payment", activity_db, oso)
+
+    if payment.activity_id is not None:
+        activity_db = await activity_manager.detail_load(
+            payment.initiative_id, payment.activity_id
+        )
+        auth.authorize(required_user, "link_payment", activity_db, oso)
+
     payment_db = await payment_manager.assign_payment_to_activity(
         payment_db, payment.activity_id, request=request
     )

@@ -65,14 +65,23 @@ class PaymentManager(Manager):
         await self.base_delete(payment, request)
 
     async def assign_payment_to_initiative(
-        self, payment: Payment, initiative_id: int, request: Request | None = None
+        self,
+        payment: Payment,
+        initiative_id: int | None,
+        request: Request | None = None,
     ) -> Payment:
-        pass
+        payment.initiative_id = initiative_id
+        self.session.add(payment)
+        await self.session.commit()
+        return payment
 
     async def assign_payment_to_activity(
-        self, payment: Payment, activity_id: int, request: Request | None = None
+        self, payment: Payment, activity_id: int | None, request: Request | None = None
     ) -> Payment:
-        pass
+        payment.activity_id = activity_id
+        self.session.add(payment)
+        await self.session.commit()
+        return payment
 
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
