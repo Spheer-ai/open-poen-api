@@ -1,5 +1,5 @@
 import pytest
-from open_poen_api.bng import get_bng_payments
+from open_poen_api.bng import import_bng_payments
 from open_poen_api.models import BNG
 import pytest_asyncio
 import json
@@ -35,4 +35,4 @@ async def bng_session(dummy_session):
     indirect=["get_mock_user"],
 )
 async def test_import(async_client, bng_session):
-    await get_bng_payments(bng_session)
+    await import_bng_payments(bng_session)

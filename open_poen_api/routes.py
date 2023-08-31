@@ -20,7 +20,7 @@ from .utils.utils import (
 )
 import os
 from .bng.api import create_consent
-from .bng import get_bng_payments, retrieve_access_token, create_consent
+from .bng import import_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -137,6 +137,7 @@ async def get_users(
 @user_router.get(
     "/users/{user_id}/bng-initiate",
     response_model=s.BNGInitiate,
+    summary="BNG Initiate",
 )
 async def bng_initiate(
     user_id: int,
@@ -251,7 +252,9 @@ async def bng_callback(
 
 # GOCARDLESS
 @user_router.get(
-    "/users/{user_id}/gocardless-initiate", response_model=s.GocardlessInitiate
+    "/users/{user_id}/gocardless-initiate",
+    response_model=s.GocardlessInitiate,
+    summary="GoCardless Initiate",
 )
 async def gocardless_initiatite(
     user_id: int,
@@ -1177,24 +1180,57 @@ async def delete_payment(
 
 
 @payment_router.get(
-    "/payments", response_model=s.PaymentReadList, response_model_exclude_unset=True
+    "/payments/bng",
+    response_model=s.PaymentReadList,
+    response_model_exclude_unset=True,
+    summary="Get BNG Payments",
 )
-async def get_payments(
-    user_id: int | None,
-    initiative_id: int | None,
-    activity_id: int | None,
+async def get_bng_payments(
     async_session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login_dep),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    if user_id is not None and initiative_id is None and activity_id is None:
-        # Get payments on user level.
-        pass
+    pass
 
-    if initiative_id is not None and activity_id is None:
-        # Get payments on initiative level.
-        pass
 
-    if activity_id is not None:
-        # Get payments on activity level.
-        pass
+@payment_router.get(
+    "/payments/user/{user_id}",
+    response_model=s.PaymentReadList,
+    response_model_exclude_unset=True,
+)
+async def get_user_payments(
+    user_id: int,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(m.optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    pass
+
+
+@payment_router.get(
+    "/payments/initiative/{initiative_id}",
+    response_model=s.PaymentReadList,
+    response_model_exclude_unset=True,
+)
+async def get_initiative_payments(
+    initiative_id: int,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(m.optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    pass
+
+
+@payment_router.get(
+    "/payments/initiative/{initiative_id}/activity/{activity_id}",
+    response_model=s.PaymentReadList,
+    response_model_exclude_unset=True,
+)
+async def get_activity_payments(
+    initiative_id: int,
+    activity_id: int,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(m.optional_login_dep),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    pass
