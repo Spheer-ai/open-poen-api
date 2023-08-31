@@ -1,4 +1,10 @@
-from .user_manager import UserManager, get_user_manager, fastapi_users
+from .user_manager import (
+    UserManager,
+    get_user_manager,
+    superuser_dep,
+    required_login_dep,
+    optional_login_dep,
+)
 from .initiative_manager import InitiativeManager, get_initiative_manager
 from .activity_manager import ActivityManager, get_activity_manager
 from .funder_manager import FunderManager, get_funder_manager

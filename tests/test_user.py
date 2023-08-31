@@ -2,10 +2,10 @@ import pytest
 from open_poen_api.models import User
 from tests.conftest import (
     retrieve_token_from_last_sent_email,
-    superuser_info,
-    userowner_info,
-    user_info,
-    anon_info,
+    superuser,
+    userowner,
+    user,
+    anon,
 )
 import asyncio
 
@@ -14,10 +14,10 @@ import asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
-        (superuser_info, {"email": "test@example.com"}, 200),
-        (user_info, {"email": "test@example.com"}, 403),
-        (anon_info, {"email": "test@example.com"}, 403),
-        (superuser_info, {"email": "user1@example.com"}, 400),
+        (superuser, {"email": "test@example.com"}, 200),
+        (user, {"email": "test@example.com"}, 403),
+        (anon, {"email": "test@example.com"}, 403),
+        (superuser, {"email": "user1@example.com"}, 400),
     ],
     ids=[
         "Superuser can",
@@ -61,7 +61,7 @@ async def test_first_login(clean_async_client, dummy_session):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser_info, 204), (userowner_info, 403), (user_info, 403), (anon_info, 403)],
+    [(superuser, 204), (userowner, 403), (user, 403), (anon, 403)],
     ids=["Superuser can", "User owner cannot", "User cannot", "Anon cannot"],
     indirect=["get_mock_user"],
 )
@@ -78,11 +78,11 @@ async def test_delete_user(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
-        (superuser_info, {"email": "different@user.com"}, 200),
-        (userowner_info, {"email": "different@user.com"}, 200),
-        (user_info, {"email": "different@user.com"}, 403),
-        (superuser_info, {"role": "financial"}, 200),
-        (userowner_info, {"role": "financial"}, 403),
+        (superuser, {"email": "different@user.com"}, 200),
+        (userowner, {"email": "different@user.com"}, 200),
+        (user, {"email": "different@user.com"}, 403),
+        (superuser, {"role": "financial"}, 200),
+        (userowner, {"role": "financial"}, 403),
     ],
     ids=[
         "Superuser can change email",
@@ -106,7 +106,7 @@ async def test_patch_user(async_client, dummy_session, body, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code, length",
-    [(superuser_info, 200, 12), (user_info, 200, 11), (anon_info, 200, 11)],
+    [(superuser, 200, 12), (user, 200, 11), (anon, 200, 11)],
     ids=["Superuser sees hidden", "User cannot see hidden", "Anon cannot see hidden"],
     indirect=["get_mock_user"],
 )
@@ -120,9 +120,9 @@ async def test_get_users_list(async_client, dummy_session, status_code, length):
 @pytest.mark.parametrize(
     "get_mock_user, status_code, fields_present, fields_not_present",
     [
-        (superuser_info, 200, ["is_superuser", "hidden"], []),
-        (userowner_info, 200, ["is_superuser", "hidden"], []),
-        (anon_info, 200, ["first_name"], ["is_superuser", "hidden"]),
+        (superuser, 200, ["is_superuser", "hidden"], []),
+        (userowner, 200, ["is_superuser", "hidden"], []),
+        (anon, 200, ["first_name"], ["is_superuser", "hidden"]),
     ],
     ids=[
         "Superuser sees everything",

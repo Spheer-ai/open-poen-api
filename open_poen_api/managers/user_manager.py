@@ -152,3 +152,24 @@ auth_backend = AuthenticationBackend(
 fastapi_users = FastAPIUsers[User, int](get_user_manager, [auth_backend])
 
 get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)
+
+
+def with_joins(original_dependency):
+    async def _user_with_extra_joins(
+        user=Depends(original_dependency),
+        user_manager: UserManager = Depends(get_user_manager),
+    ):
+        if user is None:
+            return None
+
+        detail_user = await user_manager.detail_load(user.id)
+        return detail_user
+
+    return _user_with_extra_joins
+
+
+# We define dependencies this way because we can otherwise not override them
+# easily during testing.
+superuser_dep = with_joins(fastapi_users.current_user(superuser=True))
+required_login_dep = with_joins(fastapi_users.current_user(optional=False))
+optional_login_dep = with_joins(fastapi_users.current_user(optional=True))

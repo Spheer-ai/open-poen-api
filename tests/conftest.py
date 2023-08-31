@@ -11,7 +11,7 @@ from open_poen_api.models import (
     Activity,
     RegulationRole,
 )
-from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
+from open_poen_api.managers import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api.managers import user_manager as um
 import pytest
 from httpx import AsyncClient
