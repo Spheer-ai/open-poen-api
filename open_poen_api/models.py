@@ -439,7 +439,7 @@ class Payment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     transaction_id: Mapped[str] = mapped_column(
-        String(length=64), unique=True, nullable=False, index=True
+        String(length=64), unique=True, nullable=True, index=True
     )
     entry_reference: Mapped[str] = mapped_column(String(length=128), nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String(length=128), nullable=True)
@@ -453,7 +453,9 @@ class Payment(Base):
     type: Mapped[PaymentType] = mapped_column(
         ChoiceType(PaymentType, impl=VARCHAR(length=32))
     )
-    remittance_information_unstructured: Mapped[str] = mapped_column(String(length=512))
+    remittance_information_unstructured: Mapped[str] = mapped_column(
+        String(length=512), nullable=True
+    )
     remittance_information_structured: Mapped[str] = mapped_column(
         String(length=512), nullable=True
     )
@@ -499,7 +501,7 @@ class DebitCard(Base):
     )
 
     initiative_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("initiative.id", ondelete="SET NULL")
+        Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
     initiative: Mapped[Initiative | None] = relationship(
         "Initiative", back_populates="debit_cards", lazy="noload", uselist=False

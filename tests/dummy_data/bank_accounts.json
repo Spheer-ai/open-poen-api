@@ -1,0 +1,33 @@
+[
+    {
+        "api_account_id": "ACC001",
+        "iban": "IBAN001",
+        "name": "Account 1",
+        "created": "2023-08-31T12:00:00Z",
+        "last_accessed": "2023-08-31T15:00:00Z",
+        "requisition_ids": [
+            3,
+            5
+        ]
+    },
+    {
+        "api_account_id": "ACC002",
+        "iban": "IBAN002",
+        "name": "Account 2",
+        "created": "2023-08-31T13:00:00Z",
+        "last_accessed": "2023-08-31T16:00:00Z",
+        "requisition_ids": [
+            2
+        ]
+    },
+    {
+        "api_account_id": "ACC003",
+        "iban": "IBAN003",
+        "name": "Account 3",
+        "created": "2023-08-31T14:00:00Z",
+        "last_accessed": "2023-08-31T17:00:00Z",
+        "requisition_ids": [
+            2
+        ]
+    }
+]

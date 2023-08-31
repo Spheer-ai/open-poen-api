@@ -10,12 +10,19 @@ from open_poen_api.models import (
     UserRole,
     Activity,
     RegulationRole,
+    Payment,
+    DebitCard,
+    Requisition,
+    BankAccount,
+    UserBankAccountRole,
+    BankAccountRole,
 )
 from open_poen_api.managers import superuser_dep, required_login_dep, optional_login_dep
 from open_poen_api.managers import user_manager as um
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import pytest_asyncio
 import base64
 import urllib.parse
@@ -28,8 +35,10 @@ from open_poen_api.schemas import (
     FunderCreate,
     RegulationCreate,
     GrantCreate,
+    PaymentCreateAll,
 )
 import json
+from dateutil.parser import isoparse
 
 
 superuser = 6
@@ -161,6 +170,7 @@ async def dummy_session(async_session):
     funder_manager = await m.get_funder_manager(async_session).__anext__()
     regulation_manager = await m.get_regulation_manager(async_session).__anext__()
     grant_manager = await m.get_grant_manager(async_session).__anext__()
+    bank_account_manager = await m.get_bank_account_manager(async_session).__anext__()
     users = load_json("./tests/dummy_data/users.json")
     for user in users:
         schema = UserCreateWithPassword(**user)
@@ -189,6 +199,35 @@ async def dummy_session(async_session):
         initiative_id = act.pop("initiative_id")
         schema = ActivityCreate(**act)
         await activity_manager.create(schema, initiative_id, request=None)
+    requisitions = load_json("./tests/dummy_data/requisitions.json")
+    for r in requisitions:
+        requisition = Requisition(**r)
+        async_session.add(requisition)
+        await async_session.commit()
+    bank_accounts = load_json("./tests/dummy_data/bank_accounts.json")
+    for ba in bank_accounts:
+        requisition_ids = ba.pop("requisition_ids")
+        ba["created"] = isoparse(ba["created"])
+        ba["last_accessed"] = isoparse(ba["last_accessed"])
+        requisitions_q = await async_session.execute(
+            select(Requisition).where(Requisition.id.in_(requisition_ids))
+        )
+        requisitions = requisitions_q.scalars().all()
+        bank_account = BankAccount(**ba)
+        bank_account.requisitions = requisitions
+        async_session.add(bank_account)
+        await async_session.commit()
+    debit_cards = load_json("./tests/dummy_data/debit_cards.json")
+    for dc in debit_cards:
+        debit_card = DebitCard(**dc)
+        async_session.add(debit_card)
+        await async_session.commit()
+    payments = load_json("./tests/dummy_data/payments.json")
+    for p in payments:
+        schema = PaymentCreateAll(**p)
+        payment = Payment(**schema.dict())
+        async_session.add(payment)
+        await async_session.commit()
 
     # TODO: Fix magical constants.
     regulation = await regulation_manager.min_load(6)
@@ -201,6 +240,13 @@ async def dummy_session(async_session):
 
     activity = await activity_manager.min_load(1, 1)
     await activity_manager.make_users_owner(activity, user_ids=[13])
+
+    bank_account_roles = [
+        UserBankAccountRole(user_id=1, bank_account_id=1, role=BankAccountRole.OWNER),
+        UserBankAccountRole(user_id=2, bank_account_id=2, role=BankAccountRole.OWNER),
+    ]
+    async_session.add_all(bank_account_roles)
+    await async_session.commit()
 
     return async_session
 

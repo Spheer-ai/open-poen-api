@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
-from ..schemas import PaymentCreate, PaymentUpdate, BasePaymentCreate
+from ..schemas import PaymentCreateManual, PaymentUpdate, BasePaymentCreate
 from ..models import (
     BankAccount,
     Payment,
@@ -29,7 +29,7 @@ from nordigen.types import Requisition
 class PaymentManager(Manager):
     async def create(
         self,
-        payment_create: PaymentCreate,
+        payment_create: PaymentCreateManual,
         initiative_id: int,
         activity_id: int | None,
         request: Request | None,
@@ -110,5 +110,5 @@ class PaymentManager(Manager):
         return await self.base_min_load(Payment, payment_id)
 
 
-def get_payment_manager(session: AsyncSession = Depends(get_async_session)):
+async def get_payment_manager(session: AsyncSession = Depends(get_async_session)):
     yield PaymentManager(session)

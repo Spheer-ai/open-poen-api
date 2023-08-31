@@ -115,7 +115,9 @@ class BankAccountManager(Manager):
 
         for user_id in link_user_ids:
             new_role = UserBankAccountRole(
-                user_id=user_id, activity_id=bank_account.id, role=BankAccountRole.USER
+                user_id=user_id,
+                bank_account_id=bank_account.id,
+                role=BankAccountRole.USER,
             )
             self.session.add(new_role)
 
@@ -140,6 +142,9 @@ class BankAccountManager(Manager):
         if query_result is None:
             raise EntityNotFound(message="Bank account not found")
         return query_result
+
+    async def min_load(self, bank_account_id: int):
+        return await self.base_min_load(BankAccount, bank_account_id)
 
 
 async def get_bank_account_manager(session: AsyncSession = Depends(get_async_session)):

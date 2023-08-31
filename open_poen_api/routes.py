@@ -1052,7 +1052,7 @@ async def create_initiative(
     response_model=s.PaymentRead,
 )
 async def create_payment(
-    payment: s.PaymentCreate,
+    payment: s.PaymentCreateManual,
     request: Request,
     required_user=Depends(m.required_login_dep),
     payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
