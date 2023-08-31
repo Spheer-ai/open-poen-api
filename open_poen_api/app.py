@@ -46,7 +46,7 @@ if not DEBUG:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[f"https://{domain}", "localhost", "127.0.0.1"],
+        allow_origins=[f"https://{domain}"],
         allow_methods=["*"],
         allow_headers=["*"],
         allow_credentials=True,
