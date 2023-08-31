@@ -10,7 +10,24 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
 import os
 
-app = FastAPI()
+tags_metadata = [
+    {"name": "auth"},
+    {"name": "user"},
+    {
+        "name": "funder",
+        "description": "A **funder** is any entity that is willing to finance an **initiative**. It does this by issuing a **grant** under a **regulation**. For this grant, one or multiple initiatives can be made.",
+    },
+    {
+        "name": "initiative",
+        "description": "An **initiative** is an intention to spend a **funder**'s money in a certain way. It can be subdivided into **activities**. **Payments** can be added to an initiative by a **user** if a **bank account** is coupled, if a **debit card** is assigned to the initiative by a super user or administrator, or if a super user or administrator creates a payment manually. When the initiative is finished, it's finances will be verified.",
+    },
+    {
+        "name": "payment",
+        "description": "A **payment** can be of three types: **manual**, **GoCardless** or **BNG**. Manual means that it was created manually, GoCardless that it was imported through a coupled **bank account** and BNG that it was imported from the BNG account through a **Debit Card**.",
+    },
+]
+
+app = FastAPI(openapi_tags=tags_metadata)
 
 app.include_router(
     fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]
