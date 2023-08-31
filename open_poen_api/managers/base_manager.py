@@ -4,6 +4,8 @@ from ..models import Base
 from typing import Type, TypeVar
 from pydantic import BaseModel
 from fastapi import Request
+from ..logger import audit_logger
+from typing import Dict, Any
 
 T = TypeVar("T", bound=Base)
 
@@ -47,10 +49,12 @@ class Manager:
         return query_result
 
     async def after_create(self, entity: T, request: Request | None):
-        pass
+        audit_logger.info(f"{entity} is created.")
 
-    async def after_update(self, entity: T, request: Request | None):
-        pass
+    async def after_update(
+        self, entity: T, update_dict: Dict[str, Any], request: Request | None
+    ):
+        audit_logger.info(f"{entity} is updated with {update_dict}.")
 
     async def after_delete(self, entity: T, request: Request | None):
-        pass
+        audit_logger.info(f"{entity} is deleted.")

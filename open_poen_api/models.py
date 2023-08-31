@@ -182,6 +182,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "Requisition",
         back_populates="user",
         lazy="noload",
+        cascade="all",
     )
 
     initiative_roles: Mapped[list[UserInitiativeRole]] = relationship(
@@ -546,7 +547,7 @@ class Requisition(Base, TimeStampMixin):
     n_days_access: Mapped[int] = mapped_column(Integer, nullable=False)
 
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=False
+        Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True
     )
     user: Mapped[User] = relationship(
         "User", back_populates="requisitions", lazy="noload", uselist=False

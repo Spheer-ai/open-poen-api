@@ -29,9 +29,12 @@ import os
 from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
+from .base_manager import Manager
+from typing import Any, Dict
+from ..logger import audit_logger
 
 
-class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
+class UserManager(IntegerIDMixin, BaseUserManager[User, int], Manager):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
 
@@ -50,6 +53,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         )
         fm = FastMail(conf)
         await fm.send_message(message)  # TODO: Make async.
+        await self.after_create(user, request)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -90,6 +94,21 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             return await super().update(user_update, user, request=request)
         except UserAlreadyExists:
             raise EntityAlreadyExists(message="Email address already in use")
+
+    async def on_after_update(
+        self,
+        user: User,
+        update_dict: Dict[str, Any],
+        request: Request | None = None,
+    ):
+        await self.after_update(user, update_dict, request)
+
+    async def on_after_delete(
+        self,
+        user: User,
+        request: Request | None = None,
+    ):
+        await self.after_delete(user, request)
 
     async def detail_load(self, id: int):
         # TODO: Use joinedload?
