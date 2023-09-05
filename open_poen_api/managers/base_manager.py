@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from .exc import EntityNotFound
-from ..models import Base
+from ..models import Base, User
 from typing import Type, TypeVar
 from pydantic import BaseModel
 from fastapi import Request
@@ -11,8 +11,9 @@ T = TypeVar("T", bound=Base)
 
 
 class Manager:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, current_user: User | None = None):
         self.session = session
+        self.current_user = current_user
 
     async def base_create(
         self,
@@ -30,11 +31,12 @@ class Manager:
     async def base_update(
         self, entity_update: BaseModel, db_entity: T, request: Request | None = None
     ) -> T:
-        for key, value in entity_update.dict(exclude_unset=True).items():
+        update_dict = entity_update.dict(exclude_unset=True)
+        for key, value in update_dict.items():
             setattr(db_entity, key, value)
         self.session.add(db_entity)
         await self.session.commit()
-        await self.after_update(db_entity, request)
+        await self.after_update(db_entity, update_dict, request)
         return db_entity
 
     async def base_delete(self, entity: T, request: Request | None = None) -> None:

@@ -30,8 +30,13 @@ from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from .base_manager import Manager
-from typing import Any, Dict
+from typing import Any, Dict, cast
 from ..logger import audit_logger
+from pydantic import EmailStr
+
+
+WEBSITE_NAME = os.environ["WEBSITE_NAME"]
+SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int], Manager):
@@ -43,11 +48,12 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int], Manager):
         self.session = session
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
+        email = cast(EmailStr, user.email)
         template = env.get_template("on_after_register.txt")
         body = template.render(user=user)
         message = MessageSchema(
-            subject=f"Uitnodiging {os.environ.get('WEBSITE_NAME')}",
-            recipients=[user.email],
+            subject=f"Uitnodiging {WEBSITE_NAME}",
+            recipients=[email],
             body=body,
             subtype=MessageType.plain,
         )
@@ -58,14 +64,13 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int], Manager):
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ):
+        email = cast(EmailStr, user.email)
         template = env.get_template("on_after_forgot_password.txt")
-        reset_password_url = os.environ.get("SPA_RESET_PASSWORD_URL").format(
-            token=token
-        )
+        reset_password_url = SPA_RESET_PASSWORD_URL.format(token=token)
         body = template.render(user=user, reset_password_url=reset_password_url)
         message = MessageSchema(
-            subject=f"Nieuw Wachtwoord {os.environ.get('WEBSITE_NAME')}",
-            recipients=[user.email],
+            subject=f"Nieuw Wachtwoord {WEBSITE_NAME}",
+            recipients=[email],
             body=body,
             subtype=MessageType.plain,
         )
@@ -192,3 +197,11 @@ def with_joins(original_dependency):
 superuser_dep = with_joins(fastapi_users.current_user(superuser=True))
 required_login_dep = with_joins(fastapi_users.current_user(optional=False))
 optional_login_dep = with_joins(fastapi_users.current_user(optional=True))
+
+
+async def get_user_manager_2(
+    user_manager: UserManager = Depends(get_user_manager),
+    current_user=Depends(optional_login_dep),
+):
+    user_manager.current_user = current_user
+    return user_manager

@@ -89,7 +89,7 @@ async def update_user(
     user: s.UserUpdate,
     request: Request,
     required_user=Depends(m.required_login_dep),
-    user_manager: m.UserManager = Depends(m.get_user_manager),
+    user_manager: m.UserManager = Depends(m.get_user_manager_2),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
@@ -944,7 +944,7 @@ async def update_grant(
     grant: s.GrantUpdate,
     request: Request,
     required_user=Depends(m.required_login_dep),
-    grant_manager: m.GrantManager = Depends(m.get_grant_manager),
+    grant_manager: m.GrantManager = Depends(m.GrantManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.min_load(grant_id)

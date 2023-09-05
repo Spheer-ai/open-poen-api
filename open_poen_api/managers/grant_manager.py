@@ -9,9 +9,17 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_async_session
 from fastapi import Depends
+from .user_manager import optional_login_dep
 
 
 class GrantManager(Manager):
+    def __init__(
+        self,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: User = Depends(optional_login_dep),
+    ):
+        super().__init__(session, current_user)
+
     async def create(
         self,
         grant_create: GrantCreate,
@@ -86,5 +94,8 @@ class GrantManager(Manager):
         return await self.base_min_load(Grant, id)
 
 
-async def get_grant_manager(session: AsyncSession = Depends(get_async_session)):
-    yield GrantManager(session)
+async def get_grant_manager(
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(optional_login_dep),
+):
+    yield GrantManager(session, current_user)
