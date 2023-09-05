@@ -956,7 +956,7 @@ async def update_grant(
 
 @funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
-    response_model=s.UserRead,
+    response_model=s.UserReadList,
     responses={204: {"description": "Grant overseer is removed"}},
 )
 async def link_overseer(
@@ -971,17 +971,18 @@ async def link_overseer(
 ):
     grant_db = await grant_manager.detail_load(grant_id)
     auth.authorize(required_user, "edit", grant_db, oso)
-    grant_db = await grant_manager.make_user_overseer(
-        grant_db, grant.user_id, request=request
+    grant_db = await grant_manager.make_users_overseer(
+        grant_db, grant.user_ids, request=request
     )
     # Important for up to date relations. Has to be in this async context.
     await grant_manager.session.refresh(grant_db)
-    if grant_db.overseer is not None:
-        return auth.get_authorized_output_fields(
-            required_user, "read", grant_db.overseer, oso, ent.User.REL_FIELDS
+    filtered_overseers = [
+        auth.get_authorized_output_fields(
+            required_user, "read", i, oso, ent.User.REL_FIELDS
         )
-    else:
-        return Response(status_code=204)
+        for i in grant_db.overseers
+    ]
+    return s.UserReadList(users=filtered_overseers)
 
 
 @funder_router.delete("/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}")

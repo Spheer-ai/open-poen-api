@@ -26,7 +26,7 @@ class GrantCreate(BaseModel):
 
 
 class GrantOverseerUpdate(BaseModel):
-    user_id: int | None
+    user_ids: list[int]
 
 
 class GrantUpdate(NotNullValidatorMixin):

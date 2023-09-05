@@ -80,7 +80,7 @@ class PaymentManager(BaseManager):
                 selectinload(Payment.initiative).options(
                     selectinload(Initiative.user_roles),
                     selectinload(Initiative.grant).options(
-                        selectinload(Grant.overseer_role),
+                        selectinload(Grant.overseer_roles),
                         selectinload(Grant.regulation).options(
                             selectinload(Regulation.policy_officer_roles),
                             selectinload(Regulation.grant_officer_roles),

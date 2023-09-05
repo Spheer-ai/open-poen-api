@@ -146,7 +146,7 @@ class UserGrantRole(Base):
         "User", uselist=False, back_populates="overseer_roles"
     )
     grant: Mapped["Grant"] = relationship(
-        "Grant", uselist=False, back_populates="overseer_role"
+        "Grant", uselist=False, back_populates="overseer_roles"
     )
 
 
@@ -678,15 +678,14 @@ class Grant(Base):
     initiatives: Mapped[list[Initiative]] = relationship(
         "Initiative", back_populates="grant", lazy="noload", cascade="all"
     )
-    overseer_role: Mapped[Optional[UserGrantRole]] = relationship(
+    overseer_roles: Mapped[list[UserGrantRole]] = relationship(
         "UserGrantRole",
         lazy="noload",
         cascade="all",
-        uselist=False,
         back_populates="grant",
     )
-    overseer: AssociationProxy[Optional[User]] = association_proxy(
-        "overseer_role", "user"
+    overseers: AssociationProxy[list[User]] = association_proxy(
+        "overseer_roles", "user"
     )
 
 
