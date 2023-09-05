@@ -208,22 +208,22 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "UserBankAccountRole",
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
-        overlaps="owner_bank_account_role, user",
+        overlaps="owner_bank_account_roles, user",
         cascade="all",
     )
     used_bank_accounts: AssociationProxy[list["BankAccount"]] = association_proxy(
         "user_bank_account_roles", "bank_account"
     )
 
-    owner_bank_account_role: Mapped[list[UserBankAccountRole]] = relationship(
+    owner_bank_account_roles: Mapped[list[UserBankAccountRole]] = relationship(
         "UserBankAccountRole",
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
         overlaps="user_bank_account_roles, user",
         cascade="all",
     )
-    owned_bank_account: AssociationProxy[list["BankAccount"]] = association_proxy(
-        "owner_bank_account_role", "bank_account"
+    owned_bank_accounts: AssociationProxy[list["BankAccount"]] = association_proxy(
+        "owner_bank_account_roles", "bank_account"
     )
 
     grant_officer_regulation_roles: Mapped[list[UserRegulationRole]] = relationship(
@@ -492,6 +492,9 @@ class Payment(Base):
         "BankAccount", back_populates="payments", lazy="noload"
     )
 
+    def __repr__(self):
+        return f"Payment(id={self.id}, transaction_amount='{self.transaction_amount}', route='{self.route}')"
+
 
 class DebitCard(Base):
     __tablename__ = "debitcard"
@@ -657,6 +660,9 @@ class Regulation(Base):
 
     PROXIES = ["grant_officers", "policy_officers"]
 
+    def __repr__(self):
+        return f"Regulation(id={self.id}, name='{self.name}')"
+
 
 class Grant(Base):
     __tablename__ = "grant"
@@ -688,6 +694,9 @@ class Grant(Base):
         "overseer_roles", "user"
     )
 
+    def __repr__(self):
+        return f"Grant(id={self.id}, name='{self.name}', reference='{self.reference}', budget='{self.budget}')"
+
 
 class Funder(Base):
     __tablename__ = "funder"
@@ -702,3 +711,6 @@ class Funder(Base):
         lazy="noload",
         cascade="all",
     )
+
+    def __repr__(self):
+        return f"Funder(id={self.id}, name='{self.name}')"
