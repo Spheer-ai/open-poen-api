@@ -51,8 +51,8 @@ payment_router = APIRouter(tags=["payment"])
 async def create_user(
     user: s.UserCreate,
     request: Request,
-    superuser=Depends(m.superuser_dep),
-    user_manager: m.UserManager = Depends(m.get_user_manager),
+    superuser=Depends(m.superuser),
+    user_manager: m.UserManager = m.user_manager,
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     auth.authorize(superuser, "create", ent.User, oso)
@@ -70,8 +70,8 @@ async def create_user(
 )
 async def get_user(
     user_id: int,
-    optional_user=Depends(m.optional_login_dep),
-    user_manager: m.UserManager = Depends(m.get_user_manager),
+    optional_user=Depends(m.optional_login),
+    user_manager: m.UserManager = m.user_manager,
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.detail_load(user_id)
@@ -88,8 +88,8 @@ async def update_user(
     user_id: int,
     user: s.UserUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
-    user_manager: m.UserManager = Depends(m.get_user_manager_2),
+    required_user=Depends(m.required_login),
+    user_manager: m.UserManager = m.user_manager,
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
@@ -103,8 +103,8 @@ async def update_user(
 async def delete_user(
     user_id: int,
     request: Request,
-    superuser=Depends(m.superuser_dep),
-    user_manager: m.UserManager = Depends(m.get_user_manager),
+    superuser=Depends(m.superuser),
+    user_manager: m.UserManager = m.user_manager,
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
@@ -118,7 +118,7 @@ async def delete_user(
 )
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: Enable searching by email.
@@ -144,7 +144,7 @@ async def bng_initiate(
     iban: str = Depends(s.validate_iban),
     expires_on: date = Depends(s.validate_expires_on),
     session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),  # TODO
+    optional_user=Depends(m.optional_login),  # TODO
     requester_ip: str = Depends(get_requester_ip),
 ):
     user = await session.get(ent.User, user_id)
@@ -262,8 +262,8 @@ async def gocardless_initiatite(
     n_days_access: int = Depends(s.validate_n_days_access),
     n_days_history: int = Depends(s.validate_n_days_history),
     session: AsyncSession = Depends(get_async_session),
-    required_user=Depends(m.required_login_dep),
-    user_manager: m.UserManager = Depends(m.get_user_manager),
+    required_user=Depends(m.required_login),
+    user_manager: m.UserManager = m.user_manager,
 ):
     user = await user_manager.min_load(user_id)
 
@@ -359,7 +359,7 @@ async def gocardless_callback(
 async def get_bank_account(
     user_id: int,
     bank_account_id: int,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -378,7 +378,7 @@ async def finish_bank_account(
     user_id: int,
     bank_account_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -395,7 +395,7 @@ async def delete_bank_account(
     user_id: int,
     bank_account_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -414,7 +414,7 @@ async def link_bank_account_users(
     bank_account_id: int,
     bank_account: s.BankAccountUsersUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.get_bank_account_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -441,7 +441,7 @@ async def link_bank_account_users(
 )
 async def get_initiative(
     initiative_id: int,
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -459,7 +459,7 @@ async def update_initiative(
     initiative_id: int,
     initiative: s.InitiativeUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -482,7 +482,7 @@ async def link_initiative_owners(
     initiative_id: int,
     initiative: s.InitiativeOwnersUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -506,7 +506,7 @@ async def link_initiative_owners(
 async def delete_initiative(
     initiative_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -523,7 +523,7 @@ async def delete_initiative(
 )
 async def get_initiatives(
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: pagination.
@@ -546,7 +546,7 @@ async def create_activity(
     initiative_id: int,
     activity: s.ActivityCreate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -567,7 +567,7 @@ async def create_activity(
 async def get_activity(
     initiative_id: int,
     activity_id: int,
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -586,7 +586,7 @@ async def update_activity(
     activity_id: int,
     activity: s.ActivityUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -610,7 +610,7 @@ async def link_activity_owners(
     activity_id: int,
     activity: s.ActivityOwnersUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -635,7 +635,7 @@ async def delete_activity(
     initiative_id: int,
     activity_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -653,7 +653,7 @@ async def link_initiative_debit_cards(
     initiative_id: int,
     initiative: s.InitiativeDebitCardsUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -678,7 +678,7 @@ async def link_initiative_debit_cards(
 async def create_funder(
     funder: s.FunderCreate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -694,7 +694,7 @@ async def create_funder(
 )
 async def get_funder(
     funder_id: int,
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -712,7 +712,7 @@ async def update_funder(
     funder_id: int,
     funder: s.FunderUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -727,7 +727,7 @@ async def update_funder(
 async def delete_funder(
     funder_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -744,7 +744,7 @@ async def delete_funder(
 )
 async def get_funders(
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: pagination.
@@ -763,7 +763,7 @@ async def create_regulation(
     funder_id: int,
     regulation: s.RegulationCreate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.get_funder_manager),
     regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -784,7 +784,7 @@ async def create_regulation(
 async def get_regulation(
     funder_id: int,
     regulation_id: int,
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -803,7 +803,7 @@ async def update_regulation(
     regulation_id: int,
     regulation: s.RegulationUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -827,7 +827,7 @@ async def link_officers(
     regulation_id: int,
     regulation: s.RegulationOfficersUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -861,7 +861,7 @@ async def delete_regulation(
     funder_id: int,
     regulation_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -879,7 +879,7 @@ async def delete_regulation(
 async def get_regulations(
     funder_id: int,
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: pagination.
@@ -902,7 +902,7 @@ async def create_grant(
     regulation_id: int,
     grant: s.GrantCreate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.get_regulation_manager),
     grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -923,7 +923,7 @@ async def get_grant(
     funder_id: int,
     regulation_id: int,
     grant_id: int,
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -943,7 +943,7 @@ async def update_grant(
     grant_id: int,
     grant: s.GrantUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -965,7 +965,7 @@ async def link_overseer(
     grant_id: int,
     grant: s.GrantOverseerUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -990,7 +990,7 @@ async def delete_grant(
     regulation_id: int,
     grant_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -1009,7 +1009,7 @@ async def get_grants(
     funder_id: int,
     regulation_id: int,
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     q = auth.get_authorized_query(optional_user, "read", ent.Grant, oso)
@@ -1033,7 +1033,7 @@ async def create_initiative(
     grant_id: int,
     initiative: s.InitiativeCreate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.get_grant_manager),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -1054,7 +1054,7 @@ async def create_initiative(
 async def create_payment(
     payment: s.PaymentCreateManual,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
@@ -1084,7 +1084,7 @@ async def update_payment(
     payment_id: int,
     payment: s.PaymentUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -1103,7 +1103,7 @@ async def link_initiative(
     payment_id: int,
     payment: s.PaymentInitiativeUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
     initiative_manager: m.InitiativeManager = Depends(m.get_initiative_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -1138,7 +1138,7 @@ async def link_activity(
     payment_id: int,
     payment: s.PaymentActivityUpdate,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
     activity_manager: m.ActivityManager = Depends(m.get_activity_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -1169,7 +1169,7 @@ async def link_activity(
 async def delete_payment(
     payment_id: int,
     request: Request,
-    required_user=Depends(m.required_login_dep),
+    required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.get_payment_manager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
@@ -1187,7 +1187,7 @@ async def delete_payment(
 )
 async def get_bng_payments(
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     pass
@@ -1201,7 +1201,7 @@ async def get_bng_payments(
 async def get_user_payments(
     user_id: int,
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     pass
@@ -1215,7 +1215,7 @@ async def get_user_payments(
 async def get_initiative_payments(
     initiative_id: int,
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     pass
@@ -1230,7 +1230,7 @@ async def get_activity_payments(
     initiative_id: int,
     activity_id: int,
     async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login_dep),
+    optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     pass

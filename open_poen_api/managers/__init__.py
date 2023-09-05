@@ -1,10 +1,9 @@
 from .user_manager import (
     UserManager,
-    get_user_manager,
-    superuser_dep,
-    required_login_dep,
-    optional_login_dep,
-    get_user_manager_2,
+    user_manager,
+    superuser,
+    required_login,
+    optional_login,
 )
 from .initiative_manager import InitiativeManager, get_initiative_manager
 from .activity_manager import ActivityManager, get_activity_manager

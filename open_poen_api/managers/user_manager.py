@@ -30,7 +30,7 @@ from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from .base_manager import Manager
-from typing import Any, Dict, cast
+from typing import Any, Dict, cast, Annotated
 from ..logger import audit_logger
 from pydantic import EmailStr
 
@@ -39,7 +39,7 @@ WEBSITE_NAME = os.environ["WEBSITE_NAME"]
 SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 
 
-class UserManager(IntegerIDMixin, BaseUserManager[User, int], Manager):
+class UserManagerExCurrentUser(IntegerIDMixin, BaseUserManager[User, int], Manager):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
 
@@ -156,11 +156,11 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int], Manager):
         return query_result
 
 
-async def get_user_manager(
+async def _get_user_manager(
     user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
     session: AsyncSession = Depends(get_async_session),
 ):
-    yield UserManager(session, user_db)
+    yield UserManagerExCurrentUser(session, user_db)
 
 
 def get_jwt_strategy() -> JWTStrategy:
@@ -173,15 +173,15 @@ auth_backend = AuthenticationBackend(
     name="jwt", transport=bearer_transport, get_strategy=get_jwt_strategy
 )
 
-fastapi_users = FastAPIUsers[User, int](get_user_manager, [auth_backend])
+fastapi_users = FastAPIUsers[User, int](_get_user_manager, [auth_backend])
 
-get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)
+get_user_manager_context = contextlib.asynccontextmanager(_get_user_manager)
 
 
 def with_joins(original_dependency):
     async def _user_with_extra_joins(
         user=Depends(original_dependency),
-        user_manager: UserManager = Depends(get_user_manager),
+        user_manager: UserManagerExCurrentUser = Depends(_get_user_manager),
     ):
         if user is None:
             return None
@@ -192,16 +192,27 @@ def with_joins(original_dependency):
     return _user_with_extra_joins
 
 
-# We define dependencies this way because we can otherwise not override them
-# easily during testing.
-superuser_dep = with_joins(fastapi_users.current_user(superuser=True))
-required_login_dep = with_joins(fastapi_users.current_user(optional=False))
-optional_login_dep = with_joins(fastapi_users.current_user(optional=True))
+superuser = with_joins(fastapi_users.current_user(superuser=True))
+required_login = with_joins(fastapi_users.current_user(optional=False))
+optional_login = with_joins(fastapi_users.current_user(optional=True))
 
 
-async def get_user_manager_2(
-    user_manager: UserManager = Depends(get_user_manager),
-    current_user=Depends(optional_login_dep),
-):
-    user_manager.current_user = current_user
-    return user_manager
+class UserManager(UserManagerExCurrentUser):
+    def __init__(
+        self,
+        user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
+        session: AsyncSession = Depends(get_async_session),
+        current_user: User | None = Depends(optional_login),
+    ):
+        super().__init__(session, user_db)
+        self.current_user = current_user
+
+
+# async def get_user_manager(
+#     user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
+#     session: AsyncSession = Depends(get_async_session),
+#     current_user=Depends(optional_login_dep),
+# ):
+#     yield UserManager(user_db, session, current_user)
+
+user_manager = Depends(UserManager)

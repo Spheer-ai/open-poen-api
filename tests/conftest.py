@@ -17,7 +17,7 @@ from open_poen_api.models import (
     UserBankAccountRole,
     BankAccountRole,
 )
-from open_poen_api.managers import superuser_dep, required_login_dep, optional_login_dep
+from open_poen_api.managers import superuser, required_login, optional_login
 from open_poen_api.managers import user_manager as um
 import pytest
 from httpx import AsyncClient
@@ -154,9 +154,9 @@ def load_json(json_file_path):
 
 @pytest_asyncio.fixture
 async def overridden_app(get_mock_user):
-    app.dependency_overrides[superuser_dep] = get_mock_user
-    app.dependency_overrides[required_login_dep] = get_mock_user
-    app.dependency_overrides[optional_login_dep] = get_mock_user
+    app.dependency_overrides[superuser] = get_mock_user
+    app.dependency_overrides[required_login] = get_mock_user
+    app.dependency_overrides[optional_login] = get_mock_user
     yield app
     app.dependency_overrides = {}
 
@@ -164,7 +164,8 @@ async def overridden_app(get_mock_user):
 @pytest_asyncio.fixture(scope="function")
 async def dummy_session(async_session):
     db = await get_user_db(async_session).__anext__()
-    user_manager = await m.get_user_manager(db).__anext__()
+    # user_manager = await m.get_user_manager(db).__anext__()
+    user_manager = m.UserManager(db, async_session, None)
     initiative_manager = await m.get_initiative_manager(async_session).__anext__()
     activity_manager = await m.get_activity_manager(async_session).__anext__()
     funder_manager = await m.get_funder_manager(async_session).__anext__()
@@ -256,8 +257,8 @@ async def get_mock_user(request, dummy_session):
     if request.param is None:
         return lambda: None
 
-    user_db = await get_user_db(dummy_session).__anext__()
-    user_manager = await m.get_user_manager(user_db, dummy_session).__anext__()
+    db = await get_user_db(dummy_session).__anext__()
+    user_manager = m.UserManager(db, dummy_session, None)
     user_instance = await user_manager.detail_load(request.param)
 
     async def func():
