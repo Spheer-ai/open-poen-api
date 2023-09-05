@@ -8,7 +8,7 @@ from tests.conftest import (
     policy_officer,
 )
 from open_poen_api.models import Grant
-from open_poen_api.managers import get_grant_manager
+from open_poen_api.managers import GrantManager
 
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_add_overseer(async_client, dummy_session, status_code, user_id):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        gm = await get_grant_manager(dummy_session).__anext__()
+        gm = GrantManager(dummy_session, None)
         db_grant = await gm.detail_load(grant_id)
         if user_id == 1:
             assert db_grant.overseer.email == "user1@example.com"

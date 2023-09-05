@@ -1,14 +1,7 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, Request
-from ..database import get_async_session
+from fastapi import Request
 from ..schemas import PaymentCreateManual, PaymentUpdate, BasePaymentCreate
 from ..models import (
-    BankAccount,
     Payment,
-    UserBankAccountRole,
-    User,
-    BankAccountRole,
-    ReqStatus,
     Activity,
     Initiative,
     Grant,
@@ -19,14 +12,10 @@ from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 from .exc import EntityNotFound
 from .exc import EntityAlreadyExists, EntityNotFound
-from .base_manager import Manager
-import asyncio
-from ..gocardless import client
-from nordigen import NordigenClient
-from nordigen.types import Requisition
+from .base_manager import BaseManager
 
 
-class PaymentManager(Manager):
+class PaymentManager(BaseManager):
     async def create(
         self,
         payment_create: PaymentCreateManual,
@@ -108,7 +97,3 @@ class PaymentManager(Manager):
 
     async def min_load(self, payment_id: int):
         return await self.base_min_load(Payment, payment_id)
-
-
-async def get_payment_manager(session: AsyncSession = Depends(get_async_session)):
-    yield PaymentManager(session)

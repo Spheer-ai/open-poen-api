@@ -9,7 +9,7 @@ from tests.conftest import (
     policy_officer,
 )
 from open_poen_api.models import Initiative
-from open_poen_api.managers import get_initiative_manager
+from open_poen_api.managers import InitiativeManager
 
 
 @pytest.mark.asyncio
@@ -101,7 +101,7 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        im = await get_initiative_manager(dummy_session).__anext__()
+        im = InitiativeManager(dummy_session, None)
         db_initiative = await im.detail_load(initiative_id)
         assert len(db_initiative.initiative_owners) == 1
         assert db_initiative.initiative_owners[0].email == "user1@example.com"
@@ -134,7 +134,7 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        im = await get_initiative_manager(dummy_session).__anext__()
+        im = InitiativeManager(dummy_session, None)
         db_initiative = await im.detail_load(initiative_id)
         assert len(db_initiative.debit_cards) == 1
         assert db_initiative.debit_cards[0].card_number == str(6731924123456789012)

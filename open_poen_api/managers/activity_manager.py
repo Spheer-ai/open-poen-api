@@ -8,10 +8,10 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from .exc import EntityNotFound
 from .exc import EntityAlreadyExists, EntityNotFound
-from .base_manager import Manager
+from .base_manager import BaseManager
 
 
-class ActivityManager(Manager):
+class ActivityManager(BaseManager):
     async def create(
         self,
         activity_create: ActivityCreate,
@@ -92,7 +92,3 @@ class ActivityManager(Manager):
 
     async def min_load(self, initiative_id: int, activity_id: int) -> Activity:
         return await self.base_min_load(Activity, activity_id)
-
-
-async def get_activity_manager(session: AsyncSession = Depends(get_async_session)):
-    yield ActivityManager(session)

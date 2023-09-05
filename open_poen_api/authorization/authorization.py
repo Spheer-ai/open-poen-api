@@ -251,9 +251,14 @@ def get_authorized_output_fields(
     for f in rel_fields:
         rel = getattr(resource, f)
         if isinstance(rel, ent.Base):
-            result[f] = get_fields_for_relationship(rel)
+            if is_allowed(actor, action, rel):
+                result[f] = get_fields_for_relationship(rel)
         elif isinstance(rel, (list, _AssociationList)):
-            result[f] = [get_fields_for_relationship(i) for i in rel]
+            result[f] = [
+                get_fields_for_relationship(i)
+                for i in rel
+                if is_allowed(actor, action, i)
+            ]
         elif rel is None:
             result[f] = rel
         else:

@@ -1,4 +1,4 @@
-from .base_manager import Manager
+from .base_manager import BaseManager
 from ..schemas import GrantCreate, GrantUpdate
 from ..models import Grant, UserGrantRole, User
 from fastapi import Request
@@ -6,20 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
-from ..database import get_async_session
-from fastapi import Depends
-from .user_manager import optional_login
 
 
-class GrantManager(Manager):
-    def __init__(
-        self,
-        session: AsyncSession = Depends(get_async_session),
-        current_user: User = Depends(optional_login),
-    ):
-        super().__init__(session, current_user)
-
+class GrantManager(BaseManager):
     async def create(
         self,
         grant_create: GrantCreate,
@@ -92,10 +81,3 @@ class GrantManager(Manager):
 
     async def min_load(self, id: int) -> Grant:
         return await self.base_min_load(Grant, id)
-
-
-async def get_grant_manager(
-    session: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(optional_login),
-):
-    yield GrantManager(session, current_user)

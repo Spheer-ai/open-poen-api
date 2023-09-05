@@ -15,17 +15,24 @@ from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 from .exc import EntityNotFound
 from .exc import EntityAlreadyExists, EntityNotFound
-from .base_manager import Manager
+from .base_manager import BaseManager
 import asyncio
-from ..gocardless import client
+from ..gocardless import get_nordigen_client
 from nordigen import NordigenClient
 from nordigen.types import Requisition
+from ..database import get_async_session
+from .user_manager import optional_login
 
 
-class BankAccountManager(Manager):
-    def __init__(self, session: AsyncSession, client: NordigenClient):
+class BankAccountManager(BaseManager):
+    def __init__(
+        self,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: User | None = Depends(optional_login),
+        client: NordigenClient = Depends(get_nordigen_client),
+    ):
         self.client = client
-        super().__init__(session)
+        super().__init__(session, current_user)
 
     # TODO: Prevent blocking of event loop here.
     async def finish(self, bank_account: BankAccount, request: Request | None):
@@ -145,7 +152,3 @@ class BankAccountManager(Manager):
 
     async def min_load(self, bank_account_id: int):
         return await self.base_min_load(BankAccount, bank_account_id)
-
-
-async def get_bank_account_manager(session: AsyncSession = Depends(get_async_session)):
-    yield BankAccountManager(session, client)

@@ -29,7 +29,7 @@ import os
 from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from .base_manager import Manager
+from .base_manager_ex_current_user import BaseManagerExCurrentUser
 from typing import Any, Dict, cast, Annotated
 from ..logger import audit_logger
 from pydantic import EmailStr
@@ -39,7 +39,9 @@ WEBSITE_NAME = os.environ["WEBSITE_NAME"]
 SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 
 
-class UserManagerExCurrentUser(IntegerIDMixin, BaseUserManager[User, int], Manager):
+class UserManagerExCurrentUser(
+    IntegerIDMixin, BaseUserManager[User, int], BaseManagerExCurrentUser
+):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
 
@@ -206,13 +208,3 @@ class UserManager(UserManagerExCurrentUser):
     ):
         super().__init__(session, user_db)
         self.current_user = current_user
-
-
-# async def get_user_manager(
-#     user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
-#     session: AsyncSession = Depends(get_async_session),
-#     current_user=Depends(optional_login_dep),
-# ):
-#     yield UserManager(user_db, session, current_user)
-
-user_manager = Depends(UserManager)

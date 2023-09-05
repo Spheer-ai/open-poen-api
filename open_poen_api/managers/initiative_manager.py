@@ -7,10 +7,10 @@ from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from .base_manager import Manager
+from .base_manager import BaseManager
 
 
-class InitiativeManager(Manager):
+class InitiativeManager(BaseManager):
     async def create(
         self,
         initiative_create: InitiativeCreate,
@@ -155,6 +155,7 @@ class InitiativeManager(Manager):
                 ),
                 selectinload(Initiative.activities),
                 selectinload(Initiative.debit_cards),
+                selectinload(Initiative.grant),
             )
             .where(Initiative.id == id)
         )
@@ -165,7 +166,3 @@ class InitiativeManager(Manager):
 
     async def min_load(self, id: int) -> Initiative:
         return await self.base_min_load(Initiative, id)
-
-
-async def get_initiative_manager(session: AsyncSession = Depends(get_async_session)):
-    yield InitiativeManager(session)

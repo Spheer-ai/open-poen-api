@@ -1,4 +1,4 @@
-from .base_manager import Manager
+from .base_manager import BaseManager
 from ..schemas import FunderCreate, FunderUpdate
 from ..models import Funder
 from fastapi import Request
@@ -6,12 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
-from ..database import get_async_session
-from fastapi import Depends
 
 
-class FunderManager(Manager):
+class FunderManager(BaseManager):
     async def create(
         self, funder_create: FunderCreate, request: Request | None = None
     ) -> Funder:
@@ -52,7 +49,3 @@ class FunderManager(Manager):
 
     async def min_load(self, id: int) -> Funder:
         return await self.base_min_load(Funder, id)
-
-
-async def get_funder_manager(session: AsyncSession = Depends(get_async_session)):
-    yield FunderManager(session)
