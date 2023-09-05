@@ -7,6 +7,7 @@ from tests.conftest import (
     anon,
     initiative_info,
     policy_officer,
+    hide_instance,
 )
 from open_poen_api.models import Initiative
 from open_poen_api.managers import InitiativeManager
@@ -201,10 +202,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
 async def test_get_initiatives_list(
     async_client, dummy_session, status_code, result_length
 ):
-    i = await dummy_session.get(Initiative, 1)
-    i.hidden = True
-    dummy_session.add(i)
-    await dummy_session.commit()
+    await hide_instance(dummy_session, Initiative, 1)
     response = await async_client.get("/initiatives")
     assert response.status_code == status_code
     assert len(response.json()["initiatives"]) == result_length

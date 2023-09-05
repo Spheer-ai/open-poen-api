@@ -88,6 +88,13 @@ grant_info = {
 }
 
 
+async def hide_instance(dummy_session, cls, id):
+    i = await dummy_session.get(cls, id)
+    i.hidden = True
+    dummy_session.add(i)
+    await dummy_session.commit()
+
+
 async def retrieve_token_from_last_sent_email():
     """Gets the last send email from Mailhog, assumes it's an email reply to a password
     reset request and parses the token inside it to return it."""

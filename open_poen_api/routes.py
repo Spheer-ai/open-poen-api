@@ -51,16 +51,16 @@ payment_router = APIRouter(tags=["payment"])
 async def create_user(
     user: s.UserCreate,
     request: Request,
-    superuser=Depends(m.superuser),
+    required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(superuser, "create", ent.User, oso)
+    auth.authorize(required_login, "create", ent.User, oso)
     user_with_password = s.UserCreateWithPassword(
         **user.dict(), password=temp_password_generator(size=16)
     )
     user_db = await user_manager.create(user_with_password, request=request)
-    return auth.get_authorized_output_fields(superuser, "read", user_db, oso)
+    return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
 
 
 @user_router.get(
@@ -70,13 +70,13 @@ async def create_user(
 )
 async def get_user(
     user_id: int,
-    optional_user=Depends(m.optional_login),
+    required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.detail_load(user_id)
-    auth.authorize(optional_user, "read", user_db, oso)
-    return auth.get_authorized_output_fields(optional_user, "read", user_db, oso)
+    auth.authorize(required_login, "read", user_db, oso)
+    return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
 
 
 @user_router.patch(
@@ -103,12 +103,12 @@ async def update_user(
 async def delete_user(
     user_id: int,
     request: Request,
-    superuser=Depends(m.superuser),
+    required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
-    auth.authorize(superuser, "delete", user_db, oso)
+    auth.authorize(required_login, "delete", user_db, oso)
     await user_manager.delete(user_db, request=request)
     return Response(status_code=204)
 

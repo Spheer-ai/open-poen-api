@@ -6,6 +6,7 @@ from tests.conftest import (
     userowner,
     user,
     anon,
+    hide_instance,
 )
 import asyncio
 
@@ -99,6 +100,7 @@ async def test_patch_user(async_client, dummy_session, body, status_code):
     assert response.status_code == status_code
     if status_code == 200:
         user = await dummy_session.get(User, user_id)
+        await dummy_session.refresh(user)
         for key in body:
             assert getattr(user, key) == body[key]
 
@@ -106,11 +108,17 @@ async def test_patch_user(async_client, dummy_session, body, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code, length",
-    [(superuser, 200, 12), (user, 200, 11), (anon, 200, 11)],
-    ids=["Superuser sees hidden", "User cannot see hidden", "Anon cannot see hidden"],
+    [(superuser, 200, 13), (userowner, 200, 12), (user, 200, 11), (anon, 200, 11)],
+    ids=[
+        "Superuser sees hidden",
+        "User can see itself hidden",
+        "User cannot see hidden",
+        "Anon cannot see hidden",
+    ],
     indirect=["get_mock_user"],
 )
 async def test_get_users_list(async_client, dummy_session, status_code, length):
+    await hide_instance(dummy_session, User, 1)
     response = await async_client.get("/users")
     assert response.status_code == status_code
     assert len(response.json()["users"]) == length
