@@ -143,6 +143,8 @@ OSO.register_class(
         ),
     },
 )
+OSO.register_class(ent.BankAccount)
+OSO.register_class(ent.Payment)
 OSO.load_files(["open_poen_api/main.polar"])
 
 
