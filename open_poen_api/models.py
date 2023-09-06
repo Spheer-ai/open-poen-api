@@ -347,6 +347,7 @@ class Initiative(Base):
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    justified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user_roles: Mapped[list[UserInitiativeRole]] = relationship(
         "UserInitiativeRole",
