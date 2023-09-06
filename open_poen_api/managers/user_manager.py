@@ -9,7 +9,7 @@ from ..models import (
     UserGrantRole,
 )
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from ..utils.email import MessageSchema, conf, env
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
@@ -118,31 +118,27 @@ class UserManagerExCurrentUser(
         await self.after_delete(user, request)
 
     async def detail_load(self, id: int):
-        # TODO: Use joinedload?
         query_result_q = await self.session.execute(
             select(User)
             .options(
-                selectinload(User.bng),
                 selectinload(User.requisitions),
-                selectinload(User.initiative_roles).selectinload(
+                selectinload(User.initiative_roles).joinedload(
                     UserInitiativeRole.initiative
                 ),
-                selectinload(User.activity_roles).selectinload(
-                    UserActivityRole.activity
-                ),
-                selectinload(User.user_bank_account_roles).selectinload(
+                selectinload(User.activity_roles).joinedload(UserActivityRole.activity),
+                selectinload(User.user_bank_account_roles).joinedload(
                     UserBankAccountRole.bank_account
                 ),
-                selectinload(User.owner_bank_account_role).selectinload(
+                selectinload(User.owner_bank_account_roles).joinedload(
                     UserBankAccountRole.bank_account
                 ),
-                selectinload(User.grant_officer_regulation_roles).selectinload(
+                selectinload(User.grant_officer_regulation_roles).joinedload(
                     UserRegulationRole.regulation
                 ),
-                selectinload(User.policy_officer_regulation_roles).selectinload(
+                selectinload(User.policy_officer_regulation_roles).joinedload(
                     UserRegulationRole.regulation
                 ),
-                selectinload(User.overseer_roles).selectinload(UserGrantRole.grant),
+                selectinload(User.overseer_roles).joinedload(UserGrantRole.grant),
             )
             .where(User.id == id)
         )

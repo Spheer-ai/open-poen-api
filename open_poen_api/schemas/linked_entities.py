@@ -53,13 +53,22 @@ class ActivityReadLinked(ActivityRead):
 class UserReadLinked(UserRead):
     initiatives: list[InitiativeRead]
     activities: list[ActivityRead]
-    user_bank_accounts: list[BankAccountRead]
-    owner_bank_accounts: list[BankAccountRead]
+    used_bank_accounts: list[BankAccountRead] | None
+    owned_bank_accounts: list[BankAccountRead] | None
     grant_officer_regulations: list[RegulationRead]
     policy_officer_regulations: list[RegulationRead]
     grants: list[GrantRead]
 
-    @validator("initiatives", "activities", pre=True)
+    @validator(
+        "initiatives",
+        "activities",
+        "used_bank_accounts",
+        "owned_bank_accounts",
+        "grant_officer_regulations",
+        "policy_officer_regulations",
+        "grants",
+        pre=True,
+    )
     def apply_operation(cls, v):
         return list(v)
 

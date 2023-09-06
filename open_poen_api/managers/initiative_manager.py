@@ -6,7 +6,7 @@ from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from .base_manager import BaseManager
 
 
@@ -150,12 +150,10 @@ class InitiativeManager(BaseManager):
         query_result_q = await self.session.execute(
             select(Initiative)
             .options(
-                selectinload(Initiative.user_roles).selectinload(
-                    UserInitiativeRole.user
-                ),
-                selectinload(Initiative.activities),
-                selectinload(Initiative.debit_cards),
-                selectinload(Initiative.grant),
+                joinedload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
+                joinedload(Initiative.activities),
+                joinedload(Initiative.debit_cards),
+                joinedload(Initiative.grant),
             )
             .where(Initiative.id == id)
         )

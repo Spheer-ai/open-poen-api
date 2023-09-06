@@ -1,24 +1,21 @@
 from .utils import load_env
 import typer
-from .database import asyng_engine, get_async_session_context, get_user_db_context
+from .database import get_async_session_context, get_user_db_context
 from .schemas import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
-from .managers.user_manager import get_user_manager_context
+from .managers.user_manager import UserManager
 from fastapi_users.exceptions import UserAlreadyExists
-from .models import UserRole
 import asyncio
 from rich import print
-from pydantic import EmailStr
-from typing import Literal
 
 app = typer.Typer()
 
 
 async def async_add_user(
-    email: EmailStr,
+    email: str,
     superuser: bool,
-    role: Literal["user", "financial", "admin"],
+    role: str,
     password: str,
 ):
     if password == "random":
@@ -26,15 +23,15 @@ async def async_add_user(
     try:
         async with get_async_session_context() as session:
             async with get_user_db_context(session) as user_db:
-                async with get_user_manager_context(user_db) as user_manager:
-                    user_schema = UserCreateWithPassword(
-                        email=email,
-                        is_superuser=superuser,
-                        role=role,
-                        password=password,
-                    )
-                    user = await user_manager.create(user_schema)
-                    typer.echo(f"Added user with id {user.id}")
+                user_manager = UserManager(user_db, session, None)
+                user_schema = UserCreateWithPassword(
+                    email=email,
+                    is_superuser=superuser,
+                    role=role,
+                    password=password,
+                )
+                user = await user_manager.create(user_schema)
+                typer.echo(f"Added user with id {user.id}")
     except UserAlreadyExists:
         print(f"User {email} already exists")
 
