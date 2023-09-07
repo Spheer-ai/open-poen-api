@@ -9,149 +9,65 @@ from .data_adapter import SqlAlchemyAdapter
 from sqlalchemy.orm import Session
 from typing import Type
 from sqlalchemy.ext.associationproxy import _AssociationList
+import copy
 
 SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 
+register_class_args_list: list[dict] = [
+    {"cls": ent.User},
+    {"cls": ent.Funder},
+    {"cls": ent.Regulation},
+    {
+        "cls": ent.Grant,
+        "fields": {
+            "regulation": Relation(
+                kind="one",
+                other_type="Regulation",
+                my_field="regulation_id",
+                other_field="id",
+            )
+        },
+    },
+    {
+        "cls": ent.Initiative,
+        "fields": {
+            "grant": Relation(
+                kind="one",
+                other_type="Grant",
+                my_field="grant_id",
+                other_field="id",
+            ),
+            "activities": Relation(
+                kind="many",
+                other_type="Activity",
+                my_field="id",
+                other_field="initiative_id",
+            ),
+        },
+    },
+    {
+        "cls": ent.Activity,
+        "fields": {
+            "initiative": Relation(
+                kind="one",
+                other_type="Initiative",
+                my_field="initiative_id",
+                other_field="id",
+            )
+        },
+    },
+]
+
 OSO = Oso()
-OSO.register_class(
-    ent.User,
-    fields={
-        "id": int,
-        "is_superuser": bool,
-        "role": str,
-        "hidden": bool,
-        "initiative_roles": Relation(
-            kind="many",
-            other_type="UserInitiativeRole",
-            my_field="id",
-            other_field="user_id",
-        ),
-    },
-)
-OSO.register_class(
-    ent.UserInitiativeRole,
-    fields={
-        "initiative": Relation(
-            kind="one",
-            other_type="Initiative",
-            my_field="initiative_id",
-            other_field="id",
-        )
-    },
-)
-OSO.register_class(
-    ent.UserActivityRole,
-    fields={
-        "activity": Relation(
-            kind="one",
-            other_type="Activity",
-            my_field="activity_id",
-            other_field="id",
-        )
-    },
-)
-OSO.register_class(
-    ent.UserRegulationRole,
-    fields={
-        "regulation": Relation(
-            kind="one",
-            other_type="Regulation",
-            my_field="regulation_id",
-            other_field="id",
-        ),
-        "user_id": int,
-        "regulation_id": int,
-        "role": str,
-    },
-)
-OSO.register_class(
-    ent.Initiative,
-    fields={
-        "user_roles": Relation(
-            kind="many",
-            other_type="UserInitiativeRole",
-            my_field="id",
-            other_field="initiative_id",
-        ),
-        "hidden": bool,
-        "grant": Relation(
-            kind="one",
-            other_type="Grant",
-            my_field="grant_id",
-            other_field="id",
-        ),
-        "activities": Relation(
-            kind="many",
-            other_type="Activity",
-            my_field="id",
-            other_field="initiative_id",
-        ),
-    },
-)
-OSO.register_class(
-    ent.Activity,
-    fields={
-        "user_roles": Relation(
-            kind="many",
-            other_type="UserActivityRole",
-            my_field="id",
-            other_field="activity_id",
-        ),
-        "hidden": bool,
-        "initiative": Relation(
-            kind="one",
-            other_type="Initiative",
-            my_field="initiative_id",
-            other_field="id",
-        ),
-    },
-)
-OSO.register_class(
-    ent.DebitCard,
-    fields={
-        "initiative": Relation(
-            kind="one",
-            other_type="Initiative",
-            my_field="initiative_id",
-            other_field="id",
-        )
-    },
-)
-OSO.register_class(ent.Funder)
-OSO.register_class(
-    ent.Regulation,
-    fields={
-        "policy_roles": Relation(
-            kind="many",
-            other_type="UserRegulationRole",
-            my_field="id",
-            other_field="regulation_id",
-        ),
-        "name": str,
-    },
-)
-OSO.register_class(ent.UserGrantRole)
-OSO.register_class(
-    ent.Grant,
-    fields={
-        "regulation": Relation(
-            kind="one",
-            other_type="Regulation",
-            my_field="regulation_id",
-            other_field="id",
-        ),
-        "overseer_roles": Relation(
-            kind="many",
-            other_type="UserGrantRole",
-            my_field="id",
-            other_field="grant_id",
-        ),
-    },
-)
-OSO.register_class(ent.BankAccount)
-OSO.register_class(ent.Payment)
+OSO_NO_SQL = Oso()
+for args in register_class_args_list:
+    OSO.register_class(**args)
+    args.pop("fields", None)
+    OSO_NO_SQL.register_class(**args)
+
 OSO.load_files(["open_poen_api/main.polar"])
+OSO_NO_SQL.load_files(["open_poen_api/main.polar"])
 
 
 async def set_sqlalchemy_adapter(session: Session = Depends(get_sync_session)):

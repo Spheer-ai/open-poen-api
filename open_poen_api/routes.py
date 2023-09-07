@@ -24,7 +24,7 @@ from .bng import import_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import select, and_
 from requests import RequestException
 from datetime import datetime, timedelta, date
@@ -528,15 +528,21 @@ async def get_initiatives(
 ):
     # TODO: pagination.
     q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
+    q = q.options(
+        joinedload(ent.Initiative.grant).joinedload(ent.Grant.regulation),
+    )
     initiatives_result = await async_session.execute(q)
     initiatives_scalar = initiatives_result.scalars().all()
     # TODO: This part is resulting in a lot of extra separate queries for authorization.
     # Check if this goes away if we join load the neccessary relationships.
-    filtered_initiatives = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
-        for i in initiatives_scalar
-    ]
-    return s.InitiativeReadList(initiatives=filtered_initiatives)
+    auth.get_authorized_output_fields(
+        optional_user, "read", initiatives_scalar[0], auth.OSO_NO_SQL
+    )
+    # filtered_initiatives = [
+    #     auth.get_authorized_output_fields(optional_user, "read", i, oso)
+    #     for i in initiatives_scalar
+    # ]
+    # return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
 @initiative_router.post(
