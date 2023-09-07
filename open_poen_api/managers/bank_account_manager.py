@@ -58,6 +58,7 @@ class BankAccountManager(BaseManager):
         return bank_account
 
     async def delete(self, bank_account: BankAccount, request: Request | None):
+        # TODO: What if it's linked to a justified or finished initiative / activity?
         await self.session.execute(
             delete(Payment).where(Payment.bank_account_id == bank_account.id)
         )

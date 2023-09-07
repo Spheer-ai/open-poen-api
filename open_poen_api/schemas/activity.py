@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-from .mixins import NotNullValidatorMixin, Budget
+from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
 
 
 class ActivityRead(BaseModel):
@@ -12,6 +12,8 @@ class ActivityRead(BaseModel):
     budget: Budget
     finished: bool
     finished_description: str | None
+    income: TransactionAmount
+    expenses: TransactionAmount
 
     class Config:
         orm_mode = True

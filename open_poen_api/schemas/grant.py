@@ -1,5 +1,5 @@
 from pydantic import BaseModel, condecimal
-from .mixins import NotNullValidatorMixin, Budget
+from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
 
 
 class GrantRead(BaseModel):
@@ -7,6 +7,8 @@ class GrantRead(BaseModel):
     name: str
     reference: str
     budget: Budget
+    income: TransactionAmount
+    expenses: TransactionAmount
 
     class Config:
         orm_mode = True

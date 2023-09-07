@@ -349,6 +349,18 @@ class Initiative(Base):
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
     justified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
+
     user_roles: Mapped[list[UserInitiativeRole]] = relationship(
         "UserInitiativeRole",
         back_populates="initiative",
@@ -395,6 +407,24 @@ class Activity(Base):
     finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
 
+    income: Mapped[Decimal] = mapped_column(
+        DECIMAL(precision=8, scale=2),
+        default=0,
+    )
+
+    @aggregated("payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(
+        DECIMAL(precision=8, scale=2),
+        default=0,
+    )
+
+    @aggregated("payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
+
     user_roles: Mapped[list[UserActivityRole]] = relationship(
         "UserActivityRole",
         back_populates="activity",
@@ -433,6 +463,18 @@ class PaymentType(str, Enum):
     BNG = "BNG"
     GOCARDLESS = "GoCardless"
     MANUAL = "handmatig"
+
+
+def get_finance_aggregate(route: Route):
+    return func.coalesce(
+        func.sum(
+            case(
+                (Payment.route == route.value, Payment.transaction_amount),
+                else_=0,
+            )
+        ),
+        0,
+    )
 
 
 class Payment(Base):
@@ -504,6 +546,18 @@ class DebitCard(Base):
         String(length=64), unique=True, nullable=False
     )
 
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
+
     initiative_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
@@ -574,7 +628,7 @@ class BankAccount(Base):
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    linked_requisitions: Mapped[int] = mapped_column(Integer, nullable=True)
+    linked_requisitions: Mapped[int] = mapped_column(Integer, default=0)
 
     @aggregated("requisitions", column="linked_requisitions")
     def _set_linked_requisitions(self):
@@ -674,6 +728,18 @@ class Grant(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     reference: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("initiatives.payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("initiatives.payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
 
     regulation_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("regulation.id", ondelete="CASCADE")

@@ -21,12 +21,12 @@ OSO.register_class(
         "is_superuser": bool,
         "role": str,
         "hidden": bool,
-        # "initiative_roles": Relation(
-        #     kind="many",
-        #     other_type="UserInitiativeRole",
-        #     my_field="id",
-        #     other_field="user_id",
-        # ),
+        "initiative_roles": Relation(
+            kind="many",
+            other_type="UserInitiativeRole",
+            my_field="id",
+            other_field="user_id",
+        ),
     },
 )
 OSO.register_class(
@@ -80,6 +80,12 @@ OSO.register_class(
             other_type="Grant",
             my_field="grant_id",
             other_field="id",
+        ),
+        "activities": Relation(
+            kind="many",
+            other_type="Activity",
+            my_field="id",
+            other_field="initiative_id",
         ),
     },
 )
