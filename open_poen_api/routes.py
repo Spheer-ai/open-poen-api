@@ -446,7 +446,7 @@ async def get_initiative(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(optional_user, "read", initiative_db, oso)
+    auth.authorize(optional_user, "read", initiative_db, auth.OSO_NO_SQL)
     return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
 
 
@@ -527,7 +527,7 @@ async def get_initiatives(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
+    q = auth.get_authorized_query(optional_user, "read", auth.InitiativeQ, oso)
     q = q.options(
         joinedload(ent.Initiative.grant).joinedload(ent.Grant.regulation),
     )

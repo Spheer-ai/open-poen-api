@@ -14,48 +14,94 @@ import copy
 SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 
+
+class InitiativeQ(ent.Initiative):
+    query_only = True
+
+
+class ActivityQ(ent.Activity):
+    query_only = True
+
+
+class GrantQ(ent.Grant):
+    query_only = True
+
+
+class RegulationQ(ent.Regulation):
+    query_only = True
+
+
 register_class_args_list: list[dict] = [
-    {"cls": ent.User},
-    {"cls": ent.Funder},
-    {"cls": ent.Regulation},
     {
-        "cls": ent.Grant,
-        "fields": {
-            "regulation": Relation(
-                kind="one",
-                other_type="Regulation",
-                my_field="regulation_id",
-                other_field="id",
-            )
-        },
-    },
-    {
-        "cls": ent.Initiative,
+        "cls": InitiativeQ,
         "fields": {
             "grant": Relation(
                 kind="one",
-                other_type="Grant",
+                other_type="GrantQ",
                 my_field="grant_id",
                 other_field="id",
             ),
             "activities": Relation(
                 kind="many",
-                other_type="Activity",
+                other_type="ActivityQ",
                 my_field="id",
                 other_field="initiative_id",
             ),
         },
     },
     {
-        "cls": ent.Activity,
+        "cls": GrantQ,
         "fields": {
-            "initiative": Relation(
+            "regulation": Relation(
                 kind="one",
-                other_type="Initiative",
-                my_field="initiative_id",
+                other_type="RegulationQ",
+                my_field="regulation_id",
                 other_field="id",
-            )
+            ),
         },
+    },
+    {"cls": RegulationQ},
+    {"cls": ent.User},
+    {"cls": ent.Funder},
+    {"cls": ent.Regulation},
+    {
+        "cls": ent.Grant,
+        # "fields": {
+        #     "regulation": Relation(
+        #         kind="one",
+        #         other_type="Regulation",
+        #         my_field="regulation_id",
+        #         other_field="id",
+        #     )
+        # },
+    },
+    {
+        "cls": ent.Initiative,
+        # "fields": {
+        #     "grant": Relation(
+        #         kind="one",
+        #         other_type="Grant",
+        #         my_field="grant_id",
+        #         other_field="id",
+        #     ),
+        #     "activities": Relation(
+        #         kind="many",
+        #         other_type="Activity",
+        #         my_field="id",
+        #         other_field="initiative_id",
+        #     ),
+        # },
+    },
+    {
+        "cls": ent.Activity,
+        # "fields": {
+        #     "initiative": Relation(
+        #         kind="one",
+        #         other_type="Initiative",
+        #         my_field="initiative_id",
+        #         other_field="id",
+        #     )
+        # },
     },
 ]
 
