@@ -14,6 +14,8 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 
 OSO = Oso()
+OSO.register_class(ent.Funder)
+OSO.register_class(ent.Regulation, fields={"id": int})
 OSO.register_class(
     ent.User,
     fields={
@@ -68,12 +70,7 @@ OSO.register_class(
 OSO.register_class(
     ent.Initiative,
     fields={
-        "user_roles": Relation(
-            kind="many",
-            other_type="UserInitiativeRole",
-            my_field="id",
-            other_field="initiative_id",
-        ),
+        "id": int,
         "hidden": bool,
         "grant": Relation(
             kind="one",
@@ -118,19 +115,6 @@ OSO.register_class(
         )
     },
 )
-OSO.register_class(ent.Funder)
-OSO.register_class(
-    ent.Regulation,
-    fields={
-        "policy_roles": Relation(
-            kind="many",
-            other_type="UserRegulationRole",
-            my_field="id",
-            other_field="regulation_id",
-        ),
-        "name": str,
-    },
-)
 OSO.register_class(ent.UserGrantRole)
 OSO.register_class(
     ent.Grant,
@@ -140,12 +124,6 @@ OSO.register_class(
             other_type="Regulation",
             my_field="regulation_id",
             other_field="id",
-        ),
-        "overseer_roles": Relation(
-            kind="many",
-            other_type="UserGrantRole",
-            my_field="id",
-            other_field="grant_id",
         ),
     },
 )

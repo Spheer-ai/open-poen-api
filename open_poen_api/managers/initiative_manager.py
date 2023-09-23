@@ -1,7 +1,7 @@
 from ..database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request, HTTPException
-from ..models import Initiative, User, UserInitiativeRole, DebitCard
+from ..models import Initiative, User, UserInitiativeRole, DebitCard, Grant
 from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
@@ -153,7 +153,7 @@ class InitiativeManager(BaseManager):
                 joinedload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
                 joinedload(Initiative.activities),
                 joinedload(Initiative.debit_cards),
-                joinedload(Initiative.grant),
+                joinedload(Initiative.grant).joinedload(Grant.regulation),
             )
             .where(Initiative.id == id)
         )

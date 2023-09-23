@@ -2,6 +2,7 @@ import pytest
 from tests.conftest import (
     superuser,
     initiative_owner,
+    activity_owner,
     user,
     admin,
     anon,
@@ -186,6 +187,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
         (admin, 24, 200),
         (policy_officer, 23, 200),
         (initiative_owner, 22, 200),
+        (activity_owner, 22, 200),
         (user, 21, 200),
         (anon, 21, 200),
     ],
@@ -194,6 +196,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
         "Administrator sees everything",
         "Policy officer sees own hidden initiatives",
         "initiative_owner sees own hidden initiative",
+        "activity_owner sees own hidden initiative",
         "User sees non hidden",
         "Anon sees non hidden",
     ],
