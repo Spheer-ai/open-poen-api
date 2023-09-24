@@ -20,13 +20,15 @@ class EmailSchema(BaseModel):
     email: list[EmailStr]
 
 
+print(os.environ["MAIL_SERVER"])
+
 conf = ConnectionConfig(
-    MAIL_USERNAME="",
-    MAIL_PASSWORD="",
-    MAIL_FROM=EmailStr("test@email.com"),
-    MAIL_PORT=1025,
-    MAIL_SERVER="localhost",
-    MAIL_FROM_NAME="Desired Name",
+    MAIL_USERNAME=os.environ["MAIL_USERNAME"],
+    MAIL_PASSWORD=os.environ["MAIL_PASSWORD"],
+    MAIL_FROM=EmailStr(os.environ["MAIL_FROM"]),
+    MAIL_PORT=int(os.environ["MAIL_PORT"]),
+    MAIL_SERVER=os.environ["MAIL_SERVER"],
+    MAIL_FROM_NAME=os.environ["MAIL_FROM_NAME"],
     MAIL_STARTTLS=False,
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=False,

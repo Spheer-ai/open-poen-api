@@ -29,10 +29,15 @@ Stop DB and development tools. Add -v to wipe the DB.
 docker compose down -v
 ```
 
+Attach to the app container.
+```
+docker exec -it open-poen-api-app-1 /bin/bash
+```
+
 ### CLI commands
 Add a super_user:
 ```
-poetry run open-poen add-user mark@groningen.nl --superuser --role user --password "test"
+docker exec -it open-poen-api-app-1 open-poen add-user mark@groningen.nl --superuser --role user --password "test"
 ```
 
 ### Interacting with the API

@@ -51,19 +51,3 @@ async def on_startup():
     # TODO: Don't recreate db every time.
     await create_db_and_tables()
     pass
-
-
-if not DEBUG:
-    domain: str = os.environ["DOMAIN_NAME"]
-    allowed_hosts = [domain, f"www.{domain}"]
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=allowed_hosts,
-    )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[f"https://{domain}"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-        allow_credentials=True,
-    )

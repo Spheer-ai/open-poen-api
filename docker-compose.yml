@@ -9,9 +9,10 @@ services:
       - 8000:8000
     env_file:
       - .env
-      - debug.env
+      - sandbox.env
     depends_on:
       - db
+      - mail
   db:
     image: postgres:15
     environment:
