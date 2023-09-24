@@ -4,15 +4,18 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - 8000:8000
+      - 5678:5678
     env_file:
       - .env
       - sandbox.env
     depends_on:
       - db
       - mail
+    volumes:
+      - .:/app
   db:
     image: postgres:15
     environment:
