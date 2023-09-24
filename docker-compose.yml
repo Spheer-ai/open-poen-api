@@ -1,6 +1,17 @@
 version: '3.3'
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    env_file:
+      - .env
+      - debug.env
+    depends_on:
+      - db
   db:
     image: postgres:15
     environment:

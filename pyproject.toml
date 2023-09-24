@@ -45,6 +45,7 @@ types-requests = "^2.31.0.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+include = ["open_poen_api/main.polar"]
 
 [tool.pytest.ini_options]
 testpaths = [

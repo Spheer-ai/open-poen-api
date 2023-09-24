@@ -1,4 +1,3 @@
-from .utils import load_env
 import typer
 from .database import get_async_session_context, get_user_db_context
 from .schemas import UserCreateWithPassword

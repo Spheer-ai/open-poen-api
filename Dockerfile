@@ -14,5 +14,10 @@ RUN apt install -y libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 fonts-open-san
 
 COPY dist/*.whl /tmp/
 COPY dist/requirements.txt /tmp/
+COPY auth/ /app/auth/
+COPY open_poen_api/main.polar /app/open_poen_api/main.polar
+WORKDIR /app
 
 RUN pip install --no-deps -r /tmp/requirements.txt /tmp/*.whl
+
+CMD ["uvicorn", "open_poen_api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,4 +1,3 @@
-from .utils.load_env import DEBUG
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from .managers.user_manager import fastapi_users, auth_backend
