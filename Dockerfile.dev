@@ -17,6 +17,4 @@ RUN pip install --no-deps -r /tmp/requirements.txt
 RUN pip install debugpy
 WORKDIR /app
 
-# CMD ["python", "-m", "ptvsd", "--host", "0.0.0.0", "--port", "5678", "--wait", "-m", "uvicorn", "open_poen_api:app", "--host", "0.0.0.0", "--port", "8000"]
-# CMD ["uvicorn", "open_poen_api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-CMD ["python", "-Xfrozen_modules=off", "-m", "debugpy", "--wait-for-client", "--listen", "0.0.0.0:5678", "-m", "uvicorn", "open_poen_api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["sh",  "-c",  "pip install -e /app && python -Xfrozen_modules=off -m debugpy --wait-for-client --listen 0.0.0.0:5678 -m uvicorn open_poen_api:app --host 0.0.0.0 --port 8000 --reload"]

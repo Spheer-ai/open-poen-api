@@ -5,6 +5,17 @@ from jinja2 import Environment, FileSystemLoader
 import os
 
 
+def str_to_bool(env: str) -> bool:
+    if env == "0":
+        return False
+    elif env == "1":
+        return True
+    else:
+        print(type(env))
+        print(env)
+        raise ValueError("Ambiguous environment variable")
+
+
 TEMPLATE_FOLDER = Path(__file__).parent.parent / "templates"
 
 
@@ -29,9 +40,9 @@ conf = ConnectionConfig(
     MAIL_PORT=int(os.environ["MAIL_PORT"]),
     MAIL_SERVER=os.environ["MAIL_SERVER"],
     MAIL_FROM_NAME=os.environ["MAIL_FROM_NAME"],
-    MAIL_STARTTLS=False,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=False,
-    VALIDATE_CERTS=False,
+    MAIL_STARTTLS=str_to_bool(os.environ["MAIL_STARTTLS"]),
+    MAIL_SSL_TLS=str_to_bool(os.environ["MAIL_SSL_TLS"]),
+    USE_CREDENTIALS=str_to_bool(os.environ["USE_CREDENTIALS"]),
+    VALIDATE_CERTS=str_to_bool(os.environ["VALIDATE_CERTS"]),
     TEMPLATE_FOLDER=TEMPLATE_FOLDER,
 )

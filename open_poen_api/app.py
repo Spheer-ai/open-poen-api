@@ -26,7 +26,11 @@ tags_metadata = [
     },
 ]
 
-app = FastAPI(openapi_tags=tags_metadata)
+app = FastAPI(
+    title="Open Poen API",
+    description="Creating transparency in how public funds are spent.",
+    openapi_tags=tags_metadata,
+)
 
 app.include_router(
     fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]
