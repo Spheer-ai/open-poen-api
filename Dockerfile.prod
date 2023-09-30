@@ -20,4 +20,5 @@ WORKDIR /app
 
 RUN pip install --no-deps -r /tmp/requirements.txt /tmp/*.whl
 
+EXPOSE 8000
 CMD ["uvicorn", "open_poen_api:app", "--host", "0.0.0.0", "--port", "8000"]
