@@ -1,2 +1,2 @@
-from .payments import get_bng_payments
+from .payments import import_bng_payments
 from .api import retrieve_access_token, create_consent

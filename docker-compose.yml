@@ -1,8 +1,23 @@
 version: '3.3'
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - 8000:8000
+      - 5678:5678
+    env_file:
+      - .env
+      - sandbox.env
+    depends_on:
+      - db
+      - mail
+    volumes:
+      - .:/app
   db:
-    image: postgres
+    image: postgres:15
     environment:
       POSTGRES_USER: mark
       POSTGRES_PASSWORD: mark

@@ -14,6 +14,8 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 
 OSO = Oso()
+OSO.register_class(ent.Funder)
+OSO.register_class(ent.Regulation, fields={"id": int})
 OSO.register_class(
     ent.User,
     fields={
@@ -68,18 +70,19 @@ OSO.register_class(
 OSO.register_class(
     ent.Initiative,
     fields={
-        "user_roles": Relation(
-            kind="many",
-            other_type="UserInitiativeRole",
-            my_field="id",
-            other_field="initiative_id",
-        ),
+        "id": int,
         "hidden": bool,
         "grant": Relation(
             kind="one",
             other_type="Grant",
             my_field="grant_id",
             other_field="id",
+        ),
+        "activities": Relation(
+            kind="many",
+            other_type="Activity",
+            my_field="id",
+            other_field="initiative_id",
         ),
     },
 )
@@ -112,19 +115,6 @@ OSO.register_class(
         )
     },
 )
-OSO.register_class(ent.Funder)
-OSO.register_class(
-    ent.Regulation,
-    fields={
-        "policy_roles": Relation(
-            kind="many",
-            other_type="UserRegulationRole",
-            my_field="id",
-            other_field="regulation_id",
-        ),
-        "name": str,
-    },
-)
 OSO.register_class(ent.UserGrantRole)
 OSO.register_class(
     ent.Grant,
@@ -135,14 +125,10 @@ OSO.register_class(
             my_field="regulation_id",
             other_field="id",
         ),
-        "overseer_roles": Relation(
-            kind="many",
-            other_type="UserGrantRole",
-            my_field="id",
-            other_field="grant_id",
-        ),
     },
 )
+OSO.register_class(ent.BankAccount)
+OSO.register_class(ent.Payment)
 OSO.load_files(["open_poen_api/main.polar"])
 
 
@@ -173,7 +159,12 @@ def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):
     return OSO.is_allowed(oso_actor, action, resource)
 
 
-def authorize(actor: ent.User | None, action: str, resource: ent.Base | str, oso: Oso):
+def authorize(
+    actor: ent.User | None,
+    action: str,
+    resource: ent.Base | str | Type[ent.Base],
+    oso: Oso,
+):
     """
     Authorizes a given user (actor) to perform an action on a resource
     if allowed by Oso's policies.
@@ -246,9 +237,14 @@ def get_authorized_output_fields(
     for f in rel_fields:
         rel = getattr(resource, f)
         if isinstance(rel, ent.Base):
-            result[f] = get_fields_for_relationship(rel)
+            if is_allowed(actor, action, rel):
+                result[f] = get_fields_for_relationship(rel)
         elif isinstance(rel, (list, _AssociationList)):
-            result[f] = [get_fields_for_relationship(i) for i in rel]
+            result[f] = [
+                get_fields_for_relationship(i)
+                for i in rel
+                if is_allowed(actor, action, i)
+            ]
         elif rel is None:
             result[f] = rel
         else:

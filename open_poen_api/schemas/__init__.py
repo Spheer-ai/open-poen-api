@@ -10,3 +10,4 @@ from .gocardless import *
 from .regulation import *
 from .grant import *
 from .bank_account import *
+from .payment import *

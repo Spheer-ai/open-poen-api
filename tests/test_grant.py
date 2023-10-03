@@ -8,7 +8,7 @@ from tests.conftest import (
     policy_officer,
 )
 from open_poen_api.models import Grant
-from open_poen_api.managers import get_grant_manager
+from open_poen_api.managers import GrantManager
 
 
 @pytest.mark.asyncio
@@ -75,28 +75,24 @@ async def test_delete_grant(async_client, dummy_session, status_code):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("user_id", [1, None], ids=["Add", "Remove"])
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (user, 403), (admin, 200), (anon, 403)],
     ids=["Superuser can", "User cannot", "Administrator can", "Anon cannot"],
     indirect=["get_mock_user"],
 )
-async def test_add_overseer(async_client, dummy_session, status_code, user_id):
+async def test_add_overseers(async_client, dummy_session, status_code):
     funder_id, regulation_id, grant_id = 1, 1, 1
-    body = {"user_id": user_id}
+    body = {"user_ids": [1]}
     response = await async_client.patch(
         f"/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
         json=body,
     )
     assert response.status_code == status_code
     if status_code == 200:
-        gm = await get_grant_manager(dummy_session).__anext__()
+        gm = GrantManager(dummy_session, None)
         db_grant = await gm.detail_load(grant_id)
-        if user_id == 1:
-            assert db_grant.overseer.email == "user1@example.com"
-        else:
-            assert db_grant.overseer is None
+        assert db_grant.overseers[0].email == "user1@example.com"
 
 
 @pytest.mark.asyncio

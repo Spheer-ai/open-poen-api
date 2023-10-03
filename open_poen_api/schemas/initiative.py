@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, validator, ValidationError
 from ..models import LegalEntity
-from .mixins import NotNullValidatorMixin, Budget
+from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
 
 
 class InitiativeRead(BaseModel):
@@ -18,6 +18,8 @@ class InitiativeRead(BaseModel):
     hidden_sponsors: bool | None
     hidden: bool | None
     budget: Budget
+    income: TransactionAmount
+    expenses: TransactionAmount
 
     class Config:
         orm_mode = True
@@ -47,14 +49,16 @@ class InitiativeCreate(BaseModel):
 
 
 class InitiativeUpdate(NotNullValidatorMixin):
-    NOT_NULL_FIELDS = [
+    NOT_NULL_FIELDS: list[str] = [
         "name",
         "description",
-        "purpose" "target_audience",
+        "purpose",
+        "target_audience",
         "owner",
         "owner_email",
         "legal_entity",
         "address_applicant",
+        "kvk_registration",
         "location",
         "hidden_sponsors",
         "hidden",

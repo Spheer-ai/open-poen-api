@@ -1,0 +1,62 @@
+[
+    {
+        "institution_id": "INST123",
+        "api_requisition_id": "REQ001",
+        "reference_id": "REF123",
+        "callback_handled": false,
+        "status": "CR",
+        "n_days_history": 30,
+        "n_days_access": 7,
+        "user_id": 1
+    },
+    {
+        "institution_id": "INST456",
+        "api_requisition_id": "REQ002",
+        "reference_id": "REF456",
+        "callback_handled": true,
+        "status": "LN",
+        "n_days_history": 15,
+        "n_days_access": 3,
+        "user_id": 2
+    },
+    {
+        "institution_id": "INST789",
+        "api_requisition_id": "REQ003",
+        "reference_id": "REF789",
+        "callback_handled": true,
+        "status": "LN",
+        "n_days_history": 60,
+        "n_days_access": 14,
+        "user_id": 1
+    },
+    {
+        "institution_id": "INST012",
+        "api_requisition_id": "REQ004",
+        "reference_id": "REF012",
+        "callback_handled": true,
+        "status": "LN",
+        "n_days_history": 45,
+        "n_days_access": 10,
+        "user_id": 2
+    },
+    {
+        "institution_id": "INST345",
+        "api_requisition_id": "REQ005",
+        "reference_id": "REF345",
+        "callback_handled": true,
+        "status": "EX",
+        "n_days_history": 30,
+        "n_days_access": 7,
+        "user_id": 1
+    },
+    {
+        "institution_id": "INST345",
+        "api_requisition_id": "REQ005",
+        "reference_id": "REF345",
+        "callback_handled": true,
+        "status": "RV",
+        "n_days_history": 30,
+        "n_days_access": 7,
+        "user_id": 1
+    }
+]

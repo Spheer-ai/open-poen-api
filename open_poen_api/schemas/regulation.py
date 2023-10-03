@@ -34,7 +34,7 @@ class RegulationOfficersUpdate(BaseModel):
 
 
 class RegulationUpdate(NotNullValidatorMixin):
-    NOT_NULL_FIELDS = ["name", "description"]
+    NOT_NULL_FIELDS: list[str] = ["name", "description"]
 
     name: str | None
     description: str | None

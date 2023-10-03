@@ -89,7 +89,7 @@ async def _parse_and_save_payments(session: AsyncSession, payments):
         await session.commit()
 
 
-async def get_bng_payments(
+async def import_bng_payments(
     session: AsyncSession, date_from: datetime = datetime.today() - timedelta(days=31)
 ):
     bng_account_q = await session.execute(select(ent.BNG))

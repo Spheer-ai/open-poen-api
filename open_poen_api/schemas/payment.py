@@ -1,123 +1,94 @@
-from pydantic import BaseModel, Extra, validator
-from .mixins import TimeStampMixin, Budget
-
-# from .models.entities import PaymentBase, Route, PaymentType
-# # from ..models import
-from .mixins import NotNullValidatorMixin, HiddenMixin
+from pydantic import BaseModel, Field, validator
 from datetime import datetime
+from .mixins import TransactionAmount
+from ..models import Route, PaymentType
+from typing import Literal
 
 
-class PaymentCreateFinancial(PaymentBase):
-    pass
-
-    class Config:
-        title = "PaymentCreate"
-        extra = Extra.forbid
-
-
-class PaymentUpdateActivityOwner(BaseModel, NotNullValidatorMixin):
-    short_user_description: str | None
-    long_user_description: str | None
-
-    @validator("short_user_description", "long_user_description")
-    def val_descriptions(cls, value, field):
-        return cls.not_null(value, field)
-
-    class Config:
-        extra = Extra.forbid
-        orm_mode = True
-
-
-class PaymentUpdateInitiativeOwner(PaymentUpdateActivityOwner, HiddenMixin):
-    route: Route | None
-
-    @validator("route", "hidden")
-    def val_route_and_hidden(cls, value, field):
-        return cls.not_null(value, field)
-
-    class Config:
-        extra = Extra.forbid
-        orm_mode = True
-
-
-class PaymentUpdateFinancial(PaymentUpdateInitiativeOwner):
-    booking_date: datetime | None
-    transaction_amount: Budget | None
-    creditor_name: str | None
-    creditor_account: str | None
-    debtor_name: str | None
-    debtor_account: str | None
-
-    @validator(
-        "booking_date",
-        "transaction_amount",
-        "creditor_name",
-        "creditor_account",
-        "debtor_name",
-        "debtor_account",
-    )
-    def val_fields(cls, value, field):
-        return cls.not_null(value, field)
-
-    class Config:
-        title = "PaymentUpdate"
-        extra = Extra.forbid
-        orm_mode = True
-
-
-FORBIDDEN_NON_MANUAL_PAYMENT_FIELDS = [
-    "booking_date",
-    "transaction_amount",
-    "creditor_name",
-    "credtor_account",
-    "debtor_name",
-    "debtor_account",
-]
-
-
-class PaymentOutputGuest(BaseModel):
+class PaymentRead(BaseModel):
     id: int
     booking_date: datetime
-    transaction_amount: Budget
+    transaction_amount: TransactionAmount
     creditor_name: str
     creditor_account: str
     debtor_name: str
     debtor_account: str
     route: Route
-    short_user_description: str | None
-    long_user_description: str | None
-    remittance_information_unstructured: str | None
-    remittance_information_structured: str | None
     type: PaymentType
+    remittance_information_unstructured: str
+    remittance_information_structured: str
+    short_user_description: str
+    long_user_description: str
+    # TODO: Add more fields from other entities such as initiative name,
+    # activity name, bank account IBAN, etc.
 
 
-class PaymentOutputInitiativeOwner(PaymentOutputGuest, TimeStampMixin, HiddenMixin):
-    pass
+class BasePaymentCreate(BaseModel):
+    booking_date: datetime
+    transaction_amount: TransactionAmount
+    creditor_name: str
+    creditor_account: str
+    debtor_name: str
+    debtor_account: str
+    route: Route
+    short_user_description: str
+    long_user_description: str
 
 
-class PaymentOutputFinancial(PaymentOutputInitiativeOwner):
-    pass
-
-    class Config:
-        title = "PaymentOutput"
-
-
-class PaymentOutputGuestList(BaseModel):
-    payments: list[PaymentOutputGuest]
-
-    class Config:
-        orm_mode = True
+class PaymentCreateManual(BasePaymentCreate):
+    type: Literal[PaymentType.MANUAL] = Field(default=PaymentType.MANUAL.value)
+    initiative_id: int
+    activity_id: int | None
 
 
-class PaymentOutputInitiatitveOwnerList(BaseModel):
-    payments: list[PaymentOutputInitiativeOwner]
+class PaymentCreateAll(BasePaymentCreate):
+    type: PaymentType
+    initiative_id: int | None
+    activity_id: int | None
+    debit_card_id: int | None
+    bank_account_id: int | None
 
-    class Config:
-        orm_mode = True
+    @validator("initiative_id", pre=True, always=True)
+    def validate_initiative_id(cls, initiative_id, values):
+        if values.get("type") == PaymentType.MANUAL and initiative_id is None:
+            raise ValueError("initiative_id must be provided when type is 'handmatig'.")
+        return initiative_id
+
+    @validator("bank_account_id", pre=True, always=True)
+    def validate_bank_account_id(cls, bank_account_id, values):
+        if values.get("type") == PaymentType.GOCARDLESS and bank_account_id is None:
+            raise ValueError(
+                "bank_account_id must be provided when type is 'GoCardless'."
+            )
+        return bank_account_id
+
+    @validator("debit_card_id", pre=True, always=True)
+    def validate_debit_card_id(cls, debit_card_id, values):
+        if values.get("type") == PaymentType.BNG and debit_card_id is None:
+            raise ValueError("debit_card_id must be provided when type is 'BNG'.")
+        return debit_card_id
 
 
-class PaymentOutputFinancialList(BaseModel):
-    payments: list[PaymentOutputFinancial]
+class PaymentUpdate(BaseModel):
+    booking_date: datetime
+    transaction_amount: TransactionAmount
+    creditor_name: str
+    creditor_account: str
+    debtor_name: str
+    debtor_account: str
+    route: Route
+    short_user_description: str
+    long_user_description: str
 
-    class Config:
-        orm_mode = True
+
+class PaymentInitiativeUpdate(BaseModel):
+    initiative_id: int | None
+
+
+class PaymentActivityUpdate(BaseModel):
+    initiative_id: int
+    activity_id: int | None
+
+
+class PaymentReadList(BaseModel):
+    payments: list[PaymentRead]

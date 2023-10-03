@@ -10,12 +10,18 @@ from open_poen_api.models import (
     UserRole,
     Activity,
     RegulationRole,
+    Payment,
+    DebitCard,
+    Requisition,
+    BankAccount,
+    UserBankAccountRole,
+    BankAccountRole,
 )
-from open_poen_api.routes import superuser_dep, required_login_dep, optional_login_dep
-from open_poen_api.managers import user_manager as um
+from open_poen_api.managers import superuser, required_login, optional_login
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import pytest_asyncio
 import base64
 import urllib.parse
@@ -28,8 +34,10 @@ from open_poen_api.schemas import (
     FunderCreate,
     RegulationCreate,
     GrantCreate,
+    PaymentCreateAll,
 )
 import json
+from dateutil.parser import isoparse
 
 
 superuser = 6
@@ -78,6 +86,13 @@ grant_info = {
     "reference": "AB1234",
     "budget": 1000.01,
 }
+
+
+async def hide_instance(dummy_session, cls, id):
+    i = await dummy_session.get(cls, id)
+    i.hidden = True
+    dummy_session.add(i)
+    await dummy_session.commit()
 
 
 async def retrieve_token_from_last_sent_email():
@@ -145,9 +160,9 @@ def load_json(json_file_path):
 
 @pytest_asyncio.fixture
 async def overridden_app(get_mock_user):
-    app.dependency_overrides[superuser_dep] = get_mock_user
-    app.dependency_overrides[required_login_dep] = get_mock_user
-    app.dependency_overrides[optional_login_dep] = get_mock_user
+    app.dependency_overrides[superuser] = get_mock_user
+    app.dependency_overrides[required_login] = get_mock_user
+    app.dependency_overrides[optional_login] = get_mock_user
     yield app
     app.dependency_overrides = {}
 
@@ -155,12 +170,14 @@ async def overridden_app(get_mock_user):
 @pytest_asyncio.fixture(scope="function")
 async def dummy_session(async_session):
     db = await get_user_db(async_session).__anext__()
-    user_manager = await m.get_user_manager(db).__anext__()
-    initiative_manager = await m.get_initiative_manager(async_session).__anext__()
-    activity_manager = await m.get_activity_manager(async_session).__anext__()
-    funder_manager = await m.get_funder_manager(async_session).__anext__()
-    regulation_manager = await m.get_regulation_manager(async_session).__anext__()
-    grant_manager = await m.get_grant_manager(async_session).__anext__()
+    user_manager = m.UserManager(db, async_session, None)
+    initiative_manager = m.InitiativeManager(async_session, None)
+    activity_manager = m.ActivityManager(async_session, None)
+    funder_manager = m.FunderManager(async_session, None)
+    regulation_manager = m.RegulationManager(async_session, None)
+    grant_manager = m.GrantManager(async_session, None)
+    bank_account_manager = m.BankAccountManager(async_session, None)
+
     users = load_json("./tests/dummy_data/users.json")
     for user in users:
         schema = UserCreateWithPassword(**user)
@@ -189,6 +206,35 @@ async def dummy_session(async_session):
         initiative_id = act.pop("initiative_id")
         schema = ActivityCreate(**act)
         await activity_manager.create(schema, initiative_id, request=None)
+    requisitions = load_json("./tests/dummy_data/requisitions.json")
+    for r in requisitions:
+        requisition = Requisition(**r)
+        async_session.add(requisition)
+        await async_session.commit()
+    bank_accounts = load_json("./tests/dummy_data/bank_accounts.json")
+    for ba in bank_accounts:
+        requisition_ids = ba.pop("requisition_ids")
+        ba["created"] = isoparse(ba["created"])
+        ba["last_accessed"] = isoparse(ba["last_accessed"])
+        requisitions_q = await async_session.execute(
+            select(Requisition).where(Requisition.id.in_(requisition_ids))
+        )
+        requisitions = requisitions_q.scalars().all()
+        bank_account = BankAccount(**ba)
+        bank_account.requisitions = requisitions
+        async_session.add(bank_account)
+        await async_session.commit()
+    debit_cards = load_json("./tests/dummy_data/debit_cards.json")
+    for dc in debit_cards:
+        debit_card = DebitCard(**dc)
+        async_session.add(debit_card)
+        await async_session.commit()
+    payments = load_json("./tests/dummy_data/payments.json")
+    for p in payments:
+        schema = PaymentCreateAll(**p)
+        payment = Payment(**schema.dict())
+        async_session.add(payment)
+        await async_session.commit()
 
     # TODO: Fix magical constants.
     regulation = await regulation_manager.min_load(6)
@@ -202,6 +248,13 @@ async def dummy_session(async_session):
     activity = await activity_manager.min_load(1, 1)
     await activity_manager.make_users_owner(activity, user_ids=[13])
 
+    bank_account_roles = [
+        UserBankAccountRole(user_id=1, bank_account_id=1, role=BankAccountRole.OWNER),
+        UserBankAccountRole(user_id=2, bank_account_id=2, role=BankAccountRole.OWNER),
+    ]
+    async_session.add_all(bank_account_roles)
+    await async_session.commit()
+
     return async_session
 
 
@@ -210,73 +263,11 @@ async def get_mock_user(request, dummy_session):
     if request.param is None:
         return lambda: None
 
-    user_db = await get_user_db(dummy_session).__anext__()
-    user_manager = await m.get_user_manager(user_db, dummy_session).__anext__()
+    db = await get_user_db(dummy_session).__anext__()
+    user_manager = m.UserManager(db, dummy_session, None)
     user_instance = await user_manager.detail_load(request.param)
 
     async def func():
         return user_instance
 
     return func
-
-
-@pytest_asyncio.fixture(scope="function")
-async def as_1(async_session):
-    # One user.
-    db = await m.get_user_db(async_session).__anext__()
-    um = await m.get_user_manager(db).__anext__()
-    s = UserCreateWithPassword(
-        email="existing@user.com", role="user", password="testing"
-    )
-    u = await um.create(s, request=None)
-    return async_session
-
-
-@pytest_asyncio.fixture(scope="function")
-async def as_2(as_1):
-    # One initiative and one user.
-    im = await m.get_initiative_manager(as_1).__anext__()
-    for i in (1, 2, 3):
-        info = initiative_info.copy()
-        if i > 1:
-            info.update({"name": info["name"] + str(i)})
-        s = InitiativeCreate(**info)
-        i = await im.create(s, request=None)
-    return as_1
-
-
-@pytest_asyncio.fixture(scope="function")
-async def as_3(as_2):
-    # One initiative and one user linked to one another.
-    im = await m.get_initiative_manager(as_2).__anext__()
-    i = await im.detail_load(1)
-    i = await im.make_users_owner(i, [1], request=None)
-    return as_2
-
-
-@pytest_asyncio.fixture(scope="function")
-async def as_4(as_3):
-    # One initiative + activity and one user linked to one another.
-    am = await m.get_activity_manager(as_3).__anext__()
-    s = ActivityCreate(**activity_info)
-    a = await am.create(s, 1, request=None)
-    return as_3
-
-
-@pytest_asyncio.fixture(scope="function")
-async def as_5(as_4):
-    # One initiative + activity + user and three users that are linked
-    # to the activity.
-    db = await m.get_user_db(as_4).__anext__()
-    um = await m.get_user_manager(db).__anext__()
-    am = await m.get_activity_manager(as_4).__anext__()
-    a = await as_4.get(Activity, 1)
-    ids = []
-    for i in (1, 2, 3):
-        s = UserCreateWithPassword(
-            email=f"extra{i}@user.com", role="user", password="testing"
-        )
-        u = await um.create(s, request=None)
-        ids.append(u.id)
-    await am.make_users_owner(a, ids, request=None)
-    return as_4

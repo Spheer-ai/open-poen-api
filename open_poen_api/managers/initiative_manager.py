@@ -1,16 +1,16 @@
 from ..database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request, HTTPException
-from ..models import Initiative, User, UserInitiativeRole, DebitCard
+from ..models import Initiative, User, UserInitiativeRole, DebitCard, Grant
 from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from .base_manager import Manager
+from sqlalchemy.orm import selectinload, joinedload
+from .base_manager import BaseManager
 
 
-class InitiativeManager(Manager):
+class InitiativeManager(BaseManager):
     async def create(
         self,
         initiative_create: InitiativeCreate,
@@ -150,11 +150,10 @@ class InitiativeManager(Manager):
         query_result_q = await self.session.execute(
             select(Initiative)
             .options(
-                selectinload(Initiative.user_roles).selectinload(
-                    UserInitiativeRole.user
-                ),
-                selectinload(Initiative.activities),
-                selectinload(Initiative.debit_cards),
+                joinedload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
+                joinedload(Initiative.activities),
+                joinedload(Initiative.debit_cards),
+                joinedload(Initiative.grant).joinedload(Grant.regulation),
             )
             .where(Initiative.id == id)
         )
@@ -165,7 +164,3 @@ class InitiativeManager(Manager):
 
     async def min_load(self, id: int) -> Initiative:
         return await self.base_min_load(Initiative, id)
-
-
-async def get_initiative_manager(session: AsyncSession = Depends(get_async_session)):
-    yield InitiativeManager(session)

@@ -2,14 +2,16 @@ import pytest
 from tests.conftest import (
     superuser,
     initiative_owner,
+    activity_owner,
     user,
     admin,
     anon,
     initiative_info,
     policy_officer,
+    hide_instance,
 )
 from open_poen_api.models import Initiative
-from open_poen_api.managers import get_initiative_manager
+from open_poen_api.managers import InitiativeManager
 
 
 @pytest.mark.asyncio
@@ -101,7 +103,7 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        im = await get_initiative_manager(dummy_session).__anext__()
+        im = InitiativeManager(dummy_session, None)
         db_initiative = await im.detail_load(initiative_id)
         assert len(db_initiative.initiative_owners) == 1
         assert db_initiative.initiative_owners[0].email == "user1@example.com"
@@ -134,7 +136,7 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        im = await get_initiative_manager(dummy_session).__anext__()
+        im = InitiativeManager(dummy_session, None)
         db_initiative = await im.detail_load(initiative_id)
         assert len(db_initiative.debit_cards) == 1
         assert db_initiative.debit_cards[0].card_number == str(6731924123456789012)
@@ -185,6 +187,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
         (admin, 24, 200),
         (policy_officer, 23, 200),
         (initiative_owner, 22, 200),
+        (activity_owner, 22, 200),
         (user, 21, 200),
         (anon, 21, 200),
     ],
@@ -193,6 +196,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
         "Administrator sees everything",
         "Policy officer sees own hidden initiatives",
         "initiative_owner sees own hidden initiative",
+        "activity_owner sees own hidden initiative",
         "User sees non hidden",
         "Anon sees non hidden",
     ],
@@ -201,10 +205,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
 async def test_get_initiatives_list(
     async_client, dummy_session, status_code, result_length
 ):
-    i = await dummy_session.get(Initiative, 1)
-    i.hidden = True
-    dummy_session.add(i)
-    await dummy_session.commit()
+    await hide_instance(dummy_session, Initiative, 1)
     response = await async_client.get("/initiatives")
     assert response.status_code == status_code
     assert len(response.json()["initiatives"]) == result_length

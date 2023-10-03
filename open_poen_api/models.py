@@ -146,7 +146,7 @@ class UserGrantRole(Base):
         "User", uselist=False, back_populates="overseer_roles"
     )
     grant: Mapped["Grant"] = relationship(
-        "Grant", uselist=False, back_populates="overseer_role"
+        "Grant", uselist=False, back_populates="overseer_roles"
     )
 
 
@@ -182,6 +182,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "Requisition",
         back_populates="user",
         lazy="noload",
+        cascade="all",
     )
 
     initiative_roles: Mapped[list[UserInitiativeRole]] = relationship(
@@ -207,22 +208,22 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "UserBankAccountRole",
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
-        overlaps="owner_bank_account_role, user",
+        overlaps="owner_bank_account_roles, user",
         cascade="all",
     )
     used_bank_accounts: AssociationProxy[list["BankAccount"]] = association_proxy(
         "user_bank_account_roles", "bank_account"
     )
 
-    owner_bank_account_role: Mapped[list[UserBankAccountRole]] = relationship(
+    owner_bank_account_roles: Mapped[list[UserBankAccountRole]] = relationship(
         "UserBankAccountRole",
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
         overlaps="user_bank_account_roles, user",
         cascade="all",
     )
-    owned_bank_account: AssociationProxy[list["BankAccount"]] = association_proxy(
-        "owner_bank_account_role", "bank_account"
+    owned_bank_accounts: AssociationProxy[list["BankAccount"]] = association_proxy(
+        "owner_bank_account_roles", "bank_account"
     )
 
     grant_officer_regulation_roles: Mapped[list[UserRegulationRole]] = relationship(
@@ -261,7 +262,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "initiatives",
         "activities",
         "used_bank_accounts",
-        "owned_bank_account",
+        "owned_bank_accounts",
         "grant_officer_regulations",
         "policy_officer_regulations",
     ]
@@ -277,11 +278,10 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         "initiatives",
         "activity_roles",
         "activities",
-        "shared_bank_account_roles",
-        "shared_bank_accounts",
-        "owned_bank_account_role",
-        "owned_bank_account",
-        "grant_officer_regulation_roles",
+        "user_bank_account_roles",
+        "used_bank_accounts",
+        "owner_bank_account_roles",
+        "owned_bank_accounts",
         "grant_officer_regulation_roles",
         "grant_officer_regulations",
         "policy_officer_regulation_roles",
@@ -347,6 +347,19 @@ class Initiative(Base):
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    justified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
 
     user_roles: Mapped[list[UserInitiativeRole]] = relationship(
         "UserInitiativeRole",
@@ -394,6 +407,24 @@ class Activity(Base):
     finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
 
+    income: Mapped[Decimal] = mapped_column(
+        DECIMAL(precision=8, scale=2),
+        default=0,
+    )
+
+    @aggregated("payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(
+        DECIMAL(precision=8, scale=2),
+        default=0,
+    )
+
+    @aggregated("payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
+
     user_roles: Mapped[list[UserActivityRole]] = relationship(
         "UserActivityRole",
         back_populates="activity",
@@ -434,12 +465,24 @@ class PaymentType(str, Enum):
     MANUAL = "handmatig"
 
 
+def get_finance_aggregate(route: Route):
+    return func.coalesce(
+        func.sum(
+            case(
+                (Payment.route == route.value, Payment.transaction_amount),
+                else_=0,
+            )
+        ),
+        0,
+    )
+
+
 class Payment(Base):
     __tablename__ = "payment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     transaction_id: Mapped[str] = mapped_column(
-        String(length=64), unique=True, nullable=False, index=True
+        String(length=64), unique=True, nullable=True, index=True
     )
     entry_reference: Mapped[str] = mapped_column(String(length=128), nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String(length=128), nullable=True)
@@ -453,7 +496,9 @@ class Payment(Base):
     type: Mapped[PaymentType] = mapped_column(
         ChoiceType(PaymentType, impl=VARCHAR(length=32))
     )
-    remittance_information_unstructured: Mapped[str] = mapped_column(String(length=512))
+    remittance_information_unstructured: Mapped[str] = mapped_column(
+        String(length=512), nullable=True
+    )
     remittance_information_structured: Mapped[str] = mapped_column(
         String(length=512), nullable=True
     )
@@ -464,30 +509,33 @@ class Payment(Base):
         String(length=128), nullable=True
     )
 
-    activity_id: Mapped[int] = mapped_column(
+    activity_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("activity.id", ondelete="SET NULL"), nullable=True
     )
     activity: Mapped[Optional[Activity]] = relationship(
         "Activity", back_populates="payments", lazy="noload", uselist=False
     )
-    initiative_id: Mapped[int] = mapped_column(
+    initiative_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
     initiative: Mapped[Optional[Initiative]] = relationship(
         "Initiative", back_populates="payments", lazy="noload", uselist=False
     )
-    debit_card_id: Mapped[int] = mapped_column(
+    debit_card_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("debitcard.id"), nullable=True
     )
     debit_card: Mapped[Optional["DebitCard"]] = relationship(
         "DebitCard", back_populates="payments", lazy="noload", uselist=False
     )
-    bank_account_id: Mapped[int] = mapped_column(
+    bank_account_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("bank_account.id"), nullable=True
     )
     bank_account: Mapped[Optional["BankAccount"]] = relationship(
         "BankAccount", back_populates="payments", lazy="noload"
     )
+
+    def __repr__(self):
+        return f"Payment(id={self.id}, transaction_amount='{self.transaction_amount}', route='{self.route}')"
 
 
 class DebitCard(Base):
@@ -498,8 +546,20 @@ class DebitCard(Base):
         String(length=64), unique=True, nullable=False
     )
 
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
+
     initiative_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("initiative.id", ondelete="SET NULL")
+        Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
     initiative: Mapped[Initiative | None] = relationship(
         "Initiative", back_populates="debit_cards", lazy="noload", uselist=False
@@ -544,7 +604,7 @@ class Requisition(Base, TimeStampMixin):
     n_days_access: Mapped[int] = mapped_column(Integer, nullable=False)
 
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=False
+        Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True
     )
     user: Mapped[User] = relationship(
         "User", back_populates="requisitions", lazy="noload", uselist=False
@@ -568,7 +628,7 @@ class BankAccount(Base):
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    linked_requisitions: Mapped[int] = mapped_column(Integer, nullable=True)
+    linked_requisitions: Mapped[int] = mapped_column(Integer, default=0)
 
     @aggregated("requisitions", column="linked_requisitions")
     def _set_linked_requisitions(self):
@@ -654,6 +714,9 @@ class Regulation(Base):
 
     PROXIES = ["grant_officers", "policy_officers"]
 
+    def __repr__(self):
+        return f"Regulation(id={self.id}, name='{self.name}')"
+
 
 class Grant(Base):
     __tablename__ = "grant"
@@ -666,6 +729,18 @@ class Grant(Base):
     reference: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
 
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("initiatives.payments", column="income")
+    def _set_income(self):
+        return get_finance_aggregate(Route.INCOME)
+
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+
+    @aggregated("initiatives.payments", column="expenses")
+    def _set_expenses(self):
+        return get_finance_aggregate(Route.EXPENSES)
+
     regulation_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("regulation.id", ondelete="CASCADE")
     )
@@ -675,16 +750,18 @@ class Grant(Base):
     initiatives: Mapped[list[Initiative]] = relationship(
         "Initiative", back_populates="grant", lazy="noload", cascade="all"
     )
-    overseer_role: Mapped[Optional[UserGrantRole]] = relationship(
+    overseer_roles: Mapped[list[UserGrantRole]] = relationship(
         "UserGrantRole",
         lazy="noload",
         cascade="all",
-        uselist=False,
         back_populates="grant",
     )
-    overseer: AssociationProxy[Optional[User]] = association_proxy(
-        "overseer_role", "user"
+    overseers: AssociationProxy[list[User]] = association_proxy(
+        "overseer_roles", "user"
     )
+
+    def __repr__(self):
+        return f"Grant(id={self.id}, name='{self.name}', reference='{self.reference}', budget='{self.budget}')"
 
 
 class Funder(Base):
@@ -700,3 +777,6 @@ class Funder(Base):
         lazy="noload",
         cascade="all",
     )
+
+    def __repr__(self):
+        return f"Funder(id={self.id}, name='{self.name}')"

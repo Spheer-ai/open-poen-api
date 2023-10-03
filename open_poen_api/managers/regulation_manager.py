@@ -1,4 +1,4 @@
-from .base_manager import Manager
+from .base_manager import BaseManager
 from ..schemas import RegulationCreate, RegulationUpdate
 from ..models import Regulation, UserRegulationRole, User, RegulationRole
 from fastapi import Request
@@ -6,13 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
-from ..database import get_async_session
-from fastapi import Depends
-from typing import Literal
 
 
-class RegulationManager(Manager):
+class RegulationManager(BaseManager):
     async def create(
         self,
         regulation_create: RegulationCreate,
@@ -117,7 +113,3 @@ class RegulationManager(Manager):
 
     async def min_load(self, id: int) -> Regulation:
         return await self.base_min_load(Regulation, id)
-
-
-async def get_regulation_manager(session: AsyncSession = Depends(get_async_session)):
-    yield RegulationManager(session)

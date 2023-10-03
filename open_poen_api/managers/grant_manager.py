@@ -1,4 +1,4 @@
-from .base_manager import Manager
+from .base_manager import BaseManager
 from ..schemas import GrantCreate, GrantUpdate
 from ..models import Grant, UserGrantRole, User
 from fastapi import Request
@@ -6,12 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
-from ..database import get_async_session
-from fastapi import Depends
 
 
-class GrantManager(Manager):
+class GrantManager(BaseManager):
     async def create(
         self,
         grant_create: GrantCreate,
@@ -46,24 +43,36 @@ class GrantManager(Manager):
     async def delete(self, grant: Grant, request: Request | None = None):
         await self.base_delete(grant, request)
 
-    async def make_user_overseer(
-        self, grant: Grant, user_id: int | None, request: Request | None = None
+    async def make_users_overseer(
+        self, grant: Grant, user_ids: list[int], request: Request | None = None
     ):
-        if user_id is None:
-            if grant.overseer_role is None:
-                return grant
-            else:
-                await self.session.delete(grant.overseer_role)
-        else:
-            q = await self.session.execute(select(User).where(User.id == user_id))
-            if q.scalars().first() is None:
-                raise EntityNotFound(message=f"There exists no User with id {user_id}")
-            if grant.overseer_role is None:
-                role = UserGrantRole(user_id=user_id, grant_id=grant.id)
-                self.session.add(role)
-            else:
-                grant.overseer_role.user_id = user_id
-                self.session.add(grant)
+        linked_user_ids = {role.user_id for role in grant.overseer_roles}
+
+        matched_users_q = await self.session.execute(
+            select(User).where(User.id.in_(user_ids))
+        )
+        matched_users = matched_users_q.scalars().all()
+        matched_user_ids = {user.id for user in matched_users}
+
+        if not len(matched_users) == len(user_ids):
+            raise EntityNotFound(
+                message=f"There exist no Users with id's: {set(user_ids) - matched_user_ids}"
+            )
+
+        # TODO: Log this.
+        stay_linked_user_ids = linked_user_ids.intersection(matched_user_ids)
+        unlink_user_ids = linked_user_ids - matched_user_ids
+        link_user_ids = matched_user_ids - linked_user_ids
+
+        for role in [
+            role for role in grant.overseer_roles if role.user_id in unlink_user_ids
+        ]:
+            await self.session.delete(role)
+
+        for user_id in link_user_ids:
+            new_role = UserGrantRole(user_id=user_id, grant_id=grant.id)
+            self.session.add(new_role)
+
         await self.session.commit()
         return grant
 
@@ -73,7 +82,7 @@ class GrantManager(Manager):
             .options(
                 selectinload(Grant.regulation),
                 selectinload(Grant.initiatives),
-                selectinload(Grant.overseer_role).selectinload(UserGrantRole.user),
+                selectinload(Grant.overseer_roles).selectinload(UserGrantRole.user),
             )
             .where(Grant.id == id)
         )
@@ -84,7 +93,3 @@ class GrantManager(Manager):
 
     async def min_load(self, id: int) -> Grant:
         return await self.base_min_load(Grant, id)
-
-
-async def get_grant_manager(session: AsyncSession = Depends(get_async_session)):
-    yield GrantManager(session)

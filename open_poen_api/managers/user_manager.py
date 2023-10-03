@@ -9,7 +9,7 @@ from ..models import (
     UserGrantRole,
 )
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from ..utils.email import MessageSchema, conf, env
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
@@ -29,9 +29,19 @@ import os
 from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
+from .base_manager_ex_current_user import BaseManagerExCurrentUser
+from typing import Any, Dict, cast, Annotated
+from ..logger import audit_logger
+from pydantic import EmailStr
 
 
-class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
+WEBSITE_NAME = os.environ["WEBSITE_NAME"]
+SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
+
+
+class UserManagerExCurrentUser(
+    IntegerIDMixin, BaseUserManager[User, int], BaseManagerExCurrentUser
+):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
 
@@ -40,28 +50,29 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         self.session = session
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
+        email = cast(EmailStr, user.email)
         template = env.get_template("on_after_register.txt")
         body = template.render(user=user)
         message = MessageSchema(
-            subject=f"Uitnodiging {os.environ.get('WEBSITE_NAME')}",
-            recipients=[user.email],
+            subject=f"Uitnodiging {WEBSITE_NAME}",
+            recipients=[email],
             body=body,
             subtype=MessageType.plain,
         )
         fm = FastMail(conf)
         await fm.send_message(message)  # TODO: Make async.
+        await self.after_create(user, request)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ):
+        email = cast(EmailStr, user.email)
         template = env.get_template("on_after_forgot_password.txt")
-        reset_password_url = os.environ.get("SPA_RESET_PASSWORD_URL").format(
-            token=token
-        )
+        reset_password_url = SPA_RESET_PASSWORD_URL.format(token=token)
         body = template.render(user=user, reset_password_url=reset_password_url)
         message = MessageSchema(
-            subject=f"Nieuw Wachtwoord {os.environ.get('WEBSITE_NAME')}",
-            recipients=[user.email],
+            subject=f"Nieuw Wachtwoord {WEBSITE_NAME}",
+            recipients=[email],
             body=body,
             subtype=MessageType.plain,
         )
@@ -91,32 +102,43 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         except UserAlreadyExists:
             raise EntityAlreadyExists(message="Email address already in use")
 
+    async def on_after_update(
+        self,
+        user: User,
+        update_dict: Dict[str, Any],
+        request: Request | None = None,
+    ):
+        await self.after_update(user, update_dict, request)
+
+    async def on_after_delete(
+        self,
+        user: User,
+        request: Request | None = None,
+    ):
+        await self.after_delete(user, request)
+
     async def detail_load(self, id: int):
-        # TODO: Use joinedload?
         query_result_q = await self.session.execute(
             select(User)
             .options(
-                selectinload(User.bng),
                 selectinload(User.requisitions),
-                selectinload(User.initiative_roles).selectinload(
+                selectinload(User.initiative_roles).joinedload(
                     UserInitiativeRole.initiative
                 ),
-                selectinload(User.activity_roles).selectinload(
-                    UserActivityRole.activity
-                ),
-                selectinload(User.user_bank_account_roles).selectinload(
+                selectinload(User.activity_roles).joinedload(UserActivityRole.activity),
+                selectinload(User.user_bank_account_roles).joinedload(
                     UserBankAccountRole.bank_account
                 ),
-                selectinload(User.owner_bank_account_role).selectinload(
+                selectinload(User.owner_bank_account_roles).joinedload(
                     UserBankAccountRole.bank_account
                 ),
-                selectinload(User.grant_officer_regulation_roles).selectinload(
+                selectinload(User.grant_officer_regulation_roles).joinedload(
                     UserRegulationRole.regulation
                 ),
-                selectinload(User.policy_officer_regulation_roles).selectinload(
+                selectinload(User.policy_officer_regulation_roles).joinedload(
                     UserRegulationRole.regulation
                 ),
-                selectinload(User.overseer_roles).selectinload(UserGrantRole.grant),
+                selectinload(User.overseer_roles).joinedload(UserGrantRole.grant),
             )
             .where(User.id == id)
         )
@@ -132,11 +154,11 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         return query_result
 
 
-async def get_user_manager(
+async def _get_user_manager(
     user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
     session: AsyncSession = Depends(get_async_session),
 ):
-    yield UserManager(session, user_db)
+    yield UserManagerExCurrentUser(session, user_db)
 
 
 def get_jwt_strategy() -> JWTStrategy:
@@ -149,6 +171,36 @@ auth_backend = AuthenticationBackend(
     name="jwt", transport=bearer_transport, get_strategy=get_jwt_strategy
 )
 
-fastapi_users = FastAPIUsers[User, int](get_user_manager, [auth_backend])
+fastapi_users = FastAPIUsers[User, int](_get_user_manager, [auth_backend])
 
-get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)
+get_user_manager_context = contextlib.asynccontextmanager(_get_user_manager)
+
+
+def with_joins(original_dependency):
+    async def _user_with_extra_joins(
+        user=Depends(original_dependency),
+        user_manager: UserManagerExCurrentUser = Depends(_get_user_manager),
+    ):
+        if user is None:
+            return None
+
+        detail_user = await user_manager.detail_load(user.id)
+        return detail_user
+
+    return _user_with_extra_joins
+
+
+superuser = with_joins(fastapi_users.current_user(superuser=True))
+required_login = with_joins(fastapi_users.current_user(optional=False))
+optional_login = with_joins(fastapi_users.current_user(optional=True))
+
+
+class UserManager(UserManagerExCurrentUser):
+    def __init__(
+        self,
+        user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
+        session: AsyncSession = Depends(get_async_session),
+        current_user: User | None = Depends(optional_login),
+    ):
+        super().__init__(session, user_db)
+        self.current_user = current_user

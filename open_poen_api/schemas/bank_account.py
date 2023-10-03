@@ -8,6 +8,7 @@ class BankAccountRead(BaseModel):
     name: str
     created: datetime
     last_accessed: datetime
+    linked_requisitions: int
 
 
 class BankAccountUsersUpdate(BaseModel):

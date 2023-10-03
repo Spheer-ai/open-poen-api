@@ -14,6 +14,8 @@ Use the .env.example files to configure your environment variables. Afterwards r
 ##### Use Poetry
 Poetry is used for tracking dependencies and managing the virtual environment. Make sure you use Python **3.11** or higher for running this API.
 
+
+
 Start the API.
 ```
 poetry run uvicorn open_poen_api.app:app --reload
@@ -29,10 +31,19 @@ Stop DB and development tools. Add -v to wipe the DB.
 docker compose down -v
 ```
 
+Attach to the app container.
+```
+docker exec -it open-poen-api-app-1 /bin/bash
+```
+
+### Gotcha's
+* Please note that the app in the docker compose will only start once you attach the debugger!
+* .env files have to end with an empty line. The script that parses these for Terraform otherwise skips the last key value pair.
+
 ### CLI commands
 Add a super_user:
 ```
-poetry run open-poen add-user mark@groningen.nl --superuser --role user --password "test"
+docker exec -it open-poen-api-app-1 open-poen add-user mark@groningen.nl --superuser --role user --password "test"
 ```
 
 ### Interacting with the API

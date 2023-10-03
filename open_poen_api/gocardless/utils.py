@@ -47,6 +47,11 @@ async def refresh_tokens():
         client.token = access_token
 
 
+async def get_nordigen_client():
+    await refresh_tokens()
+    return client
+
+
 # TODO: This should probably not be hard coded, but retrieved dynamically.
 INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS = {
     "ABNAMRO_ABNANL2A": 540,
