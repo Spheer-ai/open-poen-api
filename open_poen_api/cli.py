@@ -4,7 +4,9 @@ from .schemas import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
 from .managers.user_manager import UserManager
-from fastapi_users.exceptions import UserAlreadyExists
+
+# from fastapi_users.exceptions import UserAlreadyExists
+from .managers.exc import EntityAlreadyExists
 import asyncio
 from rich import print
 
@@ -31,7 +33,7 @@ async def async_add_user(
                 )
                 user = await user_manager.create(user_schema)
                 typer.echo(f"Added user with id {user.id}")
-    except UserAlreadyExists:
+    except EntityAlreadyExists:
         print(f"User {email} already exists")
 
 

@@ -50,8 +50,10 @@ async def custom_exception_handler(request: Request, exc: CustomException):
     return JSONResponse(status_code=exc.status_code, content=str(exc))
 
 
-@app.on_event("startup")
-async def on_startup():
-    # TODO: Don't recreate db every time.
-    await create_db_and_tables()
-    pass
+if os.environ["ENVIRONMENT"] == "debug":
+
+    @app.on_event("startup")
+    async def on_startup():
+        # TODO: Don't recreate db every time.
+        await create_db_and_tables()
+        pass

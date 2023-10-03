@@ -38,6 +38,7 @@ docker exec -it open-poen-api-app-1 /bin/bash
 
 ### Gotcha's
 * Please note that the app in the docker compose will only start once you attach the debugger!
+* .env files have to end with an empty line. The script that parses these for Terraform otherwise skips the last key value pair.
 
 ### CLI commands
 Add a super_user:
