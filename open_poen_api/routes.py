@@ -25,7 +25,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_, literal
 from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
@@ -118,14 +118,33 @@ async def delete_user(
 )
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login),
+    optional_user: ent.User | None=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    email: str = None,
 ):
-    # TODO: Enable searching by email.
-    # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.User, oso)
-    users_result = await session.execute(q)
+    query = select(ent.User)
+    
+    if optional_user is None:
+        query = query.where(ent.User.hidden == False)
+    else:
+        query = query.where(
+            or_(
+                ent.User.hidden == False,
+                ent.User.id == optional_user.id,
+                literal(optional_user.role == ent.UserRole.ADMINISTRATOR),
+                literal(optional_user.is_superuser)
+        ))
+    
+    if email:
+        query = query.where(ent.User.email.like(f"%{email}%"))
+        
+    query = query.offset(offset).limit(limit)
+    
+    users_result = await session.execute(query)
     users_scalar = users_result.scalars().all()
+
     filtered_users = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in users_scalar
