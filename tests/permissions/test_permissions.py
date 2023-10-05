@@ -128,3 +128,28 @@ async def test_get_authorized_actions_2(
     assert response.status_code == status_code
     if status_code == 200:
         assert set(response.json()["actions"]) == actions
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "get_mock_user, entity_class, entity_id, status_code, fields_present, fields_absent",
+    [
+        (superuser, "User", user, 200, {"role", "email", "hidden"}, set()),
+        (user, "User", superuser, 200, set(), {"first_name", "role"}),
+        (userowner, "User", userowner, 200, {"first_name", "email"}, {"role", "hidden"}),
+    ],
+    ids=["Superuser has all", "User has only read", "Userowner has read and delete"],
+    indirect=["get_mock_user"],
+)
+async def test_get_authorized_fields_2(
+    async_client, dummy_session, entity_class, entity_id, status_code, fields_present, fields_absent
+):
+    url = f"/auth/entity-access/edit-fields?entity_class={entity_class}&"
+    if entity_id is not None:
+        url += f"entity_id={entity_id}&"
+
+    response = await async_client.get(url[:-1])
+    assert response.status_code == status_code
+    if status_code == 200:
+        assert fields_present <= set(response.json()["fields"])
+        assert (fields_absent & set(response.json()["fields"])) == set()

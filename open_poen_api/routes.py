@@ -114,9 +114,7 @@ async def delete_user(
     return Response(status_code=204)
 
 
-@user_router.get(
-    "/users", response_model=s.UserReadList, response_model_exclude_unset=True
-)
+@user_router.get("/users", response_model=s.UserReadList, response_model_exclude_unset=True)
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
@@ -148,8 +146,7 @@ async def get_users(
     users_scalar = users_result.scalars().all()
 
     filtered_users = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
-        for i in users_scalar
+        auth.get_authorized_output_fields(optional_user, "read", i, oso) for i in users_scalar
     ]
     return s.UserReadList(users=filtered_users)
 
@@ -187,9 +184,7 @@ async def bng_initiate(
             requester_ip=requester_ip,
         )
     except RequestException as e:
-        raise HTTPException(
-            status_code=500, detail="Error in request for consent to BNG."
-        )
+        raise HTTPException(status_code=500, detail="Error in request for consent to BNG.")
     token = jwt.encode(
         {
             "user_id": user_id,
@@ -227,9 +222,7 @@ async def bng_callback(
             requester_ip="",
         )
     except RequestException as e:
-        raise HTTPException(
-            status_code=500, detail="Error in retrieval of access token from BNG"
-        )
+        raise HTTPException(status_code=500, detail="Error in retrieval of access token from BNG")
 
     access_token, expires_in = response["access_token"], response["expires_in"]
     expires_on = datetime.now(pytz.timezone("Europe/Amsterdam")) + timedelta(
@@ -386,9 +379,7 @@ async def get_bank_account(
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
     auth.authorize(required_user, "read", bank_account_db, oso)
-    return auth.get_authorized_output_fields(
-        required_user, "read", bank_account_db, oso
-    )
+    return auth.get_authorized_output_fields(required_user, "read", bank_account_db, oso)
 
 
 @user_router.patch(
@@ -405,9 +396,7 @@ async def finish_bank_account(
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
     auth.authorize(required_user, "finish", bank_account_db, oso)
-    bank_account_db = await bank_account_manager.finish(
-        bank_account_db, request=request
-    )
+    bank_account_db = await bank_account_manager.finish(bank_account_db, request=request)
     return bank_account_db
 
 
@@ -447,9 +436,7 @@ async def link_bank_account_users(
     # Important for up to date relations. Has to be in this async context.
     await bank_account_manager.session.refresh(bank_account_db)
     filtered_bank_account_users = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, oso, ent.User.REL_FIELDS)
         for i in bank_account_db.users
     ]
     return s.UserReadList(users=filtered_bank_account_users)
@@ -487,12 +474,8 @@ async def update_initiative(
     initiative_db = await initiative_manager.min_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
     auth.authorize_input_fields(required_user, "edit", initiative_db, initiative)
-    edited_initiative = await initiative_manager.update(
-        initiative, initiative_db, request=request
-    )
-    return auth.get_authorized_output_fields(
-        required_user, "read", edited_initiative, oso
-    )
+    edited_initiative = await initiative_manager.update(initiative, initiative_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_initiative, oso)
 
 
 @initiative_router.patch(
@@ -515,9 +498,7 @@ async def link_initiative_owners(
     # Important for up to date relations. Has to be in this async context.
     await initiative_manager.session.refresh(initiative_db)
     filtered_initiative_owners = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, oso, ent.User.REL_FIELDS)
         for i in initiative_db.initiative_owners
     ]
     return s.UserReadList(users=filtered_initiative_owners)
@@ -554,15 +535,12 @@ async def get_initiatives(
     # TODO: This part is resulting in a lot of extra separate queries for authorization.
     # Check if this goes away if we join load the neccessary relationships.
     filtered_initiatives = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
-        for i in initiatives_scalar
+        auth.get_authorized_output_fields(optional_user, "read", i, oso) for i in initiatives_scalar
     ]
     return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
-@initiative_router.post(
-    "/initiative/{initiative_id}/activity", response_model=s.ActivityRead
-)
+@initiative_router.post("/initiative/{initiative_id}/activity", response_model=s.ActivityRead)
 async def create_activity(
     initiative_id: int,
     activity: s.ActivityCreate,
@@ -574,9 +552,7 @@ async def create_activity(
 ):
     initiative_db = await initiative_manager.min_load(initiative_id)
     auth.authorize(required_user, "create_activity", initiative_db, oso)
-    activity_db = await activity_manager.create(
-        activity, initiative_id, request=request
-    )
+    activity_db = await activity_manager.create(activity, initiative_id, request=request)
     return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
 
 
@@ -614,12 +590,8 @@ async def update_activity(
     activity_db = await activity_manager.min_load(initiative_id, activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
     auth.authorize_input_fields(required_user, "edit", activity_db, activity)
-    edited_activity = await activity_manager.update(
-        activity, activity_db, request=request
-    )
-    return auth.get_authorized_output_fields(
-        required_user, "read", edited_activity, oso
-    )
+    edited_activity = await activity_manager.update(activity, activity_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_activity, oso)
 
 
 @initiative_router.patch(
@@ -643,9 +615,7 @@ async def link_activity_owners(
     # Important for up to date relations. Has to be in this async context.
     await activity_manager.session.refresh(activity_db)
     filtered_activity_owners = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, oso, ent.User.REL_FIELDS)
         for i in activity_db.activity_owners
     ]
     return s.UserReadList(users=filtered_activity_owners)
@@ -773,8 +743,7 @@ async def get_funders(
     funders_result = await async_session.execute(q)
     funders_scalar = funders_result.scalars().all()
     filtered_funders = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
-        for i in funders_scalar
+        auth.get_authorized_output_fields(optional_user, "read", i, oso) for i in funders_scalar
     ]
     return s.FunderReadList(funders=filtered_funders)
 
@@ -791,9 +760,7 @@ async def create_regulation(
 ):
     funder_db = await funder_manager.min_load(funder_id)
     auth.authorize(required_user, "create", "Regulation", oso)
-    regulation_db = await regulation_manager.create(
-        regulation, funder_id, request=request
-    )
+    regulation_db = await regulation_manager.create(regulation, funder_id, request=request)
     return auth.get_authorized_output_fields(required_user, "read", regulation_db, oso)
 
 
@@ -831,12 +798,8 @@ async def update_regulation(
     regulation_db = await regulation_manager.min_load(regulation_id)
     auth.authorize(required_user, "edit", regulation_db, oso)
     auth.authorize_input_fields(required_user, "edit", regulation_db, regulation)
-    edited_regulation = await regulation_manager.update(
-        regulation, regulation_db, request=request
-    )
-    return auth.get_authorized_output_fields(
-        required_user, "read", edited_regulation, oso
-    )
+    edited_regulation = await regulation_manager.update(regulation, regulation_db, request=request)
+    return auth.get_authorized_output_fields(required_user, "read", edited_regulation, oso)
 
 
 @funder_router.patch(
@@ -869,9 +832,7 @@ async def link_officers(
         else regulation_db.policy_officers
     )
     filtered_officers = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, oso, ent.User.REL_FIELDS)
         for i in officers
     ]
     return s.UserReadList(users=filtered_officers)
@@ -909,8 +870,7 @@ async def get_regulations(
     regulations_result = await async_session.execute(q)
     regulations_scalar = regulations_result.scalars().all()
     filtered_regulations = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
-        for i in regulations_scalar
+        auth.get_authorized_output_fields(optional_user, "read", i, oso) for i in regulations_scalar
     ]
     return s.RegulationReadList(regulations=filtered_regulations)
 
@@ -992,15 +952,11 @@ async def link_overseer(
 ):
     grant_db = await grant_manager.detail_load(grant_id)
     auth.authorize(required_user, "edit", grant_db, oso)
-    grant_db = await grant_manager.make_users_overseer(
-        grant_db, grant.user_ids, request=request
-    )
+    grant_db = await grant_manager.make_users_overseer(grant_db, grant.user_ids, request=request)
     # Important for up to date relations. Has to be in this async context.
     await grant_manager.session.refresh(grant_db)
     filtered_overseers = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, oso, ent.User.REL_FIELDS)
         for i in grant_db.overseers
     ]
     return s.UserReadList(users=filtered_overseers)
@@ -1039,8 +995,7 @@ async def get_grants(
     grants_result = await async_session.execute(q)
     grants_scalar = grants_result.scalars().all()
     filtered_grants = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
-        for i in grants_scalar
+        auth.get_authorized_output_fields(optional_user, "read", i, oso) for i in grants_scalar
     ]
     return s.GrantReadList(grants=filtered_grants)
 
@@ -1063,9 +1018,7 @@ async def create_initiative(
     grant_db = await grant_manager.min_load(grant_id)
     auth.authorize(required_user, "create_initiative", grant_db, oso)
     # TODO: Validate funder_id, regulation_id and grant_id.
-    initiative_db = await initiative_manager.create(
-        initiative, grant_id, request=request
-    )
+    initiative_db = await initiative_manager.create(initiative, grant_id, request=request)
     return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
 
@@ -1083,9 +1036,7 @@ async def create_payment(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     if payment.activity_id is not None:
-        activity_db = await activity_manager.min_load(
-            payment.initiative_id, payment.activity_id
-        )
+        activity_db = await activity_manager.min_load(payment.initiative_id, payment.activity_id)
         auth.authorize(required_user, "create_payment", activity_db, oso)
     else:
         initiative_db = await initiative_manager.min_load(payment.initiative_id)
@@ -1174,9 +1125,7 @@ async def link_activity(
     auth.authorize(required_user, "link_activity", payment_db, oso)
 
     if payment.activity_id is not None:
-        activity_db = await activity_manager.detail_load(
-            payment.initiative_id, payment.activity_id
-        )
+        activity_db = await activity_manager.detail_load(payment.initiative_id, payment.activity_id)
         auth.authorize(required_user, "link_payment", activity_db, oso)
 
     payment_db = await payment_manager.assign_payment_to_activity(
@@ -1274,6 +1223,20 @@ async def get_authorized_actions(
     else:
         resource = entity_class
 
-    return s.AuthActionsRead(
-        actions=auth.get_authorized_actions(optional_user, resource, oso)
-    )
+    return s.AuthActionsRead(actions=auth.get_authorized_actions(optional_user, resource, oso))
+
+
+@permission_router.get("/edit-fields", response_model=s.AuthFieldsRead)
+async def get_authorized_fields(
+    entity_class: s.AuthEntityClass,
+    entity_id: int,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user: ent.User | None = Depends(m.optional_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+    user_manager: m.UserManager = Depends(m.UserManager),
+):
+    class_map = {s.AuthEntityClass.USER: user_manager}
+
+    resource = await class_map[entity_class].detail_load(entity_id)
+
+    return s.AuthFieldsRead(fields=auth.get_authorized_fields(optional_user, "edit", resource))
