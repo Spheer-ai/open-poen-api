@@ -45,6 +45,7 @@ user_router = APIRouter(tags=["user"])
 funder_router = APIRouter(tags=["funder"])
 initiative_router = APIRouter(tags=["initiative"])
 payment_router = APIRouter(tags=["payment"])
+permission_router = APIRouter(tags=["auth"])
 
 
 @user_router.post("/user", response_model=s.UserRead)
@@ -118,14 +119,14 @@ async def delete_user(
 )
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
-    optional_user: ent.User | None=Depends(m.optional_login),
+    optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     email: str = None,
 ):
     query = select(ent.User)
-    
+
     if optional_user is None:
         query = query.where(ent.User.hidden == False)
     else:
@@ -134,14 +135,15 @@ async def get_users(
                 ent.User.hidden == False,
                 ent.User.id == optional_user.id,
                 literal(optional_user.role == ent.UserRole.ADMINISTRATOR),
-                literal(optional_user.is_superuser)
-        ))
-    
+                literal(optional_user.is_superuser),
+            )
+        )
+
     if email:
         query = query.where(ent.User.email.like(f"%{email}%"))
-        
+
     query = query.offset(offset).limit(limit)
-    
+
     users_result = await session.execute(query)
     users_scalar = users_result.scalars().all()
 
@@ -1254,3 +1256,24 @@ async def get_activity_payments(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     pass
+
+
+@permission_router.get("/actions", response_model=s.AuthActionsRead)
+async def get_authorized_actions(
+    entity_class: s.AuthEntityClass,
+    async_session: AsyncSession = Depends(get_async_session),
+    optional_user: ent.User | None = Depends(m.optional_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+    user_manager: m.UserManager = Depends(m.UserManager),
+    entity_id: int | None = None,
+):
+    class_map = {s.AuthEntityClass.USER: user_manager}
+
+    if entity_id is not None:
+        resource = await class_map[entity_class].detail_load(entity_id)
+    else:
+        resource = entity_class
+
+    return s.AuthActionsRead(
+        actions=auth.get_authorized_actions(optional_user, resource, oso)
+    )

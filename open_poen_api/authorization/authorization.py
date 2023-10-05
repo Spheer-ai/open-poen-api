@@ -153,6 +153,14 @@ def get_authorized_query(
     return oso.authorized_query(oso_actor, action, resource)
 
 
+def get_authorized_actions(
+    actor: ent.User | None, resource: ent.Base | str, oso: Oso
+) -> list[str]:
+    oso_actor = get_oso_actor(actor)
+
+    return oso.authorized_actions(oso_actor, resource)
+
+
 def is_allowed(actor: ent.User | None, action: str, resource: ent.Base):
     oso_actor = get_oso_actor(actor)
 
