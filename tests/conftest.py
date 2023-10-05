@@ -44,7 +44,7 @@ superuser = 6
 userowner = 1
 user = 7
 admin = 5
-policy_officer = 11
+grant_officer = 11
 initiative_owner = 12
 activity_owner = 13
 anon = None
@@ -106,9 +106,7 @@ async def retrieve_token_from_last_sent_email():
                 response = await client.get(
                     f"http://localhost:8025/api/v1/messages/{emails[0]['ID']}"
                 )
-                text = base64.b64decode(
-                    response.json()["MIME"]["Parts"][0]["Body"]
-                ).decode("utf-8")
+                text = base64.b64decode(response.json()["MIME"]["Parts"][0]["Body"]).decode("utf-8")
                 lines = text.split("\n")
                 try:
                     url = next(line for line in lines if "reset-password" in line)
@@ -125,9 +123,7 @@ async def retrieve_token_from_last_sent_email():
 
 @pytest_asyncio.fixture
 async def async_client(event_loop, overridden_app):
-    async with AsyncClient(
-        app=overridden_app, base_url="http://localhost:8000"
-    ) as client:
+    async with AsyncClient(app=overridden_app, base_url="http://localhost:8000") as client:
         yield client
 
 
@@ -239,7 +235,7 @@ async def dummy_session(async_session):
     # TODO: Fix magical constants.
     regulation = await regulation_manager.min_load(6)
     await regulation_manager.make_users_officer(
-        regulation, user_ids=[11], regulation_role=RegulationRole.POLICY_OFFICER
+        regulation, user_ids=[11], regulation_role=RegulationRole.GRANT_OFFICER
     )
 
     initiative = await initiative_manager.min_load(1)

@@ -7,7 +7,7 @@ from tests.conftest import (
     admin,
     anon,
     initiative_info,
-    policy_officer,
+    grant_officer,
     hide_instance,
 )
 from open_poen_api.models import Initiative
@@ -22,7 +22,7 @@ from open_poen_api.managers import InitiativeManager
         (user, 403),
         (admin, 200),
         (anon, 403),
-        (policy_officer, 200),
+        (grant_officer, 200),
     ],
     ids=[
         "Superuser can",
@@ -56,7 +56,7 @@ async def test_create_initiative(async_client, dummy_session, status_code):
         (user, 403),
         (admin, 204),
         (anon, 403),
-        (policy_officer, 204),
+        (grant_officer, 204),
     ],
     ids=[
         "Superuser can",
@@ -84,7 +84,7 @@ async def test_delete_initiative(async_client, dummy_session, status_code):
         (user, 403),
         (admin, 200),
         (anon, 403),
-        (policy_officer, 200),
+        (grant_officer, 200),
     ],
     ids=[
         "Superuser can",
@@ -98,9 +98,7 @@ async def test_delete_initiative(async_client, dummy_session, status_code):
 async def test_add_initiative_owner(async_client, dummy_session, status_code):
     initiative_id = 1
     body = {"user_ids": [1]}
-    response = await async_client.patch(
-        f"/initiative/{initiative_id}/owners", json=body
-    )
+    response = await async_client.patch(f"/initiative/{initiative_id}/owners", json=body)
     assert response.status_code == status_code
     if status_code == 200:
         im = InitiativeManager(dummy_session, None)
@@ -117,7 +115,7 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
         (user, 403),
         (admin, 200),
         (anon, 403),
-        (policy_officer, 403),
+        (grant_officer, 403),
     ],
     ids=[
         "Superuser can",
@@ -131,9 +129,7 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
 async def test_add_debit_cards(async_client, dummy_session, status_code):
     initiative_id = 1
     body = {"card_numbers": [6731924123456789012]}
-    response = await async_client.patch(
-        f"/initiative/{initiative_id}/debit-cards", json=body
-    )
+    response = await async_client.patch(f"/initiative/{initiative_id}/debit-cards", json=body)
     assert response.status_code == status_code
     if status_code == 200:
         im = InitiativeManager(dummy_session, None)
@@ -147,11 +143,11 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
     "get_mock_user, body, status_code",
     [
         (superuser, {"location": "Groningen"}, 200),
-        (policy_officer, {"location": "Groningen"}, 200),
+        (grant_officer, {"location": "Groningen"}, 200),
         (initiative_owner, {"location": "Groningen"}, 403),
         (user, {"location": "Groningen"}, 403),
         (superuser, {"hidden": True}, 200),
-        (policy_officer, {"hidden": True}, 200),
+        (grant_officer, {"hidden": True}, 200),
         (initiative_owner, {"hidden": True}, 403),
         (user, {"hidden": True}, 403),
         (superuser, {"name": "Community Health Initiative"}, 400),
@@ -185,7 +181,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     [
         (superuser, 24, 200),
         (admin, 24, 200),
-        (policy_officer, 23, 200),
+        (grant_officer, 23, 200),
         (initiative_owner, 22, 200),
         (activity_owner, 22, 200),
         (user, 21, 200),
@@ -202,9 +198,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     ],
     indirect=["get_mock_user"],
 )
-async def test_get_initiatives_list(
-    async_client, dummy_session, status_code, result_length
-):
+async def test_get_initiatives_list(async_client, dummy_session, status_code, result_length):
     await hide_instance(dummy_session, Initiative, 1)
     response = await async_client.get("/initiatives")
     assert response.status_code == status_code
@@ -216,7 +210,7 @@ async def test_get_initiatives_list(
     "get_mock_user, field, present, status_code",
     [
         (superuser, "address_applicant", True, 200),
-        (policy_officer, "address_applicant", True, 200),
+        (grant_officer, "address_applicant", True, 200),
         (initiative_owner, "address_applicant", True, 200),
         (user, "address_applicant", False, 200),
         (anon, "address_applicant", False, 200),

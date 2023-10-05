@@ -67,9 +67,7 @@ class UserInitiativeRole(Base):
     initiative_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("initiative.id", ondelete="CASCADE"), primary_key=True
     )
-    user: Mapped["User"] = relationship(
-        "User", back_populates="initiative_roles", uselist=False
-    )
+    user: Mapped["User"] = relationship("User", back_populates="initiative_roles", uselist=False)
     initiative: Mapped["Initiative"] = relationship(
         "Initiative", back_populates="user_roles", uselist=False
     )
@@ -83,9 +81,7 @@ class UserActivityRole(Base):
     activity_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("activity.id", ondelete="CASCADE"), primary_key=True
     )
-    user: Mapped["User"] = relationship(
-        "User", back_populates="activity_roles", uselist=False
-    )
+    user: Mapped["User"] = relationship("User", back_populates="activity_roles", uselist=False)
     activity: Mapped["Activity"] = relationship(
         "Activity", back_populates="user_roles", uselist=False
     )
@@ -142,12 +138,8 @@ class UserGrantRole(Base):
         Integer, ForeignKey("grant.id", ondelete="CASCADE"), primary_key=True
     )
 
-    user: Mapped["User"] = relationship(
-        "User", uselist=False, back_populates="overseer_roles"
-    )
-    grant: Mapped["Grant"] = relationship(
-        "Grant", uselist=False, back_populates="overseer_roles"
-    )
+    user: Mapped["User"] = relationship("User", uselist=False, back_populates="overseer_roles")
+    grant: Mapped["Grant"] = relationship("Grant", uselist=False, back_populates="overseer_roles")
 
 
 class UserRole(str, Enum):
@@ -164,9 +156,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     first_name: Mapped[str | None] = mapped_column(String(length=64))
     last_name: Mapped[str | None] = mapped_column(String(length=64))
     biography: Mapped[str | None] = mapped_column(String(length=512))
-    role: Mapped[UserRole] = mapped_column(
-        ChoiceType(UserRole, impl=VARCHAR(length=32))
-    )
+    role: Mapped[UserRole] = mapped_column(ChoiceType(UserRole, impl=VARCHAR(length=32)))
     image: Mapped[str | None] = mapped_column(String(length=128))
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -200,9 +190,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         lazy="noload",
         cascade="all",
     )
-    activities: AssociationProxy[list["Activity"]] = association_proxy(
-        "activity_roles", "activity"
-    )
+    activities: AssociationProxy[list["Activity"]] = association_proxy("activity_roles", "activity")
 
     user_bank_account_roles: Mapped[list[UserBankAccountRole]] = relationship(
         "UserBankAccountRole",
@@ -244,9 +232,9 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         overlaps="grant_officer_regulation_roles, user",
         cascade="all",
     )
-    policy_officer_regulations: AssociationProxy[
-        list["Regulation"]
-    ] = association_proxy("policy_officer_regulation_roles", "regulation")
+    policy_officer_regulations: AssociationProxy[list["Regulation"]] = association_proxy(
+        "policy_officer_regulation_roles", "regulation"
+    )
 
     overseer_roles: Mapped[list[UserGrantRole]] = relationship(
         "UserGrantRole",
@@ -254,9 +242,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
         lazy="noload",
         cascade="all",
     )
-    grants: AssociationProxy[list["Grant"]] = association_proxy(
-        "overseer_roles", "grant"
-    )
+    grants: AssociationProxy[list["Grant"]] = association_proxy("overseer_roles", "grant")
 
     PROXIES = [
         "initiatives",
@@ -297,16 +283,12 @@ class BNG(Base):
     expires_on: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     consent_id: Mapped[str] = mapped_column(String(length=64))
     access_token: Mapped[str] = mapped_column(String(length=2048))
-    last_import_on: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_import_on: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True
     )
-    user: Mapped[User] = relationship(
-        "User", back_populates="bng", lazy="noload", uselist=False
-    )
+    user: Mapped[User] = relationship("User", back_populates="bng", lazy="noload", uselist=False)
 
     def __repr__(self):
         return f"BNG(id={self.id}, iban='{self.iban}', expires_on='{self.expires_on}')"
@@ -327,9 +309,7 @@ class Initiative(Base):
     __tablename__ = "initiative"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(
-        String(length=64), nullable=False, index=True, unique=True
-    )
+    name: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True, unique=True)
     description: Mapped[str] = mapped_column(String(length=512), nullable=False)
     purpose: Mapped[str] = mapped_column(String(length=64), nullable=False)
     target_audience: Mapped[str] = mapped_column(String(length=64), nullable=False)
@@ -342,9 +322,7 @@ class Initiative(Base):
     kvk_registration: Mapped[str | None] = mapped_column(String(length=16))
     location: Mapped[str] = mapped_column(String(length=64), nullable=False)
     image: Mapped[str | None] = mapped_column(String(length=128))
-    hidden_sponsors: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
+    hidden_sponsors: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
     justified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -367,9 +345,7 @@ class Initiative(Base):
         lazy="noload",
         cascade="delete",
     )
-    initiative_owners: AssociationProxy[list[User]] = association_proxy(
-        "user_roles", "user"
-    )
+    initiative_owners: AssociationProxy[list[User]] = association_proxy("user_roles", "user")
     activities: Mapped[list["Activity"]] = relationship(
         "Activity", back_populates="initiative", lazy="noload", cascade="delete"
     )
@@ -379,9 +355,7 @@ class Initiative(Base):
     debit_cards: Mapped[list["DebitCard"]] = relationship(
         "DebitCard", back_populates="initiative", lazy="noload"
     )
-    grant_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("grant.id", ondelete="CASCADE")
-    )
+    grant_id: Mapped[int] = mapped_column(Integer, ForeignKey("grant.id", ondelete="CASCADE"))
     grant: Mapped["Grant"] = relationship(
         "Grant", back_populates="initiatives", lazy="noload", uselist=False
     )
@@ -431,9 +405,7 @@ class Activity(Base):
         lazy="noload",
         cascade="all",
     )
-    activity_owners: AssociationProxy[list[User]] = association_proxy(
-        "user_roles", "user"
-    )
+    activity_owners: AssociationProxy[list[User]] = association_proxy("user_roles", "user")
     initiative_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("initiative.id", ondelete="CASCADE")
     )
@@ -493,21 +465,15 @@ class Payment(Base):
     debtor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
     debtor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
     route: Mapped[Route] = mapped_column(ChoiceType(Route, impl=VARCHAR(length=32)))
-    type: Mapped[PaymentType] = mapped_column(
-        ChoiceType(PaymentType, impl=VARCHAR(length=32))
-    )
+    type: Mapped[PaymentType] = mapped_column(ChoiceType(PaymentType, impl=VARCHAR(length=32)))
     remittance_information_unstructured: Mapped[str] = mapped_column(
         String(length=512), nullable=True
     )
     remittance_information_structured: Mapped[str] = mapped_column(
         String(length=512), nullable=True
     )
-    short_user_description: Mapped[str] = mapped_column(
-        String(length=512), nullable=True
-    )
-    long_user_description: Mapped[str] = mapped_column(
-        String(length=128), nullable=True
-    )
+    short_user_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
+    long_user_description: Mapped[str] = mapped_column(String(length=128), nullable=True)
 
     activity_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("activity.id", ondelete="SET NULL"), nullable=True
@@ -542,9 +508,7 @@ class DebitCard(Base):
     __tablename__ = "debitcard"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    card_number: Mapped[str] = mapped_column(
-        String(length=64), unique=True, nullable=False
-    )
+    card_number: Mapped[str] = mapped_column(String(length=64), unique=True, nullable=False)
 
     income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
 
@@ -594,12 +558,8 @@ class Requisition(Base, TimeStampMixin):
     institution_id: Mapped[str] = mapped_column(String(length=32), nullable=False)
     api_requisition_id: Mapped[str] = mapped_column(String(length=128), nullable=False)
     reference_id: Mapped[str] = mapped_column(String(length=36), nullable=False)
-    callback_handled: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
-    status: Mapped[ReqStatus] = mapped_column(
-        ChoiceType(ReqStatus, impl=VARCHAR(length=32))
-    )
+    callback_handled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    status: Mapped[ReqStatus] = mapped_column(ChoiceType(ReqStatus, impl=VARCHAR(length=32)))
     n_days_history: Mapped[int] = mapped_column(Integer, nullable=False)
     n_days_access: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -684,9 +644,7 @@ class Regulation(Base):
         overlaps="policy_officer_roles, regulation",
         cascade="all",
     )
-    grant_officers: AssociationProxy[list[User]] = association_proxy(
-        "grant_officer_roles", "user"
-    )
+    grant_officers: AssociationProxy[list[User]] = association_proxy("grant_officer_roles", "user")
 
     policy_officer_roles: Mapped[list[UserRegulationRole]] = relationship(
         "UserRegulationRole",
@@ -705,9 +663,7 @@ class Regulation(Base):
         lazy="noload",
         cascade="all",
     )
-    funder_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("funder.id", ondelete="CASCADE")
-    )
+    funder_id: Mapped[int] = mapped_column(Integer, ForeignKey("funder.id", ondelete="CASCADE"))
     funder: Mapped["Funder"] = relationship(
         "Funder", back_populates="regulations", lazy="noload", uselist=False
     )
@@ -720,9 +676,7 @@ class Regulation(Base):
 
 class Grant(Base):
     __tablename__ = "grant"
-    __table_args__ = (
-        UniqueConstraint("name", "regulation_id", name="_name_regulation_uc"),
-    )
+    __table_args__ = (UniqueConstraint("name", "regulation_id", name="_name_regulation_uc"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -756,9 +710,7 @@ class Grant(Base):
         cascade="all",
         back_populates="grant",
     )
-    overseers: AssociationProxy[list[User]] = association_proxy(
-        "overseer_roles", "user"
-    )
+    overseers: AssociationProxy[list[User]] = association_proxy("overseer_roles", "user")
 
     def __repr__(self):
         return f"Grant(id={self.id}, name='{self.name}', reference='{self.reference}', budget='{self.budget}')"

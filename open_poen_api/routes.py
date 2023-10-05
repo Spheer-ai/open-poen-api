@@ -121,7 +121,7 @@ async def get_users(
     oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
-    email: str = None,
+    email: str | None = None,
 ):
     query = select(ent.User)
 
@@ -1214,10 +1214,17 @@ async def get_authorized_actions(
     optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
     user_manager: m.UserManager = Depends(m.UserManager),
+    funder_manager: m.FunderManager = Depends(m.FunderManager),
+    regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     entity_id: int | None = None,
 ):
-    class_map = {s.AuthEntityClass.USER: user_manager}
+    class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
+        s.AuthEntityClass.USER: user_manager,
+        s.AuthEntityClass.FUNDER: funder_manager,
+        s.AuthEntityClass.REGULATION: regulation_manager,
+    }
 
+    resource: ent.Base | s.AuthEntityClass
     if entity_id is not None:
         resource = await class_map[entity_class].detail_load(entity_id)
     else:
@@ -1234,8 +1241,16 @@ async def get_authorized_fields(
     optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
     user_manager: m.UserManager = Depends(m.UserManager),
+    funder_manager: m.FunderManager = Depends(
+        m.FunderManager,
+    ),
+    regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
 ):
-    class_map = {s.AuthEntityClass.USER: user_manager}
+    class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
+        s.AuthEntityClass.USER: user_manager,
+        s.AuthEntityClass.FUNDER: funder_manager,
+        s.AuthEntityClass.REGULATION: regulation_manager,
+    }
 
     resource = await class_map[entity_class].detail_load(entity_id)
 

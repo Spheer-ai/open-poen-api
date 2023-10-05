@@ -10,7 +10,7 @@ from open_poen_api.managers import RegulationManager
 import pytest_asyncio
 import pytest
 from oso.exceptions import NotFoundError, ForbiddenError
-from tests.conftest import superuser, user, userowner
+from tests.conftest import superuser, user, userowner, admin, grant_officer
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -98,26 +98,38 @@ async def test_get_authorized_output_fields_2(dummy_session):
         fields = get_authorized_output_fields(user, "read", regulation, oso)
 
 
-async def test_get_authorized_actions(dummy_session):
-    actor = await dummy_session.get(User, 1)
-    user1 = await dummy_session.get(User, 1)
-    user2 = await dummy_session.get(User, 2)
-    actions1 = get_authorized_actions(actor, user1, OSO)
-    actions2 = get_authorized_actions(actor, user2, OSO)
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, entity_class, entity_id, status_code, actions",
     [
-        (superuser, "User", user, 200, {"edit", "delete", "create", "read"}),
+        (superuser, "User", user, 200, {"edit", "delete", "read"}),
+        (superuser, "User", None, 200, {"create"}),
+        (user, "User", None, 200, set()),
         (user, "User", superuser, 200, {"read"}),
         (userowner, "User", userowner, 200, {"read", "edit"}),
+        (superuser, "Funder", 1, 200, {"edit", "delete", "read", "create_regulation"}),
+        (user, "Funder", 1, 200, {"read"}),
+        (user, "Funder", None, 200, set()),
+        (admin, "Regulation", 1, 200, {"read", "edit", "delete", "create_grant"}),
+        (grant_officer, "Regulation", 6, 200, {"read", "create_grant"}),
+        (user, "Regulation", 1, 200, {"read"}),
     ],
-    ids=["Superuser has all", "User has only read", "Userowner has read and delete"],
+    ids=[
+        "Superuser can edit, delete and read user",
+        "Superuser can create user",
+        "User cannot create user",
+        "User can only read superuser",
+        "Userowner can read and edit himself",
+        "Superuser can edit, delete, read and create grants on funder",
+        "User can only read funder",
+        "User cannot create funder",
+        "Admin can do everything on regulation",
+        "Grant officer can do everything on regulation",
+        "User can only read regulation",
+    ],
     indirect=["get_mock_user"],
 )
-async def test_get_authorized_actions_2(
+async def test_get_authorized_actions(
     async_client, dummy_session, entity_class, entity_id, status_code, actions
 ):
     url = f"/auth/entity-access/actions?entity_class={entity_class}&"
@@ -137,11 +149,23 @@ async def test_get_authorized_actions_2(
         (superuser, "User", user, 200, {"role", "email", "hidden"}, set()),
         (user, "User", superuser, 200, set(), {"first_name", "role"}),
         (userowner, "User", userowner, 200, {"first_name", "email"}, {"role", "hidden"}),
+        (superuser, "Funder", 1, 200, {"url", "name"}, set()),
+        (user, "Funder", 1, 200, set(), {"url", "name"}),
+        (admin, "Regulation", 1, 200, {"name", "description"}, set()),
+        (grant_officer, "Regulation", 6, 200, set(), {"name", "description"}),
     ],
-    ids=["Superuser has all", "User has only read", "Userowner has read and delete"],
+    ids=[
+        "Superuser can edit sensitive fields on user",
+        "User cannot edit superuser",
+        "Userowner can edit non sensitive fields on himself",
+        "Superuser can edit all fields on funder",
+        "User cannot edit funder",
+        "Admin can edit all fields on regulation",
+        "Grant officer cannot edit regulation",
+    ],
     indirect=["get_mock_user"],
 )
-async def test_get_authorized_fields_2(
+async def test_get_authorized_editable_fields(
     async_client, dummy_session, entity_class, entity_id, status_code, fields_present, fields_absent
 ):
     url = f"/auth/entity-access/edit-fields?entity_class={entity_class}&"

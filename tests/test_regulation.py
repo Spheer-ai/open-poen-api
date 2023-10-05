@@ -1,5 +1,5 @@
 import pytest
-from tests.conftest import superuser, user, admin, anon, regulation_info, policy_officer
+from tests.conftest import superuser, user, admin, anon, regulation_info, grant_officer
 from open_poen_api.models import Regulation
 from open_poen_api.managers import RegulationManager
 
@@ -7,7 +7,7 @@ from open_poen_api.managers import RegulationManager
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 200), (user, 403), (admin, 200), (policy_officer, 403), (anon, 403)],
+    [(superuser, 200), (user, 403), (admin, 200), (grant_officer, 403), (anon, 403)],
     ids=[
         "Superuser can",
         "User cannot",
@@ -32,7 +32,7 @@ async def test_create_regulation(async_client, dummy_session, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 204), (user, 403), (admin, 204), (policy_officer, 403), (anon, 403)],
+    [(superuser, 204), (user, 403), (admin, 204), (grant_officer, 403), (anon, 403)],
     ids=[
         "Superuser can",
         "User cannot",
@@ -44,9 +44,7 @@ async def test_create_regulation(async_client, dummy_session, status_code):
 )
 async def test_delete_regulation(async_client, dummy_session, status_code):
     funder_id, regulation_id = 1, 1
-    response = await async_client.delete(
-        f"/funder/{funder_id}/regulation/{regulation_id}"
-    )
+    response = await async_client.delete(f"/funder/{funder_id}/regulation/{regulation_id}")
     assert response.status_code == status_code
     if status_code == 204:
         regulation = await dummy_session.get(Regulation, funder_id)
@@ -57,7 +55,7 @@ async def test_delete_regulation(async_client, dummy_session, status_code):
 @pytest.mark.parametrize("role", ["grant officer", "policy officer"])
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 200), (user, 403), (admin, 200), (policy_officer, 403), (anon, 403)],
+    [(superuser, 200), (user, 403), (admin, 200), (grant_officer, 403), (anon, 403)],
     ids=[
         "Superuser can",
         "User cannot",
@@ -92,7 +90,7 @@ async def test_add_officer(async_client, dummy_session, status_code, role):
     [
         (superuser, {"name": "Another Name"}, 200),
         (user, {"name": "Another Name"}, 403),
-        (policy_officer, {"name": "Another name"}, 403),
+        (grant_officer, {"name": "Another name"}, 403),
         (superuser, {"name": "Healthcare Quality Assurance"}, 400),
     ],
     ids=[
@@ -118,7 +116,7 @@ async def test_patch_regulation(async_client, dummy_session, body, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 200), (policy_officer, 200), (anon, 200)],
+    [(superuser, 200), (grant_officer, 200), (anon, 200)],
     ids=[
         "Superuser sees everything",
         "Policy officer sees everything",
