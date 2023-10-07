@@ -22,4 +22,4 @@ RUN pip install poetry
 RUN poetry config virtualenvs.create false
 RUN poetry install
 
-CMD ["poetry", "run", "uvicorn", "open_poen_api:app", "--reload"]
+CMD ["poetry", "run", "uvicorn", "open_poen_api:app", "--reload", "--port", "8000", "--host", "0.0.0.0"]
