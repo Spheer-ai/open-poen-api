@@ -6,6 +6,8 @@ from fastapi import (
     Response,
     BackgroundTasks,
     Query,
+    UploadFile,
+    File,
 )
 from typing import Optional
 from fastapi.responses import RedirectResponse
@@ -46,6 +48,7 @@ funder_router = APIRouter(tags=["funder"])
 initiative_router = APIRouter(tags=["initiative"])
 payment_router = APIRouter(tags=["payment"])
 permission_router = APIRouter(tags=["auth"])
+utils_router = APIRouter(tags=["utils"])
 
 
 @user_router.post("/user", response_model=s.UserRead)
@@ -1216,12 +1219,14 @@ async def get_authorized_actions(
     user_manager: m.UserManager = Depends(m.UserManager),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
+    grant_manager: m.GrantManager = Depends(m.GrantManager),
     entity_id: int | None = None,
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
+        s.AuthEntityClass.GRANT: grant_manager,
     }
 
     resource: ent.Base | s.AuthEntityClass
@@ -1245,13 +1250,41 @@ async def get_authorized_fields(
         m.FunderManager,
     ),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
+    grant_manager: m.GrantManager = Depends(m.GrantManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
+        s.AuthEntityClass.GRANT: grant_manager,
     }
 
     resource = await class_map[entity_class].detail_load(entity_id)
 
     return s.AuthFieldsRead(fields=auth.get_authorized_fields(optional_user, "edit", resource))
+
+
+# @utils_router.post("/utils/upload-files")
+# async def upload_files(file_upload_create: s.FileUploadCreate, files: list[UploadFile] = File(...)):
+# detail load the right instance from the right class.
+
+# for file in files:
+#     if file.content_type not in ["image/jpeg", "image/png"]:
+#         raise HTTPException(status_code=400, detail="Invalid file type")
+
+#     # Upload to Azure
+#     blob_client = container_client.get_blob_client(file.filename)
+#     blob_client.upload_blob(file.file.read())
+
+
+# class UploadType(BaseModel):
+#     type: str
+
+# @app.post("/upload/")
+# async def upload_files(upload_type: UploadType, files: list[UploadFile] = File(...)):
+#     if upload_type.type not in ["profile_picture", "payment_attachment"]:
+#         raise HTTPException(status_code=400, detail="Invalid upload type")
+
+#     for file in files:
+#         # Additional logic based on upload_type.type
+#         # ...
