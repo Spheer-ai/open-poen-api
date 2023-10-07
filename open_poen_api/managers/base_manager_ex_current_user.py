@@ -6,11 +6,12 @@ from pydantic import BaseModel
 from fastapi import Request
 from ..logger import audit_logger
 from typing import Dict, Any
+from abc import ABC, abstractmethod
 
 T = TypeVar("T", bound=Base)
 
 
-class BaseManagerExCurrentUser:
+class BaseManagerExCurrentUser(ABC):
     def __init__(self, session: AsyncSession, current_user: User | None = None):
         self.session = session
         self.current_user = current_user
@@ -50,13 +51,15 @@ class BaseManagerExCurrentUser:
             raise EntityNotFound(message=f"{db_model.__name__} not found")
         return query_result
 
+    @abstractmethod
+    async def detail_load(self, id: int) -> Base:
+        pass
+
     async def after_create(self, entity: T, request: Request | None):
         audit_logger.info(f"{self.current_user} is creating an entity.")
         audit_logger.info(f"{entity} is created.")
 
-    async def after_update(
-        self, entity: T, update_dict: Dict[str, Any], request: Request | None
-    ):
+    async def after_update(self, entity: T, update_dict: Dict[str, Any], request: Request | None):
         audit_logger.info(f"{self.current_user} is updating an entity.")
         audit_logger.info(f"{entity} is updated with {update_dict}.")
 

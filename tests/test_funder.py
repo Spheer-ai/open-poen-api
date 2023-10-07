@@ -4,7 +4,7 @@ from tests.conftest import (
     userowner,
     user,
     admin,
-    policy_officer,
+    grant_officer,
     initiative_owner,
     anon,
     funder_info,
@@ -15,7 +15,7 @@ from open_poen_api.models import Funder
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 200), (user, 403), (admin, 200), (policy_officer, 403), (anon, 403)],
+    [(superuser, 200), (user, 403), (admin, 200), (grant_officer, 403), (anon, 403)],
     ids=[
         "Superuser can",
         "User cannot",
@@ -39,7 +39,7 @@ async def test_create_funder(async_client, dummy_session, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 204), (user, 403), (admin, 204), (policy_officer, 403), (anon, 403)],
+    [(superuser, 204), (user, 403), (admin, 204), (grant_officer, 403), (anon, 403)],
     ids=[
         "Superuser can",
         "User cannot",
@@ -64,7 +64,7 @@ async def test_delete_funder(async_client, dummy_session, status_code):
     [
         (superuser, {"name": "Another Name"}, 200),
         (user, {"name": "Another Name"}, 403),
-        (policy_officer, {"name": "Another Name"}, 403),
+        (grant_officer, {"name": "Another Name"}, 403),
         (superuser, {"name": "EcoFuture Fund"}, 400),
     ],
     ids=[
@@ -101,7 +101,7 @@ async def test_get_funders_list(async_client, dummy_session, status_code):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 200), (policy_officer, 200), (anon, 200)],
+    [(superuser, 200), (grant_officer, 200), (anon, 200)],
     ids=["Superuser can", "Policy officer can", "Anon can"],
     indirect=["get_mock_user"],
 )

@@ -11,3 +11,5 @@ from .regulation import *
 from .grant import *
 from .bank_account import *
 from .payment import *
+from .auth import *
+from .file_upload import *

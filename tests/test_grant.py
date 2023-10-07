@@ -5,7 +5,7 @@ from tests.conftest import (
     admin,
     anon,
     grant_info,
-    policy_officer,
+    grant_officer,
 )
 from open_poen_api.models import Grant
 from open_poen_api.managers import GrantManager
@@ -18,7 +18,7 @@ from open_poen_api.managers import GrantManager
         (superuser, 200),
         (user, 403),
         (admin, 200),
-        (policy_officer, 200),
+        (grant_officer, 200),
         (anon, 403),
     ],
     ids=[
@@ -51,7 +51,7 @@ async def test_create_grant(async_client, dummy_session, status_code):
         (superuser, 204),
         (user, 403),
         (admin, 204),
-        (policy_officer, 204),
+        (grant_officer, 204),
         (anon, 403),
     ],
     ids=[
@@ -102,7 +102,7 @@ async def test_add_overseers(async_client, dummy_session, status_code):
         (superuser, {"name": "Another Name"}, 200),
         (admin, {"name": "Another Name"}, 200),
         (user, {"name": "Another Name"}, 403),
-        (policy_officer, {"name": "Another name"}, 200),
+        (grant_officer, {"name": "Another name"}, 200),
         (superuser, {"name": "Cultural Heritage Preservation Fund"}, 400),
     ],
     ids=[
@@ -135,9 +135,7 @@ async def test_patch_grant(async_client, dummy_session, body, status_code):
 )
 async def test_get_grants_list(async_client, dummy_session, status_code):
     funder_id, regulation_id = 1, 1
-    response = await async_client.get(
-        f"/funder/{funder_id}/regulation/{regulation_id}/grants"
-    )
+    response = await async_client.get(f"/funder/{funder_id}/regulation/{regulation_id}/grants")
     assert response.status_code == status_code
     assert len(response.json()["grants"]) == 2
 

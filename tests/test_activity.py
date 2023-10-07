@@ -2,7 +2,7 @@ import pytest
 from tests.conftest import (
     superuser,
     admin,
-    policy_officer,
+    grant_officer,
     initiative_owner,
     activity_owner,
     user,
@@ -19,7 +19,7 @@ from open_poen_api.managers.activity_manager import ActivityManager
     [
         (superuser, 200),
         (admin, 200),
-        (policy_officer, 200),
+        (grant_officer, 200),
         (initiative_owner, 200),
         (user, 403),
         (anon, 403),
@@ -37,9 +37,7 @@ from open_poen_api.managers.activity_manager import ActivityManager
 async def test_create_activity(async_client, dummy_session, status_code):
     body = activity_info
     initiative_id = 1
-    response = await async_client.post(
-        f"/initiative/{initiative_id}/activity", json=body
-    )
+    response = await async_client.post(f"/initiative/{initiative_id}/activity", json=body)
     assert response.status_code == status_code
     if status_code == 200:
         db_activity = dummy_session.get(Activity, response.json()["id"])
@@ -54,7 +52,7 @@ async def test_create_activity(async_client, dummy_session, status_code):
     [
         (superuser, 204),
         (admin, 204),
-        (policy_officer, 204),
+        (grant_officer, 204),
         (initiative_owner, 204),
         (activity_owner, 403),
         (user, 403),
@@ -73,9 +71,7 @@ async def test_create_activity(async_client, dummy_session, status_code):
 )
 async def test_delete_activity(async_client, dummy_session, status_code):
     initiative_id, activity_id = 1, 1
-    response = await async_client.delete(
-        f"/initiative/{initiative_id}/activity/{activity_id}"
-    )
+    response = await async_client.delete(f"/initiative/{initiative_id}/activity/{activity_id}")
     assert response.status_code == status_code
     if status_code == 204:
         activity = await dummy_session.get(Activity, activity_id)
@@ -94,7 +90,7 @@ async def test_delete_activity(async_client, dummy_session, status_code):
         (superuser, [2, 3, 4], 200),
         (user, [2], 403),
         (admin, [2], 200),
-        (policy_officer, [2], 200),
+        (grant_officer, [2], 200),
         (initiative_owner, [2], 200),
         (activity_owner, [2], 403),
         (anon, [2], 403),
@@ -132,7 +128,7 @@ async def test_add_activity_owner(async_client, dummy_session, ids, status_code)
     [
         (superuser, {"hidden": True}, 200),
         (admin, {"hidden": True}, 200),
-        (policy_officer, {"hidden": True}, 200),
+        (grant_officer, {"hidden": True}, 200),
         (initiative_owner, {"hidden": True}, 200),
         (activity_owner, {"hidden": True}, 403),
         (activity_owner, {"description": "New description."}, 200),
@@ -175,7 +171,7 @@ async def test_patch_activity(async_client, dummy_session, body, status_code):
         (anon, "budget", True, 200),
         (activity_owner, "hidden", True, 200),
         (initiative_owner, "hidden", True, 200),
-        (policy_officer, "hidden", True, 200),
+        (grant_officer, "hidden", True, 200),
         (admin, "hidden", True, 200),
         (superuser, "hidden", True, 200),
         (user, "hidden", False, 200),
@@ -194,12 +190,8 @@ async def test_patch_activity(async_client, dummy_session, body, status_code):
     ],
     indirect=["get_mock_user"],
 )
-async def test_get_linked_activity_detail(
-    async_client, dummy_session, field, present, status_code
-):
+async def test_get_linked_activity_detail(async_client, dummy_session, field, present, status_code):
     initiative_id, activity_id = 1, 1
-    response = await async_client.get(
-        f"/initiative/{initiative_id}/activity/{activity_id}"
-    )
+    response = await async_client.get(f"/initiative/{initiative_id}/activity/{activity_id}")
     assert response.status_code == status_code
     assert (field in response.json().keys()) == present
