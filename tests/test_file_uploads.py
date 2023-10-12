@@ -41,5 +41,5 @@ async def test_upload_files(
     assert response.status_code == status_code
     if status_code == 200:
         db_user = await dummy_session.get(User, 1)
-        assert db_user.image_path is not None
-        assert db_user.image_thumbnail_path is not None
+        assert db_user.image_url is not None
+        assert db_user.image_thumbnail_url is not None

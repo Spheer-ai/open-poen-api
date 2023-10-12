@@ -6,6 +6,7 @@ import string
 import random
 import datetime
 from azure.storage.blob.aio import BlobServiceClient
+from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from pydantic import BaseModel
 from ..managers.exc import UnsupportedFileType, FileTooLarge
 
@@ -37,12 +38,13 @@ def temp_password_generator(
 blob_service_client = BlobServiceClient.from_connection_string(
     os.environ["AZURE_STORAGE_CONNECTION_STRING"]
 )
+AZURE_STORAGE_ACCOUNT_KEY = os.environ["AZURE_STORAGE_ACCOUNT_KEY"]
 container_client = blob_service_client.get_container_client("media")
 
 
 class ProfilePictureUpdate(BaseModel):
-    image_path: str | None
-    image_thumbnail_path: str | None
+    raw_image_url: str | None
+    raw_image_thumbnail_url: str | None
 
 
 async def upload_profile_picture(
@@ -71,5 +73,24 @@ async def upload_profile_picture(
     await thumbnail_blob_client.upload_blob(thumbnail_bytes.getvalue(), overwrite=True)
 
     return ProfilePictureUpdate(
-        image_path=blob_client.url, image_thumbnail_path=thumbnail_blob_client.url
+        raw_image_url=blob_client.url,
+        raw_image_thumbnail_url=thumbnail_blob_client.url,
     )
+
+
+def generate_sas_token(blob_url: str) -> str:
+    url_parts = blob_url.split("/")
+    account_name = url_parts[2].split(".")[0]
+    container_name = url_parts[3]
+    blob_name = "/".join(url_parts[4:])
+
+    sas_permissions = BlobSasPermissions(read=True)
+    sas_token = generate_blob_sas(
+        account_name=account_name,
+        container_name=container_name,
+        blob_name=blob_name,
+        account_key=AZURE_STORAGE_ACCOUNT_KEY,
+        permission=sas_permissions,
+        expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+    )
+    return f"{blob_url}?{sas_token}"

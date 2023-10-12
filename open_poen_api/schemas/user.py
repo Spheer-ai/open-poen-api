@@ -15,6 +15,8 @@ class UserRead(schemas.BaseUser[int]):
     role: UserRole | None
     image: str | None
     hidden: bool | None
+    image_url: str | None
+    image_thumbnail_url: str | None
 
     class Config:
         orm_mode = True

@@ -165,7 +165,7 @@ class UserManagerExCurrentUser(
         self, user: User, request: Request | None = None
     ) -> None:
         profile_picture_update = ProfilePictureUpdate(
-            image_path=None, image_thumbnail_path=None
+            raw_image_url=None, raw_image_thumbnail_url=None
         )
         await self.base_update(profile_picture_update, user, request=request)
 

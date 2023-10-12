@@ -14,8 +14,6 @@ from sqlalchemy import (
 from datetime import datetime
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
-
-# from ..mixins import TimeStampMixin, HiddenMixin, Money
 from typing import Optional
 from sqlalchemy import select, and_, func, case
 from sqlalchemy.orm import (
@@ -23,16 +21,13 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
     relationship,
-    selectinload,
 )
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.associationproxy import association_proxy, AssociationProxy
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
-from sqlalchemy.dialects import postgresql as pg
-import uuid
-from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy_utils import aggregated
+from .utils.utils import generate_sas_token
 
 
 class TimeStampMixin:
@@ -48,8 +43,20 @@ class TimeStampMixin:
 
 
 class ImagePathMixin:
-    image_path: Mapped[str | None] = mapped_column(String, nullable=True)
-    image_thumbnail_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    raw_image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    raw_image_thumbnail_url: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    @hybrid_property
+    def image_url(self):
+        if self.raw_image_url:
+            return generate_sas_token(self.raw_image_url)
+        return None
+
+    @hybrid_property
+    def image_thumbnail_url(self):
+        if self.raw_image_thumbnail_url:
+            return generate_sas_token(self.raw_image_thumbnail_url)
+        return None
 
 
 class Base(DeclarativeBase):
