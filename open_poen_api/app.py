@@ -58,6 +58,13 @@ async def custom_exception_handler(request: Request, exc: CustomException):
 
 
 if os.environ["ENVIRONMENT"] == "debug":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allows all origins
+        allow_credentials=True,
+        allow_methods=["*"],  # Allows all methods
+        allow_headers=["*"],  # Allows all headers
+    )
 
     @app.on_event("startup")
     async def on_startup():
