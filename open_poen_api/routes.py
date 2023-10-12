@@ -1323,28 +1323,28 @@ async def get_authorized_fields(
     )
 
 
-@utils_router.post("/utils/upload-files")
+@user_router.post("/user/{user_id}/upload-files/{file_upload_type}")
 async def upload_files(
-    file_upload_create: s.FileUploadCreate,
+    user_id: int,
+    file_upload_type: s.FileUploadType,
+    request: Request,
     files: list[UploadFile] = File(...),
     user_manager: m.UserManager = Depends(m.UserManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    profile_picture_class_map: dict[
-        s.FileUploadEntityClass, m.ProfilePictureUploadHandler
-    ] = {s.FileUploadEntityClass.USER: user_manager}
-
-    if file_upload_create.upload_type == s.FileUploadType.PROFILE_PICTURE:
+    if file_upload_type == s.FileUploadType.PROFILE_PICTURE:
         if not len(files) == 1:
             raise HTTPException(
                 status_code=400,
                 detail="Cannot upload multiple files for profile picture",
             )
-        await profile_picture_class_map[
-            file_upload_create.entity_class
-        ].set_profile_picture(files[0], file_upload_create.entity_id)
-    elif file_upload_create.upload_type == s.FileUploadType.PICTURE:
-        pass
-        # for file in files:
-        #     await profile_picture_class_map[file_upload_create.entity_class].upload_picture(
-        #         file
-        # )
+        user_db = await user_manager.detail_load(user_id)
+        auth.authorize(required_user, "edit", user_db, oso)
+        await user_manager.set_profile_picture(files[0], user_db, request=request)
+    elif file_upload_type == s.FileUploadType.PICTURE:
+        raise NotImplementedError
+    elif file_upload_type == s.FileUploadType.DOCUMENT:
+        raise NotImplementedError
+    else:
+        raise ValueError

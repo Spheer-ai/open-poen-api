@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
 import os
+from .logger import audit_logger
 
 tags_metadata = [
     {"name": "auth"},
@@ -54,7 +55,10 @@ app.include_router(permission_router, prefix="/auth/entity-access", tags=["auth"
 
 @app.exception_handler(CustomException)
 async def custom_exception_handler(request: Request, exc: CustomException):
-    return JSONResponse(status_code=exc.status_code, content=str(exc))
+    audit_logger.info(
+        f"Exception occurred with status code {exc.status_code} and message {exc.message}"
+    )
+    return JSONResponse(status_code=exc.status_code, content=exc.message)
 
 
 if os.environ["ENVIRONMENT"] == "debug":

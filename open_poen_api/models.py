@@ -47,6 +47,11 @@ class TimeStampMixin:
     )
 
 
+class ImagePathMixin:
+    image_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    image_thumbnail_path: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class Base(DeclarativeBase):
     PROXIES: list[str] = []
 
@@ -159,7 +164,7 @@ class UserRole(str, Enum):
     USER = "user"
 
 
-class User(SQLAlchemyBaseUserTable[int], Base):
+class User(SQLAlchemyBaseUserTable[int], ImagePathMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     first_name: Mapped[str | None] = mapped_column(String(length=64))
     last_name: Mapped[str | None] = mapped_column(String(length=64))

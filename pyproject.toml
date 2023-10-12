@@ -31,6 +31,7 @@ oso = "^0.27.0"
 psycopg2 = "^2.9.6"
 pillow = "^10.0.1"
 azure-storage-blob = "^12.18.2"
+aiohttp = "^3.8.6"
 
 
 [tool.poetry.group.dev.dependencies]

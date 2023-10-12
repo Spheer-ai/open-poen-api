@@ -11,6 +11,7 @@ from ..models import (
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from ..utils.email import MessageSchema, conf, env
+from ..utils.utils import upload_profile_picture, ProfilePictureUpdate
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -21,7 +22,6 @@ from fastapi_users.authentication import (
     AuthenticationBackend,
 )
 from fastapi_users import schemas
-from fastapi_users import models
 from fastapi_users.exceptions import UserAlreadyExists
 import contextlib
 from fastapi_mail import MessageType, FastMail
@@ -30,10 +30,8 @@ from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from .base_manager_ex_current_user import BaseManagerExCurrentUser
-from typing import Any, Dict, cast, Annotated
-from ..logger import audit_logger
+from typing import Any, Dict, cast
 from pydantic import EmailStr
-from .manager_handlers import ProfilePictureUploadHandler
 
 
 WEBSITE_NAME = os.environ["WEBSITE_NAME"]
@@ -44,7 +42,6 @@ class UserManagerExCurrentUser(
     IntegerIDMixin,
     BaseUserManager[User, int],
     BaseManagerExCurrentUser,
-    ProfilePictureUploadHandler,
 ):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
@@ -157,11 +154,20 @@ class UserManagerExCurrentUser(
             raise EntityNotFound(message="User not found")
         return query_result
 
-    async def set_profile_picture(self, file: UploadFile, id: int) -> None:
-        user = await self.min_load(id)
-        filename = f"{id}_user_profile_picture"
-        profile_picture_update = await self.upload_profile_picture(file, filename)
-        await super().update(profile_picture_update, user, request=None)
+    async def set_profile_picture(
+        self, file: UploadFile, user: User, request: Request | None = None
+    ) -> None:
+        filename = f"{user.id}_user_profile_picture"
+        profile_picture_update = await upload_profile_picture(file, filename)
+        await self.base_update(profile_picture_update, user, request=request)
+
+    async def unset_profile_picture(
+        self, user: User, request: Request | None = None
+    ) -> None:
+        profile_picture_update = ProfilePictureUpdate(
+            image_path=None, image_thumbnail_path=None
+        )
+        await self.base_update(profile_picture_update, user, request=request)
 
 
 async def _get_user_manager(
