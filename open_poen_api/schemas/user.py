@@ -7,11 +7,12 @@ from ..models import UserRole
 
 
 class UserRead(schemas.BaseUser[int]):
+    id: int
     email: EmailStr | None
     first_name: str | None
     last_name: str | None
     biography: str | None
-    role: UserRole
+    role: UserRole | None
     image: str | None
     hidden: bool | None
 

@@ -98,7 +98,9 @@ async def test_delete_initiative(async_client, dummy_session, status_code):
 async def test_add_initiative_owner(async_client, dummy_session, status_code):
     initiative_id = 1
     body = {"user_ids": [1]}
-    response = await async_client.patch(f"/initiative/{initiative_id}/owners", json=body)
+    response = await async_client.patch(
+        f"/initiative/{initiative_id}/owners", json=body
+    )
     assert response.status_code == status_code
     if status_code == 200:
         im = InitiativeManager(dummy_session, None)
@@ -129,7 +131,9 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
 async def test_add_debit_cards(async_client, dummy_session, status_code):
     initiative_id = 1
     body = {"card_numbers": [6731924123456789012]}
-    response = await async_client.patch(f"/initiative/{initiative_id}/debit-cards", json=body)
+    response = await async_client.patch(
+        f"/initiative/{initiative_id}/debit-cards", json=body
+    )
     assert response.status_code == status_code
     if status_code == 200:
         im = InitiativeManager(dummy_session, None)
@@ -198,7 +202,9 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     ],
     indirect=["get_mock_user"],
 )
-async def test_get_initiatives_list(async_client, dummy_session, status_code, result_length):
+async def test_get_initiatives_list(
+    async_client, dummy_session, status_code, result_length
+):
     await hide_instance(dummy_session, Initiative, 1)
     response = await async_client.get("/initiatives")
     assert response.status_code == status_code

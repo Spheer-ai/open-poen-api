@@ -25,7 +25,7 @@ from open_poen_api.managers import GrantManager
         "Superuser can",
         "User cannot",
         "Administrator can",
-        "Policy officer can",
+        "Grant officer can",
         "Anon cannot",
     ],
     indirect=["get_mock_user"],
@@ -135,7 +135,9 @@ async def test_patch_grant(async_client, dummy_session, body, status_code):
 )
 async def test_get_grants_list(async_client, dummy_session, status_code):
     funder_id, regulation_id = 1, 1
-    response = await async_client.get(f"/funder/{funder_id}/regulation/{regulation_id}/grants")
+    response = await async_client.get(
+        f"/funder/{funder_id}/regulation/{regulation_id}/grants"
+    )
     assert response.status_code == status_code
     assert len(response.json()["grants"]) == 2
 

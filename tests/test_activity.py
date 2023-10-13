@@ -37,7 +37,9 @@ from open_poen_api.managers.activity_manager import ActivityManager
 async def test_create_activity(async_client, dummy_session, status_code):
     body = activity_info
     initiative_id = 1
-    response = await async_client.post(f"/initiative/{initiative_id}/activity", json=body)
+    response = await async_client.post(
+        f"/initiative/{initiative_id}/activity", json=body
+    )
     assert response.status_code == status_code
     if status_code == 200:
         db_activity = dummy_session.get(Activity, response.json()["id"])
@@ -71,7 +73,9 @@ async def test_create_activity(async_client, dummy_session, status_code):
 )
 async def test_delete_activity(async_client, dummy_session, status_code):
     initiative_id, activity_id = 1, 1
-    response = await async_client.delete(f"/initiative/{initiative_id}/activity/{activity_id}")
+    response = await async_client.delete(
+        f"/initiative/{initiative_id}/activity/{activity_id}"
+    )
     assert response.status_code == status_code
     if status_code == 204:
         activity = await dummy_session.get(Activity, activity_id)
@@ -190,8 +194,12 @@ async def test_patch_activity(async_client, dummy_session, body, status_code):
     ],
     indirect=["get_mock_user"],
 )
-async def test_get_linked_activity_detail(async_client, dummy_session, field, present, status_code):
+async def test_get_linked_activity_detail(
+    async_client, dummy_session, field, present, status_code
+):
     initiative_id, activity_id = 1, 1
-    response = await async_client.get(f"/initiative/{initiative_id}/activity/{activity_id}")
+    response = await async_client.get(
+        f"/initiative/{initiative_id}/activity/{activity_id}"
+    )
     assert response.status_code == status_code
     assert (field in response.json().keys()) == present

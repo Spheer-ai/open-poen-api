@@ -21,7 +21,9 @@ async def user_data(async_session):
         is_superuser=True,
         role="user",
     )
-    financial = User(hashed_password="123456", email="financial@gmail.com", role="financial")
+    financial = User(
+        hashed_password="123456", email="financial@gmail.com", role="financial"
+    )
     administrator = User(
         hashed_password="123456", email="administrator@gmail.com", role="administrator"
     )
@@ -72,7 +74,9 @@ field_combs = [
 
 
 @pytest.mark.parametrize("actor,action,resource,fields,are_authorized", field_combs)
-async def test_field_permissions(actor, action, resource, fields, are_authorized, user_data):
+async def test_field_permissions(
+    actor, action, resource, fields, are_authorized, user_data
+):
     actor = user_data[actor]
     resource = user_data[resource]
     authorized_fields = OSO.authorized_fields(actor, "read", resource)
@@ -148,7 +152,14 @@ async def test_get_authorized_actions(
     [
         (superuser, "User", user, 200, {"role", "email", "hidden"}, set()),
         (user, "User", superuser, 200, set(), {"first_name", "role"}),
-        (userowner, "User", userowner, 200, {"first_name", "email"}, {"role", "hidden"}),
+        (
+            userowner,
+            "User",
+            userowner,
+            200,
+            {"first_name", "email"},
+            {"role", "hidden"},
+        ),
         (superuser, "Funder", 1, 200, {"url", "name"}, set()),
         (user, "Funder", 1, 200, set(), {"url", "name"}),
         (admin, "Regulation", 1, 200, {"name", "description"}, set()),
@@ -166,7 +177,13 @@ async def test_get_authorized_actions(
     indirect=["get_mock_user"],
 )
 async def test_get_authorized_editable_fields(
-    async_client, dummy_session, entity_class, entity_id, status_code, fields_present, fields_absent
+    async_client,
+    dummy_session,
+    entity_class,
+    entity_id,
+    status_code,
+    fields_present,
+    fields_absent,
 ):
     url = f"/auth/entity-access/edit-fields?entity_class={entity_class}&"
     if entity_id is not None:

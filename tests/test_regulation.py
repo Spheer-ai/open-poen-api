@@ -44,7 +44,9 @@ async def test_create_regulation(async_client, dummy_session, status_code):
 )
 async def test_delete_regulation(async_client, dummy_session, status_code):
     funder_id, regulation_id = 1, 1
-    response = await async_client.delete(f"/funder/{funder_id}/regulation/{regulation_id}")
+    response = await async_client.delete(
+        f"/funder/{funder_id}/regulation/{regulation_id}"
+    )
     assert response.status_code == status_code
     if status_code == 204:
         regulation = await dummy_session.get(Regulation, funder_id)

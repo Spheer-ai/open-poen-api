@@ -99,14 +99,16 @@ async def retrieve_token_from_last_sent_email():
     """Gets the last send email from Mailhog, assumes it's an email reply to a password
     reset request and parses the token inside it to return it."""
     async with AsyncClient() as client:
-        response = await client.get("http://localhost:8025/api/v2/messages")
+        response = await client.get("http://mail:8025/api/v2/messages")
         if response.status_code == 200:
             emails = response.json()["items"]
             if len(emails) > 0:
                 response = await client.get(
-                    f"http://localhost:8025/api/v1/messages/{emails[0]['ID']}"
+                    f"http://mail:8025/api/v1/messages/{emails[0]['ID']}"
                 )
-                text = base64.b64decode(response.json()["MIME"]["Parts"][0]["Body"]).decode("utf-8")
+                text = base64.b64decode(
+                    response.json()["MIME"]["Parts"][0]["Body"]
+                ).decode("utf-8")
                 lines = text.split("\n")
                 try:
                     url = next(line for line in lines if "reset-password" in line)
@@ -123,7 +125,9 @@ async def retrieve_token_from_last_sent_email():
 
 @pytest_asyncio.fixture
 async def async_client(event_loop, overridden_app):
-    async with AsyncClient(app=overridden_app, base_url="http://localhost:8000") as client:
+    async with AsyncClient(
+        app=overridden_app, base_url="http://localhost:8000"
+    ) as client:
         yield client
 
 
