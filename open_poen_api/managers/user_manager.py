@@ -1,4 +1,4 @@
-from fastapi import Depends, Request
+from fastapi import Depends, Request, UploadFile
 from ..database import get_user_db, get_async_session
 from ..models import (
     User,
@@ -33,6 +33,7 @@ from .base_manager_ex_current_user import BaseManagerExCurrentUser
 from typing import Any, Dict, cast, Annotated
 from ..logger import audit_logger
 from pydantic import EmailStr
+from .manager_handlers import ProfilePictureUploadHandler
 
 
 WEBSITE_NAME = os.environ["WEBSITE_NAME"]
@@ -40,7 +41,10 @@ SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 
 
 class UserManagerExCurrentUser(
-    IntegerIDMixin, BaseUserManager[User, int], BaseManagerExCurrentUser
+    IntegerIDMixin,
+    BaseUserManager[User, int],
+    BaseManagerExCurrentUser,
+    ProfilePictureUploadHandler,
 ):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
@@ -152,6 +156,12 @@ class UserManagerExCurrentUser(
         if query_result is None:
             raise EntityNotFound(message="User not found")
         return query_result
+
+    async def set_profile_picture(self, file: UploadFile, id: int) -> None:
+        user = await self.min_load(id)
+        filename = f"{id}_user_profile_picture"
+        profile_picture_update = await self.upload_profile_picture(file, filename)
+        await super().update(profile_picture_update, user, request=None)
 
 
 async def _get_user_manager(

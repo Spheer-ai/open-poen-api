@@ -1323,27 +1323,28 @@ async def get_authorized_fields(
     )
 
 
-# @utils_router.post("/utils/upload-files")
-# async def upload_files(file_upload_create: s.FileUploadCreate, files: list[UploadFile] = File(...)):
-# detail load the right instance from the right class.
+@utils_router.post("/utils/upload-files")
+async def upload_files(
+    file_upload_create: s.FileUploadCreate,
+    files: list[UploadFile] = File(...),
+    user_manager: m.UserManager = Depends(m.UserManager),
+):
+    profile_picture_class_map: dict[
+        s.FileUploadEntityClass, m.ProfilePictureUploadHandler
+    ] = {s.FileUploadEntityClass.USER: user_manager}
 
-# for file in files:
-#     if file.content_type not in ["image/jpeg", "image/png"]:
-#         raise HTTPException(status_code=400, detail="Invalid file type")
-
-#     # Upload to Azure
-#     blob_client = container_client.get_blob_client(file.filename)
-#     blob_client.upload_blob(file.file.read())
-
-
-# class UploadType(BaseModel):
-#     type: str
-
-# @app.post("/upload/")
-# async def upload_files(upload_type: UploadType, files: list[UploadFile] = File(...)):
-#     if upload_type.type not in ["profile_picture", "payment_attachment"]:
-#         raise HTTPException(status_code=400, detail="Invalid upload type")
-
-#     for file in files:
-#         # Additional logic based on upload_type.type
-#         # ...
+    if file_upload_create.upload_type == s.FileUploadType.PROFILE_PICTURE:
+        if not len(files) == 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot upload multiple files for profile picture",
+            )
+        await profile_picture_class_map[
+            file_upload_create.entity_class
+        ].set_profile_picture(files[0], file_upload_create.entity_id)
+    elif file_upload_create.upload_type == s.FileUploadType.PICTURE:
+        pass
+        # for file in files:
+        #     await profile_picture_class_map[file_upload_create.entity_class].upload_picture(
+        #         file
+        # )
