@@ -7,6 +7,9 @@ from ..models import (
     UserBankAccountRole,
     UserRegulationRole,
     UserGrantRole,
+    Attachment,
+    AttachmentEntityType,
+    AttachmentAttachmentType,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
@@ -159,7 +162,15 @@ class UserManagerExCurrentUser(
     ) -> None:
         filename = f"{user.id}_user_profile_picture"
         profile_picture_update = await upload_profile_picture(file, filename)
-        await self.base_update(profile_picture_update, user, request=request)
+        user.profile_picture = Attachment(
+            entity_id=user.id,
+            entity_type=AttachmentEntityType.USER,
+            attachment_type=AttachmentAttachmentType.PROFILE_PICTURE,
+            raw_attachment_url=profile_picture_update.raw_image_url,
+        )
+        self.session.add(user)
+        await self.session.commit()
+        # await self.base_update(profile_picture_update, user, request=request)
 
     async def unset_profile_picture(
         self, user: User, request: Request | None = None

@@ -24,6 +24,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.associationproxy import association_proxy, AssociationProxy
+from sqlalchemy.ext.declarative import declared_attr
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
 from sqlalchemy_utils import aggregated
@@ -42,23 +43,6 @@ class TimeStampMixin:
     )
 
 
-class ImagePathMixin:
-    raw_image_url: Mapped[str | None] = mapped_column(String, nullable=True)
-    raw_image_thumbnail_url: Mapped[str | None] = mapped_column(String, nullable=True)
-
-    @hybrid_property
-    def image_url(self):
-        if self.raw_image_url:
-            return generate_sas_token(self.raw_image_url)
-        return None
-
-    @hybrid_property
-    def image_thumbnail_url(self):
-        if self.raw_image_thumbnail_url:
-            return generate_sas_token(self.raw_image_thumbnail_url)
-        return None
-
-
 class Base(DeclarativeBase):
     PROXIES: list[str] = []
 
@@ -69,6 +53,66 @@ requisition_bank_account = Table(
     Column("requisition_id", Integer, ForeignKey("requisition.id"), primary_key=True),
     Column("bank_account_id", Integer, ForeignKey("bank_account.id"), primary_key=True),
 )
+
+
+class AttachmentEntityType(str, Enum):
+    USER = "user"
+    INITIATIVE = "initiative"
+    ACTIVITY = "activity"
+
+
+class AttachmentAttachmentType(str, Enum):
+    PROFILE_PICTURE = "profile_picture"
+    PICTURE = "picture"
+    DOCUMENT = "document"
+
+
+class Attachment(Base):
+    __tablename__ = "attachments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_id: Mapped[int] = mapped_column(Integer)
+    entity_type: Mapped[AttachmentEntityType] = mapped_column(
+        ChoiceType(AttachmentEntityType, impl=VARCHAR(length=32))
+    )
+    attachment_type: Mapped[AttachmentAttachmentType] = mapped_column(
+        ChoiceType(AttachmentAttachmentType, impl=VARCHAR(length=32))
+    )
+    raw_attachment_url: Mapped[str] = mapped_column(String, nullable=False)
+    raw_attachment_thumbnail_128_url: Mapped[str] = mapped_column(String, nullable=True)
+    raw_attachment_thumbnail_256_url: Mapped[str] = mapped_column(String, nullable=True)
+    raw_attachment_thumbnail_512_url: Mapped[str] = mapped_column(String, nullable=True)
+
+    @hybrid_property
+    def attachment_url(self):
+        return generate_sas_token(self.raw_attachment_url)
+
+    @hybrid_property
+    def attachment_thumbnail_url_128(self):
+        return generate_sas_token(self.raw_attachment_thumbnail_128_url)
+
+    @hybrid_property
+    def attachment_thumbnail_url_256(self):
+        return generate_sas_token(self.raw_attachment_thumbnail_256_url)
+
+    @hybrid_property
+    def attachment_thumbnail_url_512(self):
+        return generate_sas_token(self.raw_attachment_thumbnail_512_url)
+
+
+class ProfilePictureMixin:
+    id_column: str
+    entity_type: str
+
+    @declared_attr
+    def profile_picture(cls) -> Mapped[Attachment | None]:
+        return relationship(
+            "Attachment",
+            lazy="noload",
+            primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
+            f"Attachment.entity_type=='{cls.entity_type}', Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
+            cascade="all",
+            uselist=False,
+        )
 
 
 class UserInitiativeRole(Base):
@@ -171,7 +215,14 @@ class UserRole(str, Enum):
     USER = "user"
 
 
-class User(SQLAlchemyBaseUserTable[int], ImagePathMixin, Base):
+class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     self.setup_profile_picture("User.id", AttachmentEntityType.USER.value)
+
+    id_column = "User.id"
+    entity_type_value = AttachmentEntityType.USER.value
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     first_name: Mapped[str | None] = mapped_column(String(length=64))
     last_name: Mapped[str | None] = mapped_column(String(length=64))
