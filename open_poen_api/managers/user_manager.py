@@ -14,7 +14,7 @@ from ..models import (
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from ..utils.email import MessageSchema, conf, env
-from ..utils.utils import upload_profile_picture, ProfilePictureUpdate
+from ..utils.utils import upload_profile_picture
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -32,6 +32,7 @@ import os
 from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_
 from .base_manager_ex_current_user import BaseManagerExCurrentUser
 from typing import Any, Dict, cast
 from pydantic import EmailStr
@@ -143,6 +144,7 @@ class UserManagerExCurrentUser(
                     UserRegulationRole.regulation
                 ),
                 selectinload(User.overseer_roles).joinedload(UserGrantRole.grant),
+                joinedload(User.profile_picture),
             )
             .where(User.id == id)
         )
@@ -161,24 +163,40 @@ class UserManagerExCurrentUser(
         self, file: UploadFile, user: User, request: Request | None = None
     ) -> None:
         filename = f"{user.id}_user_profile_picture"
-        profile_picture_update = await upload_profile_picture(file, filename)
-        user.profile_picture = Attachment(
-            entity_id=user.id,
-            entity_type=AttachmentEntityType.USER,
-            attachment_type=AttachmentAttachmentType.PROFILE_PICTURE,
-            raw_attachment_url=profile_picture_update.raw_image_url,
-        )
-        self.session.add(user)
-        await self.session.commit()
-        # await self.base_update(profile_picture_update, user, request=request)
+        ppu = await upload_profile_picture(file, filename)
+        if user.profile_picture is None:
+            profile_picture = Attachment(
+                entity_id=user.id,
+                entity_type=AttachmentEntityType.USER,
+                attachment_type=AttachmentAttachmentType.PROFILE_PICTURE,
+            )
+        else:
+            profile_picture = user.profile_picture
 
-    async def unset_profile_picture(
+        profile_picture.raw_attachment_url = ppu.raw_attachment_url
+        profile_picture.raw_attachment_thumbnail_128_url = (
+            ppu.raw_attachment_thumbnail_128_url
+        )
+        profile_picture.raw_attachment_thumbnail_256_url = (
+            ppu.raw_attachment_thumbnail_256_url
+        )
+        profile_picture.raw_attachment_thumbnail_512_url = (
+            ppu.raw_attachment_thumbnail_512_url
+        )
+
+        self.session.add(profile_picture)
+        await self.session.commit()
+        await self.after_update(user, {"profile_picture": "created"}, request=request)
+
+    async def delete_profile_picture(
         self, user: User, request: Request | None = None
     ) -> None:
-        profile_picture_update = ProfilePictureUpdate(
-            raw_image_url=None, raw_image_thumbnail_url=None
-        )
-        await self.base_update(profile_picture_update, user, request=request)
+        if user.profile_picture is None:
+            return
+
+        await self.session.delete(user.profile_picture)
+        await self.session.commit()
+        await self.after_update(user, {"profile_picture": "deleted"}, request=request)
 
 
 async def _get_user_manager(

@@ -78,9 +78,15 @@ class Attachment(Base):
         ChoiceType(AttachmentAttachmentType, impl=VARCHAR(length=32))
     )
     raw_attachment_url: Mapped[str] = mapped_column(String, nullable=False)
-    raw_attachment_thumbnail_128_url: Mapped[str] = mapped_column(String, nullable=True)
-    raw_attachment_thumbnail_256_url: Mapped[str] = mapped_column(String, nullable=True)
-    raw_attachment_thumbnail_512_url: Mapped[str] = mapped_column(String, nullable=True)
+    raw_attachment_thumbnail_128_url: Mapped[str] = mapped_column(
+        String, nullable=False
+    )
+    raw_attachment_thumbnail_256_url: Mapped[str] = mapped_column(
+        String, nullable=False
+    )
+    raw_attachment_thumbnail_512_url: Mapped[str] = mapped_column(
+        String, nullable=False
+    )
 
     @hybrid_property
     def attachment_url(self):
@@ -216,12 +222,8 @@ class UserRole(str, Enum):
 
 
 class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.setup_profile_picture("User.id", AttachmentEntityType.USER.value)
-
     id_column = "User.id"
-    entity_type_value = AttachmentEntityType.USER.value
+    entity_type = AttachmentEntityType.USER.value
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     first_name: Mapped[str | None] = mapped_column(String(length=64))
@@ -230,7 +232,6 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
     role: Mapped[UserRole] = mapped_column(
         ChoiceType(UserRole, impl=VARCHAR(length=32))
     )
-    image: Mapped[str | None] = mapped_column(String(length=128))
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

@@ -38,6 +38,9 @@ from open_poen_api.schemas import (
 )
 import json
 from dateutil.parser import isoparse
+from io import BytesIO
+from fastapi import UploadFile
+import asyncio
 
 
 superuser = 6
@@ -121,6 +124,16 @@ async def retrieve_token_from_last_sent_email():
                 raise ValueError("No emails present.")
         else:
             raise ValueError("Request to Mailhog failed.")
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
 
 
 @pytest_asyncio.fixture
@@ -254,6 +267,18 @@ async def dummy_session(async_session):
     ]
     async_session.add_all(bank_account_roles)
     await async_session.commit()
+
+    with open("tests/dummy_data/test.png", "rb") as f:
+        image_content = f.read()
+
+    image_stream = BytesIO(image_content)
+    mock_upload_file = UploadFile(
+        filename="test.png",
+        file=image_stream,
+        headers={"content-type": "image/png"},
+    )
+    user_db = await user_manager.detail_load(1)
+    await user_manager.set_profile_picture(mock_upload_file, user_db, request=None)
 
     return async_session
 

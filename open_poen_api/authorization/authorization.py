@@ -16,6 +16,7 @@ ALGORITHM = "HS256"
 OSO = Oso()
 OSO.register_class(ent.Funder)
 OSO.register_class(ent.Regulation, fields={"id": int})
+OSO.register_class(ent.Attachment)
 OSO.register_class(
     ent.User,
     fields={
@@ -145,7 +146,9 @@ def get_oso_actor(actor: ent.User | None):
     return anon if actor is None else actor
 
 
-def get_authorized_query(actor: ent.User | None, action: str, resource: Type[ent.Base], oso: Oso):
+def get_authorized_query(
+    actor: ent.User | None, action: str, resource: Type[ent.Base], oso: Oso
+):
     oso_actor = get_oso_actor(actor)
 
     return oso.authorized_query(oso_actor, action, resource)
@@ -215,16 +218,25 @@ def get_authorized_output_fields(
     def get_fields_for_relationship(resource: ent.Base):
         fields = oso.authorized_fields(oso_actor, action, resource)
         filtered_fields = (
-            fields - set(resource.PROXIES) - set(resource.__mapper__.relationships.keys())
+            fields
+            - set(resource.PROXIES)
+            - set(resource.__mapper__.relationships.keys())
         )
-        return {k: v for k, v in resource.__dict__.items() if k in filtered_fields}
+        fields_with_values = {}
+        for f in filtered_fields:
+            fields_with_values[f] = getattr(resource, f)
+        return fields_with_values
 
     oso_actor = get_oso_actor(actor)
-    allowed_fields = oso.authorized_fields(oso_actor, action, resource) - set(ignore_fields)
+    allowed_fields = oso.authorized_fields(oso_actor, action, resource) - set(
+        ignore_fields
+    )
 
     # Non relationship fields that are authorized.
     non_rel_fields = (
-        allowed_fields - set(resource.PROXIES) - set(resource.__mapper__.relationships.keys())
+        allowed_fields
+        - set(resource.PROXIES)
+        - set(resource.__mapper__.relationships.keys())
     )
     # Relationship fields that are authorized.
     rel_fields = allowed_fields & (
@@ -243,7 +255,9 @@ def get_authorized_output_fields(
                 result[f] = get_fields_for_relationship(rel)
         elif isinstance(rel, (list, _AssociationList)):
             result[f] = [
-                get_fields_for_relationship(i) for i in rel if is_allowed(actor, action, i)
+                get_fields_for_relationship(i)
+                for i in rel
+                if is_allowed(actor, action, i)
             ]
         elif rel is None:
             result[f] = rel

@@ -26,7 +26,7 @@ from .bng import import_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import select, and_, or_, literal
 from requests import RequestException
 from datetime import datetime, timedelta, date
@@ -128,7 +128,7 @@ async def get_users(
     limit: int = 20,
     email: str | None = None,
 ):
-    query = select(ent.User)
+    query = select(ent.User).options(joinedload(ent.User.profile_picture))
 
     if optional_user is None:
         query = query.where(ent.User.hidden == False)
@@ -1324,7 +1324,7 @@ async def get_authorized_fields(
 
 
 @user_router.post("/user/{user_id}/profile-picture")
-async def upload_files(
+async def upload_profile_picture(
     user_id: int,
     request: Request,
     file: UploadFile = File(...),
@@ -1335,3 +1335,17 @@ async def upload_files(
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_user, "edit", user_db, oso)
     await user_manager.set_profile_picture(file, user_db, request=request)
+
+
+@user_router.delete("/user/{user_id}/profile-picture/{attachment_id}")
+async def delete_profile_picture(
+    user_id: int,
+    request: Request,
+    user_manager: m.UserManager = Depends(m.UserManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    user_db = await user_manager.detail_load(user_id)
+    auth.authorize(required_user, "edit", user_db, oso)
+    await user_manager.delete_profile_picture(user_db, request=request)
+    return Response(status_code=204)

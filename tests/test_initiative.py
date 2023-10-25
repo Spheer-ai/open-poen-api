@@ -14,7 +14,6 @@ from open_poen_api.models import Initiative
 from open_poen_api.managers import InitiativeManager
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -48,7 +47,6 @@ async def test_create_initiative(async_client, dummy_session, status_code):
         assert initiative_data["name"] == body["name"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -76,7 +74,6 @@ async def test_delete_initiative(async_client, dummy_session, status_code):
         assert initiative is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -109,7 +106,6 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
         assert db_initiative.initiative_owners[0].email == "user1@example.com"
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -142,7 +138,6 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
         assert db_initiative.debit_cards[0].card_number == str(6731924123456789012)
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
@@ -179,7 +174,6 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
             assert getattr(initiative, key) == body[key]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, result_length, status_code",
     [
@@ -211,7 +205,6 @@ async def test_get_initiatives_list(
     assert len(response.json()["initiatives"]) == result_length
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, field, present, status_code",
     [

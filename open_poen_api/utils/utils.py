@@ -43,8 +43,10 @@ container_client = blob_service_client.get_container_client("media")
 
 
 class ProfilePictureUpdate(BaseModel):
-    raw_image_url: str | None
-    raw_image_thumbnail_url: str | None
+    raw_attachment_url: str
+    raw_attachment_thumbnail_128_url: str
+    raw_attachment_thumbnail_256_url: str
+    raw_attachment_thumbnail_512_url: str
 
 
 async def upload_profile_picture(
@@ -63,18 +65,29 @@ async def upload_profile_picture(
     await blob_client.upload_blob(file_content, overwrite=True)
 
     image = Image.open(io.BytesIO(file_content))
-    image.thumbnail((1024, 1024))
-    thumbnail_bytes = io.BytesIO()
     image_format = "PNG" if file.content_type == "image/png" else "JPEG"
-    image.save(thumbnail_bytes, format=image_format)
 
-    thumbnail_blob_path = f"image_thumbnails/thumbnail_{filename}.{ext}"
-    thumbnail_blob_client = container_client.get_blob_client(thumbnail_blob_path)
-    await thumbnail_blob_client.upload_blob(thumbnail_bytes.getvalue(), overwrite=True)
+    thumbnail_urls = {}
+
+    for size in [128, 256, 512]:
+        thumbnail = image.copy()
+        thumbnail.thumbnail((size, size))
+
+        thumbnail_bytes = io.BytesIO()
+        thumbnail.save(thumbnail_bytes, format=image_format)
+
+        thumbnail_blob_path = f"image_thumbnails/{filename}_{size}.{ext}"
+        thumbnail_blob_client = container_client.get_blob_client(thumbnail_blob_path)
+        await thumbnail_blob_client.upload_blob(
+            thumbnail_bytes.getvalue(), overwrite=True
+        )
+        thumbnail_urls[size] = thumbnail_blob_client.url
 
     return ProfilePictureUpdate(
-        raw_image_url=blob_client.url,
-        raw_image_thumbnail_url=thumbnail_blob_client.url,
+        raw_attachment_url=blob_client.url,
+        raw_attachment_thumbnail_128_url=thumbnail_urls[128],
+        raw_attachment_thumbnail_256_url=thumbnail_urls[256],
+        raw_attachment_thumbnail_512_url=thumbnail_urls[512],
     )
 
 
