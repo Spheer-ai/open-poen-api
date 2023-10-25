@@ -1,5 +1,9 @@
 import typer
-from .database import get_async_session_context, get_user_db_context
+from .database import (
+    get_async_session_context,
+    get_user_db_context,
+    create_db_and_tables,
+)
 from .schemas import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
@@ -45,6 +49,15 @@ def add_user(
     password: str = "random",
 ):
     asyncio.run(async_add_user(email, superuser, role, password))
+
+
+@app.command()
+def reset_db():
+    confirmation = typer.confirm(
+        "Are you sure? This will remove all data from the database."
+    )
+    if confirmation:
+        asyncio.run(create_db_and_tables())
 
 
 @app.command()
