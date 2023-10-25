@@ -86,6 +86,28 @@ async def test_add_officer(async_client, dummy_session, status_code, role):
         assert officers[0].email == "user1@example.com"
 
 
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [(superuser, 200)],
+    ids=[
+        "Single user can be both officers",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_officer_can_have_double_role(async_client, dummy_session, status_code):
+    funder_id, regulation_id = 1, 1
+    body1 = {"user_ids": [1], "role": "policy officer"}
+    body2 = {"user_ids": [1], "role": "grant officer"}
+    for body in (body1, body2):
+        response = await async_client.patch(
+            f"/funder/{funder_id}/regulation/{regulation_id}/officers", json=body
+        )
+        assert response.status_code == status_code
+    rm = RegulationManager(dummy_session, None)
+    db_regulation = await rm.detail_load(regulation_id)
+    assert len(db_regulation.grant_officers) == len(db_regulation.policy_officers) == 1
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
