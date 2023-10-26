@@ -1,39 +1,45 @@
-# import pytest
-# from tests.conftest import user_info
+import pytest
+from tests.conftest import user
 
 
-# @pytest.mark.parametrize(
-#     "get_mock_user, status_code",
-#     [(user_info, 200)],
-#     indirect=["get_mock_user"],
-# )
-# async def test_create_gocardless(async_client, as_1, status_code):
-#     params = {"institution_id": "ING_INGBNL2A"}
-#     user_id = 1
-#     response = await async_client.get(
-#         f"/users/{user_id}/gocardless-initiate", params=params
-#     )
-#     assert response.status_code == status_code
-
-
-# @pytest.fixture(scope="module")
-# def token() -> gcl.Token:
-#     return gcl.create_new_token()
-
-
-# @pytest.fixture(scope="module")
-# def institutions(token) -> list[gcl.Institution]:
-#     return gcl.get_institutions(access_token=token.access)
-
-
-# def test_create_new_token():
-#     token = gcl.create_new_token()
-
-
-# def test_get_institutions(token):
-#     gcl.get_institutions(access_token=token.access)
-
-
-# def test_create_new_agreement(token, institutions):
-#     ing = [i for i in institutions if i.name == "ING"][0]
-#     gcl.create_new_agreement(access_token=token.access, institution=ing)
+@pytest.mark.parametrize(
+    "get_mock_user, institution_id, n_days_access, n_days_history, expected_status_code",
+    [
+        (user, "SANDBOXFINANCE_SFIN0000", 10, 10, 200),
+        (user, "INVALID_INSTITUTION", 10, 10, 400),
+        (user, "SANDBOXFINANCE_SFIN0000", 91, 10, 400),
+        (user, "SANDBOXFINANCE_SFIN0000", 0, 10, 400),
+        (user, "SANDBOXFINANCE_SFIN0000", 10, 731, 400),
+        (user, "SANDBOXFINANCE_SFIN0000", 10, 0, 400),
+    ],
+    ids=[
+        "URL is returned for correct request",
+        "Invalid institution_id returns 400",
+        "n_days_access > 90 returns 400",
+        "n_days_access < 1 returns 400",
+        "n_days_history > 730 returns 400",
+        "n_days_history < 1 returns 400",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_create_gocardless(
+    async_client,
+    dummy_session,
+    get_mock_user,
+    institution_id,
+    n_days_access,
+    n_days_history,
+    expected_status_code,
+):
+    params = {
+        "institution_id": institution_id,
+        "n_days_access": n_days_access,
+        "n_days_history": n_days_history,
+    }
+    user_id = 1
+    response = await async_client.get(
+        f"/users/{user_id}/gocardless-initiate", params=params
+    )
+    assert response.status_code == expected_status_code
+    if expected_status_code == 200:
+        assert "url" in response.json()
