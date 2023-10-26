@@ -8,8 +8,9 @@ from fastapi import (
     Query,
     UploadFile,
     File,
+    Body,
 )
-from typing import Optional
+from typing import Annotated
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
@@ -53,7 +54,16 @@ utils_router = APIRouter(tags=["utils"])
 
 @user_router.post("/user", response_model=s.UserRead)
 async def create_user(
-    user: s.UserCreate,
+    user: Annotated[
+        s.UserCreate,
+        Body(
+            example={
+                "email": "henkdevries@gmail.com",
+                "role": "user",
+                "is_superuser": True,
+            }
+        ),
+    ],
     request: Request,
     required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
@@ -77,6 +87,7 @@ async def get_user(
     required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    session=Depends(get_async_session),
 ):
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_login, "read", user_db, oso)
@@ -90,7 +101,9 @@ async def get_user(
 )
 async def update_user(
     user_id: int,
-    user: s.UserUpdate,
+    user: Annotated[
+        s.UserUpdate, Body(example={"first_name": "Henk", "last_name": "de Vries"})
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
@@ -700,7 +713,10 @@ async def link_initiative_debit_cards(
 
 @funder_router.post("/funder", response_model=s.FunderRead)
 async def create_funder(
-    funder: s.FunderCreate,
+    funder: Annotated[
+        s.FunderCreate,
+        Body(example={"name": "Gemeente Amsterdam", "url": "https://amsterdam.nl"}),
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
@@ -785,7 +801,15 @@ async def get_funders(
 @funder_router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
 async def create_regulation(
     funder_id: int,
-    regulation: s.RegulationCreate,
+    regulation: Annotated[
+        s.RegulationCreate,
+        Body(
+            example={
+                "name": "Buurtprojecten",
+                "description": "Buurtprojecten in Amsterdam Oost.",
+            }
+        ),
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
@@ -924,7 +948,16 @@ async def get_regulations(
 async def create_grant(
     funder_id: int,
     regulation_id: int,
-    grant: s.GrantCreate,
+    grant: Annotated[
+        s.GrantCreate,
+        Body(
+            example={
+                "name": "Boerenmarkt op Westerplein",
+                "reference": "AO-1991",
+                "budget": 1000.00,
+            }
+        ),
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),

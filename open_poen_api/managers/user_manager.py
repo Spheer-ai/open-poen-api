@@ -147,6 +147,7 @@ class UserManagerExCurrentUser(
                 joinedload(User.profile_picture),
             )
             .where(User.id == id)
+            .execution_options(populate_existing=True)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:

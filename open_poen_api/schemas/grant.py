@@ -1,4 +1,4 @@
-from pydantic import BaseModel, condecimal
+from pydantic import BaseModel, Field
 from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
 
 
@@ -24,7 +24,7 @@ class GrantReadList(BaseModel):
 class GrantCreate(BaseModel):
     name: str
     reference: str
-    budget: Budget
+    budget: Budget = Field(examples=[1000.01, 555, 9455.11])
 
 
 class GrantOverseerUpdate(BaseModel):
