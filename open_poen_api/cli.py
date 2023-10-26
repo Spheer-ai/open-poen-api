@@ -8,11 +8,13 @@ from .schemas import UserCreateWithPassword
 from .gocardless import client, refresh_tokens
 from .utils.utils import temp_password_generator
 from .managers.user_manager import UserManager
+from .gocardless.payments import get_gocardless_payments
 
 # from fastapi_users.exceptions import UserAlreadyExists
 from .managers.exc import EntityAlreadyExists
 import asyncio
 from rich import print
+from datetime import datetime
 
 app = typer.Typer()
 
@@ -58,6 +60,19 @@ def reset_db():
     )
     if confirmation:
         asyncio.run(create_db_and_tables())
+
+
+@app.command()
+def retrieve_payments(requisition_id: int, date_from: str = ""):
+    if date_from != "":
+        try:
+            parsed_date_from = datetime.strptime(date_from, "%Y-%m-%d")
+        except ValueError:
+            typer.echo("Invalid date format. Use YYYY-MM-DD.")
+            raise typer.Abort()
+
+    asyncio.run(refresh_tokens())
+    asyncio.run(get_gocardless_payments(requisition_id, parsed_date_from))
 
 
 @app.command()

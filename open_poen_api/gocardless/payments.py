@@ -10,6 +10,7 @@ from decimal import Decimal
 from sqlalchemy.orm import selectinload
 from asyncio import sleep
 from ..database import async_session_maker
+from ..logger import audit_logger
 
 
 CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
@@ -56,8 +57,6 @@ async def process_requisition(
         return
 
     for account in api_requisition["accounts"]:
-        # TODO: Make sure we don't do double imports for an account.
-        # (Multiple requisitions can be for the same account.)
         if account in processed_accounts:
             continue
         else:
@@ -91,7 +90,7 @@ async def process_requisition(
             account = ent.BankAccount(
                 api_account_id=metadata["id"],
                 iban=metadata["iban"],
-                name=details["account"]["name"],
+                name=details["account"]["ownerName"],
                 created=parse(metadata["created"]),
                 last_accessed=parse(metadata["last_accessed"]),
                 requisitions=[requisition],
@@ -124,11 +123,16 @@ async def process_requisition(
             cur_end_date = min(
                 cur_start_date + timedelta(days=PAYMENT_RETRIEVAL_INTERVAL), date_to
             )
+            audit_logger.info(
+                f"Retrieving payments for user {requisition.user} with period {cur_start_date.strftime('%Y-%m-%d')} till {cur_end_date.strftime('%Y-%m-%d')}."
+            )
             api_transactions = api_account.get_transactions(
                 date_from=cur_start_date.strftime("%Y-%m-%d"),
                 date_to=cur_end_date.strftime("%Y-%m-%d"),
             )
             await sleep(1)
+
+            skipped, imported = 0, 0
             for payment in api_transactions["transactions"]["booked"]:
                 payment = {
                     CAMEL_CASE_PATTERN.sub("_", k).lower(): v
@@ -150,6 +154,7 @@ async def process_requisition(
                     )
                 )
                 if payment_db_q.scalars().first():
+                    skipped += 1
                     continue
 
                 if (
@@ -167,11 +172,13 @@ async def process_requisition(
                     **{k: v for k, v in payment.items() if k in ALLOWED_PAYMENT_FIELDS},
                     route=route,
                     type=ent.PaymentType.GOCARDLESS,
-                    bank_account_id=account.id
+                    bank_account_id=account.id,
                 )
                 session.add(new_payment)
                 await session.commit()
+                imported += 1
 
+            audit_logger.info(f"Retrieved {imported} and skipped {skipped} payments.")
             cur_start_date = cur_end_date
 
 

@@ -167,7 +167,7 @@ class UserBankAccountRole(Base):
         Integer, ForeignKey("bank_account.id", ondelete="CASCADE"), primary_key=True
     )
     role: Mapped[BankAccountRole] = mapped_column(
-        ChoiceType(BankAccountRole, impl=VARCHAR(length=32))
+        ChoiceType(BankAccountRole, impl=VARCHAR(length=32)), primary_key=True
     )
 
     user: Mapped["User"] = relationship("User", uselist=False)

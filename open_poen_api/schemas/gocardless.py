@@ -3,13 +3,13 @@ from pydantic import BaseModel
 from ..gocardless import INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS
 
 
-def validate_institution_id(institution_id: str = Query(...)):
+def validate_institution_id(institution_id: str):
     if institution_id not in INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS:
         raise HTTPException(status_code=400, detail="institution_id is not selectable")
     return institution_id
 
 
-def validate_n_days_access(n_days_access: int = Query(...)):
+def validate_n_days_access(n_days_access: int):
     if n_days_access > 90:
         raise HTTPException(
             status_code=400,
@@ -23,7 +23,7 @@ def validate_n_days_access(n_days_access: int = Query(...)):
     return n_days_access
 
 
-def validate_n_days_history(institution_id: str, n_days_history: int = Query(...)):
+def validate_n_days_history(institution_id: str, n_days_history: int):
     max_n_days = INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS[institution_id]
     if n_days_history > max_n_days:
         raise HTTPException(

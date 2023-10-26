@@ -9,6 +9,7 @@ from fastapi import (
     UploadFile,
     File,
     Body,
+    Path,
 )
 from typing import Annotated
 from fastapi.responses import RedirectResponse
@@ -294,18 +295,24 @@ async def bng_callback(
     summary="GoCardless Initiate",
 )
 async def gocardless_initiatite(
-    user_id: int,
-    institution_id: str = Depends(s.validate_institution_id),
-    n_days_access: int = Depends(s.validate_n_days_access),
-    n_days_history: int = Depends(s.validate_n_days_history),
+    user_id: int = Path(..., examples={"1": {"summary": "1", "value": 1}}),
+    institution_id: str = Query(
+        ..., examples={"ING": {"summary": "ING", "value": "ING_INGBNL2A"}}
+    ),
+    n_days_access: int = Query(..., examples={"7": {"summary": "7", "value": 7}}),
+    n_days_history: int = Query(..., examples={"7": {"summary": "7", "value": 7}}),
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
 ):
+    s.validate_institution_id(institution_id)
+    s.validate_n_days_access(n_days_access)
+    s.validate_n_days_history(institution_id, n_days_history)
+
+    # TODO: Ensure only users can link for themselves.
     user = await user_manager.min_load(user_id)
 
     await refresh_tokens()
-
     reference_id = str(uuid.uuid4())
 
     token = jwt.encode(
