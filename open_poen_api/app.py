@@ -69,9 +69,3 @@ if os.environ["ENVIRONMENT"] == "debug":
         allow_methods=["*"],  # Allows all methods
         allow_headers=["*"],  # Allows all headers
     )
-
-    @app.on_event("startup")
-    async def on_startup():
-        # TODO: Don't recreate db every time.
-        await create_db_and_tables()
-        pass
