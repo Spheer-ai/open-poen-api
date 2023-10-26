@@ -11,7 +11,6 @@ from open_poen_api.models import Grant
 from open_poen_api.managers import GrantManager
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -44,7 +43,6 @@ async def test_create_grant(async_client, dummy_session, status_code):
         assert grant_data["name"] == body["name"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -74,7 +72,6 @@ async def test_delete_grant(async_client, dummy_session, status_code):
         assert grant is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (user, 403), (admin, 200), (anon, 403)],
@@ -95,7 +92,6 @@ async def test_add_overseers(async_client, dummy_session, status_code):
         assert db_grant.overseers[0].email == "user1@example.com"
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
@@ -126,7 +122,6 @@ async def test_patch_grant(async_client, dummy_session, body, status_code):
             assert getattr(grant, key) == body[key]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (anon, 200)],
@@ -142,7 +137,6 @@ async def test_get_grants_list(async_client, dummy_session, status_code):
     assert len(response.json()["grants"]) == 2
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (anon, 200)],

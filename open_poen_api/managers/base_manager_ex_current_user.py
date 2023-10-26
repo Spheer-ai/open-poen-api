@@ -59,7 +59,9 @@ class BaseManagerExCurrentUser(ABC):
         audit_logger.info(f"{self.current_user} is creating an entity.")
         audit_logger.info(f"{entity} is created.")
 
-    async def after_update(self, entity: T, update_dict: Dict[str, Any], request: Request | None):
+    async def after_update(
+        self, entity: T, update_dict: Dict[str, Any], request: Request | None
+    ):
         audit_logger.info(f"{self.current_user} is updating an entity.")
         audit_logger.info(f"{entity} is updated with {update_dict}.")
 

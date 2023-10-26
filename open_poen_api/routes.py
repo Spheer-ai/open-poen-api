@@ -8,8 +8,9 @@ from fastapi import (
     Query,
     UploadFile,
     File,
+    Body,
 )
-from typing import Optional
+from typing import Annotated
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
@@ -26,7 +27,7 @@ from .bng import import_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import select, and_, or_, literal
 from requests import RequestException
 from datetime import datetime, timedelta, date
@@ -53,7 +54,16 @@ utils_router = APIRouter(tags=["utils"])
 
 @user_router.post("/user", response_model=s.UserRead)
 async def create_user(
-    user: s.UserCreate,
+    user: Annotated[
+        s.UserCreate,
+        Body(
+            example={
+                "email": "henkdevries@gmail.com",
+                "role": "user",
+                "is_superuser": True,
+            }
+        ),
+    ],
     request: Request,
     required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
@@ -77,6 +87,7 @@ async def get_user(
     required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    session=Depends(get_async_session),
 ):
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_login, "read", user_db, oso)
@@ -90,7 +101,9 @@ async def get_user(
 )
 async def update_user(
     user_id: int,
-    user: s.UserUpdate,
+    user: Annotated[
+        s.UserUpdate, Body(example={"first_name": "Henk", "last_name": "de Vries"})
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
@@ -128,7 +141,7 @@ async def get_users(
     limit: int = 20,
     email: str | None = None,
 ):
-    query = select(ent.User)
+    query = select(ent.User).options(joinedload(ent.User.profile_picture))
 
     if optional_user is None:
         query = query.where(ent.User.hidden == False)
@@ -700,7 +713,10 @@ async def link_initiative_debit_cards(
 
 @funder_router.post("/funder", response_model=s.FunderRead)
 async def create_funder(
-    funder: s.FunderCreate,
+    funder: Annotated[
+        s.FunderCreate,
+        Body(example={"name": "Gemeente Amsterdam", "url": "https://amsterdam.nl"}),
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
@@ -785,7 +801,15 @@ async def get_funders(
 @funder_router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
 async def create_regulation(
     funder_id: int,
-    regulation: s.RegulationCreate,
+    regulation: Annotated[
+        s.RegulationCreate,
+        Body(
+            example={
+                "name": "Buurtprojecten",
+                "description": "Buurtprojecten in Amsterdam Oost.",
+            }
+        ),
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
@@ -924,7 +948,16 @@ async def get_regulations(
 async def create_grant(
     funder_id: int,
     regulation_id: int,
-    grant: s.GrantCreate,
+    grant: Annotated[
+        s.GrantCreate,
+        Body(
+            example={
+                "name": "Boerenmarkt op Westerplein",
+                "reference": "AO-1991",
+                "budget": 1000.00,
+            }
+        ),
+    ],
     request: Request,
     required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
@@ -1323,27 +1356,29 @@ async def get_authorized_fields(
     )
 
 
-# @utils_router.post("/utils/upload-files")
-# async def upload_files(file_upload_create: s.FileUploadCreate, files: list[UploadFile] = File(...)):
-# detail load the right instance from the right class.
+@user_router.post("/user/{user_id}/profile-picture")
+async def upload_profile_picture(
+    user_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    user_manager: m.UserManager = Depends(m.UserManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    user_db = await user_manager.detail_load(user_id)
+    auth.authorize(required_user, "edit", user_db, oso)
+    await user_manager.set_profile_picture(file, user_db, request=request)
 
-# for file in files:
-#     if file.content_type not in ["image/jpeg", "image/png"]:
-#         raise HTTPException(status_code=400, detail="Invalid file type")
 
-#     # Upload to Azure
-#     blob_client = container_client.get_blob_client(file.filename)
-#     blob_client.upload_blob(file.file.read())
-
-
-# class UploadType(BaseModel):
-#     type: str
-
-# @app.post("/upload/")
-# async def upload_files(upload_type: UploadType, files: list[UploadFile] = File(...)):
-#     if upload_type.type not in ["profile_picture", "payment_attachment"]:
-#         raise HTTPException(status_code=400, detail="Invalid upload type")
-
-#     for file in files:
-#         # Additional logic based on upload_type.type
-#         # ...
+@user_router.delete("/user/{user_id}/profile-picture/{attachment_id}")
+async def delete_profile_picture(
+    user_id: int,
+    request: Request,
+    user_manager: m.UserManager = Depends(m.UserManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    user_db = await user_manager.detail_load(user_id)
+    auth.authorize(required_user, "edit", user_db, oso)
+    await user_manager.delete_profile_picture(user_db, request=request)
+    return Response(status_code=204)

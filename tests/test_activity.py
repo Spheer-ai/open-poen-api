@@ -13,7 +13,6 @@ from open_poen_api.models import Activity, Initiative
 from open_poen_api.managers.activity_manager import ActivityManager
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -48,7 +47,6 @@ async def test_create_activity(async_client, dummy_session, status_code):
         assert activity_data["name"] == body["name"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
@@ -84,7 +82,6 @@ async def test_delete_activity(async_client, dummy_session, status_code):
         assert initiative is not None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, ids, status_code",
     [
@@ -126,7 +123,6 @@ async def test_add_activity_owner(async_client, dummy_session, ids, status_code)
         assert set([i.id for i in db_activity.activity_owners]) == set(ids)
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
@@ -167,7 +163,6 @@ async def test_patch_activity(async_client, dummy_session, body, status_code):
             assert getattr(activity, key) == body[key]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, field, present, status_code",
     [

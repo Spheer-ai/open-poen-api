@@ -12,7 +12,6 @@ from tests.conftest import (
 from open_poen_api.models import Funder
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (user, 403), (admin, 200), (grant_officer, 403), (anon, 403)],
@@ -36,7 +35,6 @@ async def test_create_funder(async_client, dummy_session, status_code):
         assert funder_data["name"] == body["name"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 204), (user, 403), (admin, 204), (grant_officer, 403), (anon, 403)],
@@ -58,7 +56,6 @@ async def test_delete_funder(async_client, dummy_session, status_code):
         assert funder is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
@@ -85,7 +82,6 @@ async def test_patch_funder(async_client, dummy_session, body, status_code):
             assert getattr(funder, key) == body[key]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (anon, 200)],
@@ -98,7 +94,6 @@ async def test_get_funders_list(async_client, dummy_session, status_code):
     assert len(response.json()["funders"]) == 3
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (grant_officer, 200), (anon, 200)],

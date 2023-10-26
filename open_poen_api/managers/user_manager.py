@@ -1,4 +1,4 @@
-from fastapi import Depends, Request
+from fastapi import Depends, Request, UploadFile
 from ..database import get_user_db, get_async_session
 from ..models import (
     User,
@@ -7,10 +7,14 @@ from ..models import (
     UserBankAccountRole,
     UserRegulationRole,
     UserGrantRole,
+    Attachment,
+    AttachmentEntityType,
+    AttachmentAttachmentType,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from ..utils.email import MessageSchema, conf, env
+from ..utils.utils import upload_profile_picture
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -21,7 +25,6 @@ from fastapi_users.authentication import (
     AuthenticationBackend,
 )
 from fastapi_users import schemas
-from fastapi_users import models
 from fastapi_users.exceptions import UserAlreadyExists
 import contextlib
 from fastapi_mail import MessageType, FastMail
@@ -29,9 +32,9 @@ import os
 from ..authorization.authorization import SECRET_KEY
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_
 from .base_manager_ex_current_user import BaseManagerExCurrentUser
-from typing import Any, Dict, cast, Annotated
-from ..logger import audit_logger
+from typing import Any, Dict, cast
 from pydantic import EmailStr
 
 
@@ -40,7 +43,9 @@ SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 
 
 class UserManagerExCurrentUser(
-    IntegerIDMixin, BaseUserManager[User, int], BaseManagerExCurrentUser
+    IntegerIDMixin,
+    BaseUserManager[User, int],
+    BaseManagerExCurrentUser,
 ):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
@@ -139,8 +144,10 @@ class UserManagerExCurrentUser(
                     UserRegulationRole.regulation
                 ),
                 selectinload(User.overseer_roles).joinedload(UserGrantRole.grant),
+                joinedload(User.profile_picture),
             )
             .where(User.id == id)
+            .execution_options(populate_existing=True)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
@@ -152,6 +159,45 @@ class UserManagerExCurrentUser(
         if query_result is None:
             raise EntityNotFound(message="User not found")
         return query_result
+
+    async def set_profile_picture(
+        self, file: UploadFile, user: User, request: Request | None = None
+    ) -> None:
+        filename = f"{user.id}_user_profile_picture"
+        ppu = await upload_profile_picture(file, filename)
+        if user.profile_picture is None:
+            profile_picture = Attachment(
+                entity_id=user.id,
+                entity_type=AttachmentEntityType.USER,
+                attachment_type=AttachmentAttachmentType.PROFILE_PICTURE,
+            )
+        else:
+            profile_picture = user.profile_picture
+
+        profile_picture.raw_attachment_url = ppu.raw_attachment_url
+        profile_picture.raw_attachment_thumbnail_128_url = (
+            ppu.raw_attachment_thumbnail_128_url
+        )
+        profile_picture.raw_attachment_thumbnail_256_url = (
+            ppu.raw_attachment_thumbnail_256_url
+        )
+        profile_picture.raw_attachment_thumbnail_512_url = (
+            ppu.raw_attachment_thumbnail_512_url
+        )
+
+        self.session.add(profile_picture)
+        await self.session.commit()
+        await self.after_update(user, {"profile_picture": "created"}, request=request)
+
+    async def delete_profile_picture(
+        self, user: User, request: Request | None = None
+    ) -> None:
+        if user.profile_picture is None:
+            return
+
+        await self.session.delete(user.profile_picture)
+        await self.session.commit()
+        await self.after_update(user, {"profile_picture": "deleted"}, request=request)
 
 
 async def _get_user_manager(

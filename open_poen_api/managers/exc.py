@@ -18,3 +18,13 @@ class EntityAlreadyExists(CustomException):
 class EntityNotFound(CustomException):
     def __init__(self, message: str):
         super().__init__(message, status_code=404)
+
+
+class UnsupportedFileType(CustomException):
+    def __init__(self, message: str):
+        super().__init__(message, status_code=415)
+
+
+class FileTooLarge(CustomException):
+    def __init__(self, message: str):
+        super().__init__(message, status_code=413)

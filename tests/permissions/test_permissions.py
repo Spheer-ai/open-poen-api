@@ -102,7 +102,6 @@ async def test_get_authorized_output_fields_2(dummy_session):
         fields = get_authorized_output_fields(user, "read", regulation, oso)
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, entity_class, entity_id, status_code, actions",
     [
@@ -146,7 +145,6 @@ async def test_get_authorized_actions(
         assert set(response.json()["actions"]) == actions
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, entity_class, entity_id, status_code, fields_present, fields_absent",
     [

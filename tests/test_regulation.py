@@ -4,7 +4,6 @@ from open_poen_api.models import Regulation
 from open_poen_api.managers import RegulationManager
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (user, 403), (admin, 200), (grant_officer, 403), (anon, 403)],
@@ -29,7 +28,6 @@ async def test_create_regulation(async_client, dummy_session, status_code):
         assert regulation_data["name"] == body["name"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 204), (user, 403), (admin, 204), (grant_officer, 403), (anon, 403)],
@@ -53,7 +51,6 @@ async def test_delete_regulation(async_client, dummy_session, status_code):
         assert regulation is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("role", ["grant officer", "policy officer"])
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
@@ -137,7 +134,6 @@ async def test_patch_regulation(async_client, dummy_session, body, status_code):
             assert getattr(regulation, key) == body[key]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (grant_officer, 200), (anon, 200)],
@@ -155,7 +151,6 @@ async def test_get_regulations_list(async_client, dummy_session, status_code):
     assert len(response.json()["regulations"]) == 5
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (anon, 200)],

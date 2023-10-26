@@ -4,6 +4,7 @@ from .mixins import NotNullValidatorMixin
 
 from fastapi_users import schemas
 from ..models import UserRole
+from .profile_picture import ProfilePicture
 
 
 class UserRead(schemas.BaseUser[int]):
@@ -13,8 +14,8 @@ class UserRead(schemas.BaseUser[int]):
     last_name: str | None
     biography: str | None
     role: UserRole | None
-    image: str | None
     hidden: bool | None
+    profile_picture: ProfilePicture | None
 
     class Config:
         orm_mode = True
@@ -61,5 +62,4 @@ class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
     last_name: str | None
     biography: str | None
     role: UserRole | None
-    image: str | None
     hidden: bool | None

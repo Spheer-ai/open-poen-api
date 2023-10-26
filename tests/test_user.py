@@ -11,7 +11,6 @@ from tests.conftest import (
 import asyncio
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
@@ -38,7 +37,6 @@ async def test_create_user(async_client, dummy_session, body, status_code):
         assert user_data["email"] == body["email"]
 
 
-@pytest.mark.asyncio
 async def test_first_login(clean_async_client, dummy_session):
     body = {"email": "user1@example.com"}
     response = await clean_async_client.post("/auth/forgot-password", json=body)
@@ -59,7 +57,6 @@ async def test_first_login(clean_async_client, dummy_session):
     assert "access_token" in response.json().keys()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 204), (userowner, 403), (user, 403), (anon, 403)],
@@ -75,7 +72,6 @@ async def test_delete_user(async_client, dummy_session, status_code):
         assert user is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, body, status_code",
     [
@@ -105,7 +101,6 @@ async def test_patch_user(async_client, dummy_session, body, status_code):
             assert getattr(user, key) == body[key]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code, length",
     [(superuser, 200, 13), (userowner, 200, 12), (user, 200, 11), (anon, 200, 11)],
@@ -124,17 +119,44 @@ async def test_get_users_list(async_client, dummy_session, status_code, length):
     assert len(response.json()["users"]) == length
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, offset, limit, email, expected_length, status_code",
     [
-        (superuser, 0, 5, None, 5, 200),  # Basic offset and limit, should return first 5 users
+        (
+            superuser,
+            0,
+            5,
+            None,
+            5,
+            200,
+        ),  # Basic offset and limit, should return first 5 users
         (superuser, 5, 5, None, 5, 200),  # Offset by 5, should return next 5 users
-        (superuser, 10, 5, None, 3, 200), # Offset by 10, should return last 3 users
-        (superuser, 0, 20, None, 13, 200), # Limit greater than total users, should return all 13
-        (superuser, 0, 5, "financial3", 1, 200),  # Searching by email, should return 1 user
+        (superuser, 10, 5, None, 3, 200),  # Offset by 10, should return last 3 users
+        (
+            superuser,
+            0,
+            20,
+            None,
+            13,
+            200,
+        ),  # Limit greater than total users, should return all 13
+        (
+            superuser,
+            0,
+            5,
+            "financial3",
+            1,
+            200,
+        ),  # Searching by email, should return 1 user
         (superuser, 0, 1, None, 1, 200),  # Limit of 1, should return first user
-        (superuser, 13, 5, None, 0, 200)  # Offset equal to total number of users, should return empty
+        (
+            superuser,
+            13,
+            5,
+            None,
+            0,
+            200,
+        ),  # Offset equal to total number of users, should return empty
     ],
     ids=[
         "Get first five",
@@ -147,7 +169,9 @@ async def test_get_users_list(async_client, dummy_session, status_code, length):
     ],
     indirect=["get_mock_user"],
 )
-async def test_get_users_list_with_params(async_client, dummy_session, offset, limit, email, expected_length, status_code):
+async def test_get_users_list_with_params(
+    async_client, dummy_session, offset, limit, email, expected_length, status_code
+):
     url = "/users?"
     if offset is not None:
         url += f"offset={offset}&"
@@ -161,13 +185,12 @@ async def test_get_users_list_with_params(async_client, dummy_session, offset, l
     assert len(response.json()["users"]) == expected_length
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "get_mock_user, status_code, fields_present, fields_not_present",
     [
-        (superuser, 200, ["is_superuser", "hidden"], []),
-        (userowner, 200, ["is_superuser", "hidden"], []),
-        (anon, 200, ["first_name"], ["is_superuser", "hidden"]),
+        (superuser, 200, ["is_superuser", "hidden", "profile_picture"], []),
+        (userowner, 200, ["is_superuser", "hidden", "profile_picture"], []),
+        (anon, 200, ["first_name", "profile_picture"], ["is_superuser", "hidden"]),
     ],
     ids=[
         "Superuser sees everything",
