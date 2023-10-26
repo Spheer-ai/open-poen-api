@@ -10,6 +10,8 @@ from sqlalchemy import (
     Table,
     UniqueConstraint,
     DECIMAL,
+    Interval,
+    literal_column,
 )
 from datetime import datetime
 from enum import Enum
@@ -28,6 +30,7 @@ from sqlalchemy.ext.declarative import declared_attr
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
 from sqlalchemy_utils import aggregated
+from sqlalchemy.sql import func as sql_func, text
 from .utils.utils import generate_sas_token
 
 
@@ -599,7 +602,7 @@ class Payment(Base):
     )
 
     def __repr__(self):
-        return f"Payment(id={self.id}, transaction_amount='{self.transaction_amount}', route='{self.route}')"
+        return f"Payment(id='{self.id}', transaction_id='{self.transaction_id}', transaction_amount='{self.transaction_amount}', route='{self.route}')"
 
 
 class DebitCard(Base):
@@ -699,6 +702,24 @@ class BankAccount(Base):
         return func.coalesce(
             func.sum(case((Requisition.status == ReqStatus.LINKED.value, 1), else_=0)),
             0,
+        )
+
+    user_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    @aggregated("user_roles", column="user_count")
+    def _set_user_count(self):
+        return func.count()
+
+    latest_expiration_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    @aggregated("requisitions", column="latest_expiration_date")
+    def _set_latest_expiration_date(self):
+        # return func.max(Requisition.created_at + Requisition.n_days_access)
+        return func.max(
+            Requisition.created_at
+            + text("(requisition.n_days_access || ' days')::interval")
         )
 
     requisitions: Mapped[list[Requisition]] = relationship(

@@ -153,8 +153,10 @@ async def process_requisition(
                         ent.Payment.transaction_id == payment["transaction_id"]
                     )
                 )
-                if payment_db_q.scalars().first():
+                payment_db = payment_db_q.scalars().first()
+                if payment_db:
                     skipped += 1
+                    audit_logger.info(f"Skipping payment {payment_db}.")
                     continue
 
                 if (
@@ -179,7 +181,7 @@ async def process_requisition(
                 imported += 1
 
             audit_logger.info(f"Retrieved {imported} and skipped {skipped} payments.")
-            cur_start_date = cur_end_date
+            cur_start_date = cur_end_date + timedelta(days=1)
 
 
 async def get_gocardless_payments(
