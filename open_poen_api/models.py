@@ -717,13 +717,12 @@ class BankAccount(Base):
     def _set_user_count(self):
         return func.count()
 
-    latest_expiration_date: Mapped[datetime] = mapped_column(
+    expiration_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
-    @aggregated("requisitions", column="latest_expiration_date")
-    def _set_latest_expiration_date(self):
-        # return func.max(Requisition.created_at + Requisition.n_days_access)
+    @aggregated("requisitions", column="expiration_date")
+    def _set_expiration_date(self):
         return func.max(
             Requisition.created_at
             + text("(requisition.n_days_access || ' days')::interval")

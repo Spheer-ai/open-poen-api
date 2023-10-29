@@ -9,6 +9,8 @@ class BankAccountRead(BaseModel):
     created: datetime
     last_accessed: datetime
     linked_requisitions: int
+    user_count: int
+    expiration_date: datetime
 
 
 class BankAccountUsersUpdate(BaseModel):

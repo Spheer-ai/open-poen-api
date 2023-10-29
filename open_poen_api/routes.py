@@ -400,7 +400,7 @@ async def gocardless_callback(
 
 
 @user_router.get(
-    "/user/{user_id}/bank_account/{bank_account_id}",
+    "/user/{user_id}/bank-account/{bank_account_id}",
     response_model=s.BankAccountReadLinked,
     response_model_exclude_unset=True,
 )
@@ -419,7 +419,7 @@ async def get_bank_account(
 
 
 @user_router.patch(
-    "/user/{user_id}/bank_account/{bank_account_id}",
+    "/user/{user_id}/bank-account/{bank_account_id}",
     response_model=s.BankAccountRead,
 )
 async def finish_bank_account(
@@ -438,7 +438,7 @@ async def finish_bank_account(
     return bank_account_db
 
 
-@user_router.delete("/user/{user_id}/bank_account/{bank_account_id}")
+@user_router.delete("/user/{user_id}/bank-account/{bank_account_id}")
 async def delete_bank_account(
     user_id: int,
     bank_account_id: int,
@@ -454,7 +454,7 @@ async def delete_bank_account(
 
 
 @user_router.patch(
-    "/user/{user_id}/bank_account/{bank_account_id}/users",
+    "/user/{user_id}/bank-account/{bank_account_id}/users",
     response_model=s.UserReadList,
 )
 async def link_bank_account_users(
