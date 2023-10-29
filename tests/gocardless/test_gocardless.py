@@ -43,3 +43,18 @@ async def test_create_gocardless(
     assert response.status_code == expected_status_code
     if expected_status_code == 200:
         assert "url" in response.json()
+
+
+@pytest.mark.parametrize(
+    "get_mock_user",
+    [
+        user,
+    ],
+    ids=[
+        "Can get list of institutions",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_institutions(async_client, get_mock_user):
+    response = await async_client.get("/utils/gocardless/institutions")
+    assert any([i["id"] == "ING_INGBNL2A" for i in response.json()["institutions"]])

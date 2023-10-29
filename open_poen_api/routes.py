@@ -37,11 +37,11 @@ import pytz
 from .authorization.authorization import SECRET_KEY, ALGORITHM
 from .authorization import authorization as auth
 from .gocardless import (
-    refresh_tokens,
-    client,
+    get_nordigen_client,
     INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS,
     get_gocardless_payments,
 )
+from nordigen import NordigenClient
 import uuid
 
 
@@ -304,6 +304,7 @@ async def gocardless_initiatite(
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
+    client: NordigenClient = Depends(get_nordigen_client),
 ):
     s.validate_institution_id(institution_id)
     s.validate_n_days_access(n_days_access)
@@ -312,7 +313,6 @@ async def gocardless_initiatite(
     # TODO: Ensure only users can link for themselves.
     user = await user_manager.min_load(user_id)
 
-    await refresh_tokens()
     reference_id = str(uuid.uuid4())
 
     token = jwt.encode(
@@ -1389,3 +1389,13 @@ async def delete_profile_picture(
     auth.authorize(required_user, "edit", user_db, oso)
     await user_manager.delete_profile_picture(user_db, request=request)
     return Response(status_code=204)
+
+
+@utils_router.get(
+    "/utils/gocardless/institutions", response_model=s.GoCardlessInstitutionList
+)
+async def get_institutions(
+    request: Request, client: NordigenClient = Depends(get_nordigen_client)
+):
+    institutions = client.institution.get_institutions(country="NL")
+    return s.GoCardlessInstitutionList(institutions=institutions)

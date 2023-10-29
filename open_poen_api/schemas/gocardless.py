@@ -40,3 +40,16 @@ def validate_n_days_history(institution_id: str, n_days_history: int):
 
 class GocardlessInitiate(BaseModel):
     url: str
+
+
+class GocardlessInstitution(BaseModel):
+    id: str
+    name: str
+    bic: str
+    transaction_total_days: int
+    countries: list[str]
+    logo: str
+
+
+class GoCardlessInstitutionList(BaseModel):
+    institutions: list[GocardlessInstitution]
