@@ -329,7 +329,7 @@ async def gocardless_initiatite(
         ALGORITHM,
     )
 
-    init = client.initialize_session(
+    init = await client.initialize_session(
         redirect_uri=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/gocardless-callback",
         institution_id=institution_id,
         reference_id=token,
@@ -1401,5 +1401,5 @@ async def delete_profile_picture(
 async def get_institutions(
     request: Request, client: NordigenClient = Depends(get_nordigen_client)
 ):
-    institutions = client.institution.get_institutions(country="NL")
+    institutions = await client.institution.get_institutions(country="NL")
     return s.GoCardlessInstitutionList(institutions=institutions)

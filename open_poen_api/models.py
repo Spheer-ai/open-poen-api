@@ -684,6 +684,11 @@ class Requisition(Base, TimeStampMixin):
         secondary=requisition_bank_account,
     )
 
+    def __repr__(self):
+        return (
+            f"Requisition(id='{self.id}', user='{self.user}', status='{self.status}')"
+        )
+
 
 class BankAccount(Base):
     __tablename__ = "bank_account"
@@ -693,7 +698,9 @@ class BankAccount(Base):
     iban: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_accessed: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     linked_requisitions: Mapped[int] = mapped_column(Integer, default=0)
 

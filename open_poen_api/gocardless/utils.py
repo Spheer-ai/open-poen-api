@@ -29,13 +29,13 @@ async def refresh_tokens():
     async with lock:
         if not access_token or token_is_expired(access_expires_at):
             if refresh_token and not token_is_expired(refresh_expires_at):
-                token_data = client.exchange_token(refresh_token)
+                token_data = await client.exchange_token(refresh_token)
                 access_token = token_data["access"]
                 access_expires_at = datetime.now() + timedelta(
                     seconds=token_data["access_expires"]
                 )
             else:
-                token_data = client.generate_token()
+                token_data = await client.generate_token()
                 access_token = token_data["access"]
                 access_expires_at = datetime.now() + timedelta(
                     seconds=token_data["access_expires"]

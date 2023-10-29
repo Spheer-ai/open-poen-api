@@ -1,7 +1,7 @@
 from .. import models as ent
 from sqlalchemy import select, and_, inspect, not_
 from sqlalchemy.ext.asyncio import AsyncSession
-from .utils import client
+from .utils import get_nordigen_client
 from datetime import datetime, timedelta
 from collections.abc import MutableMapping
 from dateutil.parser import parse
@@ -44,33 +44,27 @@ async def process_requisition(
     date_from: datetime,
     processed_accounts: set[str],
 ):
-    api_requisition = client.requisition.get_requisition_by_id(
+    client = await get_nordigen_client()
+
+    api_requisition = await client.requisition.get_requisition_by_id(
         requisition.api_requisition_id
     )
-    await sleep(1)
+    await sleep(0.5)
 
     requisition.status = ent.ReqStatus(api_requisition["status"])
     session.add(requisition)
     await session.commit()
 
     if not requisition.status == ent.ReqStatus.LINKED:
+        audit_logger.info(f"Skipping {requisition} because of its status.")
         return
 
-    for account in api_requisition["accounts"]:
-        if account in processed_accounts:
-            continue
-        else:
-            processed_accounts.add(account)
-
-        api_account = client.account_api(account)
-        metadata = api_account.get_metadata()
-        await sleep(1)
-
-        if metadata["status"] != "READY":
-            continue
-
-        details = api_account.get_details()
-        await sleep(1)
+    for account_api_id in api_requisition["accounts"]:
+        api_account = client.account_api(account_api_id)
+        metadata = await api_account.get_metadata()
+        await sleep(0.5)
+        details = await api_account.get_details()
+        await sleep(0.5)
 
         account_q = await session.execute(
             select(ent.BankAccount)
@@ -93,13 +87,28 @@ async def process_requisition(
             else parse(metadata["last_accessed"])
         )
 
+        account_log_str = (
+            account if account else f"unsaved account with api id {account_api_id}"
+        )
+
+        if account_api_id in processed_accounts:
+            audit_logger.info(
+                f"Skipping {account_log_str} because it's already processed."
+            )
+            continue
+        elif metadata["status"] != "READY":
+            audit_logger.info(f"Skipping {account_log_str} because it's not ready.")
+            continue
+        else:
+            processed_accounts.add(account_api_id)
+
         if not account:
             account = ent.BankAccount(
                 api_account_id=metadata["id"],
                 iban=metadata["iban"],
                 name=details["account"]["ownerName"],
                 created=parse(metadata["created"]),
-                last_accessed=parse(metadata["last_accessed"]),
+                last_accessed=last_accessed,
                 requisitions=[requisition],
             )
             session.add(account)
@@ -120,7 +129,7 @@ async def process_requisition(
                 await session.commit()
             if requisition not in account.requisitions:
                 account.requisitions.append(requisition)
-            account.last_accessed = parse(metadata["last_accessed"])
+            account.last_accessed = last_accessed
             session.add(account)
             await session.commit()
 
@@ -133,11 +142,11 @@ async def process_requisition(
             audit_logger.info(
                 f"Retrieving payments for user {requisition.user} with period {cur_start_date.strftime('%Y-%m-%d')} till {cur_end_date.strftime('%Y-%m-%d')}."
             )
-            api_transactions = api_account.get_transactions(
+            api_transactions = await api_account.get_transactions(
                 date_from=cur_start_date.strftime("%Y-%m-%d"),
                 date_to=cur_end_date.strftime("%Y-%m-%d"),
             )
-            await sleep(1)
+            await sleep(0.5)
 
             skipped, imported = 0, 0
             for payment in api_transactions["transactions"]["booked"]:
