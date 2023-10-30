@@ -413,16 +413,16 @@ class Initiative(Base):
         Boolean, default=False, nullable=False
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
     justified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="income")
     def _set_income(self):
         return get_finance_aggregate(Route.INCOME)
 
-    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="expenses")
     def _set_expenses(self):
@@ -472,10 +472,10 @@ class Activity(Base):
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
-    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
 
     income: Mapped[Decimal] = mapped_column(
-        DECIMAL(precision=8, scale=2),
+        DECIMAL(precision=10, scale=2),
         default=0,
     )
 
@@ -484,7 +484,7 @@ class Activity(Base):
         return get_finance_aggregate(Route.INCOME)
 
     expenses: Mapped[Decimal] = mapped_column(
-        DECIMAL(precision=8, scale=2),
+        DECIMAL(precision=10, scale=2),
         default=0,
     )
 
@@ -554,7 +554,7 @@ class Payment(Base):
     entry_reference: Mapped[str] = mapped_column(String(length=128), nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String(length=128), nullable=True)
     booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
     creditor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
     creditor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
     debtor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
@@ -613,13 +613,13 @@ class DebitCard(Base):
         String(length=64), unique=True, nullable=False
     )
 
-    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="income")
     def _set_income(self):
         return get_finance_aggregate(Route.INCOME)
 
-    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="expenses")
     def _set_expenses(self):
@@ -824,15 +824,15 @@ class Grant(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     reference: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
 
-    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("initiatives.payments", column="income")
     def _set_income(self):
         return get_finance_aggregate(Route.INCOME)
 
-    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("initiatives.payments", column="expenses")
     def _set_expenses(self):

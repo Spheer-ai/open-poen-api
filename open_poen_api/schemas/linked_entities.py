@@ -12,10 +12,6 @@ from pydantic import validator
 class FunderReadLinked(FunderRead):
     regulations: list[RegulationRead]
 
-    @validator("regulations", pre=True)
-    def apply_operation(cls, v):
-        return list(v)
-
 
 class RegulationReadLinked(RegulationRead):
     grant_officers: list[UserRead]
@@ -27,7 +23,11 @@ class RegulationReadLinked(RegulationRead):
 class GrantReadLinked(GrantRead):
     regulation: RegulationRead
     initiatives: list[InitiativeRead]
-    overseer: UserRead | None
+    overseers: list[UserRead]
+
+    @validator("overseers", pre=True)
+    def apply_operation(cls, v):
+        return list(v)
 
 
 class InitiativeReadLinked(InitiativeRead):

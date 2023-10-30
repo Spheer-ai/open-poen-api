@@ -40,18 +40,11 @@ class BankAccountManager(BaseManager):
 
     async def revoke(self, bank_account: BankAccount, request: Request | None):
         for req in bank_account.requisitions:
-            try:
-                api_req = await self.client.requisition.get_requisition_by_id(
-                    req.api_requisition_id
-                )
-            except ClientResponseError as e:
-                if e.status == 404:
-                    audit_logger.error(
-                        f"{req} could not be retrieved from GoCardless's API on revocation of a bank account. This should not be possible."
-                    )
-                raise e
+            api_req = await self.client.requisition.get_requisition_by_id(
+                req.api_requisition_id
+            )
             await self.client.requisition.delete_requisition(req.api_requisition_id)
-            for api_user_agreement_id in api_req.agreements:
+            for api_user_agreement_id in api_req["agreements"]:
                 await self.client.agreement.delete_agreement(api_user_agreement_id)
             req.status = ReqStatus.REVOKED
             self.session.add(req)
@@ -75,7 +68,7 @@ class BankAccountManager(BaseManager):
                 req.api_requisition_id
             )
             await self.client.requisition.delete_requisition(req.api_requisition_id)
-            for api_user_agreement_id in api_req.agreements:
+            for api_user_agreement_id in api_req["agreements"]:
                 await self.client.agreement.delete_agreement(api_user_agreement_id)
             req.status = ReqStatus.DELETED
             self.session.add(req)

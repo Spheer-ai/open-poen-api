@@ -431,7 +431,7 @@ async def revoke_bank_account(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
-    auth.authorize(required_user, "finish", bank_account_db, oso)
+    auth.authorize(required_user, "revoke", bank_account_db, oso)
     bank_account_db = await bank_account_manager.revoke(
         bank_account_db, request=request
     )
@@ -796,18 +796,28 @@ async def delete_funder(
     response_model_exclude_unset=True,
 )
 async def get_funders(
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    name: str | None = None,
 ):
-    # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.Funder, oso)
-    funders_result = await async_session.execute(q)
+    query = select(ent.Funder)
+
+    if name:
+        query = query.where(ent.Funder.name.like(f"%{name}%"))
+
+    query = query.offset(offset).limit(limit)
+
+    funders_result = await session.execute(query)
     funders_scalar = funders_result.scalars().all()
+
     filtered_funders = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in funders_scalar
     ]
+
     return s.FunderReadList(funders=filtered_funders)
 
 
@@ -939,19 +949,28 @@ async def delete_regulation(
 )
 async def get_regulations(
     funder_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    name: str | None = None,
 ):
-    # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.Regulation, oso)
-    q = q.where(ent.Regulation.funder_id == funder_id)
-    regulations_result = await async_session.execute(q)
+    query = select(ent.Regulation).where(ent.Regulation.funder_id == funder_id)
+
+    if name:
+        query = query.where(ent.Regulation.name.like(f"%{name}%"))
+
+    query = query.offset(offset).limit(limit)
+
+    regulations_result = await session.execute(query)
     regulations_scalar = regulations_result.scalars().all()
+
     filtered_regulations = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in regulations_scalar
     ]
+
     return s.RegulationReadList(regulations=filtered_regulations)
 
 
@@ -1025,11 +1044,11 @@ async def update_grant(
 
 
 @funder_router.patch(
-    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseers",
     response_model=s.UserReadList,
     responses={204: {"description": "Grant overseer is removed"}},
 )
-async def link_overseer(
+async def link_overseers(
     funder_id: int,
     regulation_id: int,
     grant_id: int,
@@ -1084,8 +1103,13 @@ async def get_grants(
     oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
+    name: str | None = None,
 ):
     query = select(ent.Grant).where(ent.Grant.regulation_id == regulation_id)
+
+    if name:
+        query = query.where(ent.Grant.name.like(f"%{name}%"))
+
     query = query.offset(offset).limit(limit)
 
     grants_result = await async_session.execute(query)

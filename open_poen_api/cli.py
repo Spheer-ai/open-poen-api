@@ -19,6 +19,30 @@ from datetime import datetime
 app = typer.Typer()
 
 
+async def async_add_user(
+    email: str,
+    superuser: bool,
+    role: str,
+    password: str,
+):
+    if password == "random":
+        password = temp_password_generator(16)
+    try:
+        async with get_async_session_context() as session:
+            async with get_user_db_context(session) as user_db:
+                user_manager = UserManager(user_db, session, None)
+                user_schema = UserCreateWithPassword(
+                    email=email,
+                    is_superuser=superuser,
+                    role=role,
+                    password=password,
+                )
+                user = await user_manager.create(user_schema)
+                typer.echo(f"Added user with id {user.id}")
+    except EntityAlreadyExists:
+        print(f"User {email} already exists")
+
+
 @app.command()
 def add_user(
     email: str,
@@ -26,29 +50,6 @@ def add_user(
     role: str = "user",
     password: str = "random",
 ):
-    async def async_add_user(
-        email: str,
-        superuser: bool,
-        role: str,
-        password: str,
-    ):
-        if password == "random":
-            password = temp_password_generator(16)
-        try:
-            async with get_async_session_context() as session:
-                async with get_user_db_context(session) as user_db:
-                    user_manager = UserManager(user_db, session, None)
-                    user_schema = UserCreateWithPassword(
-                        email=email,
-                        is_superuser=superuser,
-                        role=role,
-                        password=password,
-                    )
-                    user = await user_manager.create(user_schema)
-                    typer.echo(f"Added user with id {user.id}")
-        except EntityAlreadyExists:
-            print(f"User {email} already exists")
-
     asyncio.run(async_add_user(email, superuser, role, password))
 
 

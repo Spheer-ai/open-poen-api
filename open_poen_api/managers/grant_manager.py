@@ -81,7 +81,7 @@ class GrantManager(BaseManager):
             select(Grant)
             .options(
                 selectinload(Grant.regulation),
-                selectinload(Grant.initiatives).joinedload(Initiative.grant),
+                selectinload(Grant.initiatives),
                 selectinload(Grant.overseer_roles).selectinload(UserGrantRole.user),
             )
             .where(Grant.id == id)
