@@ -422,7 +422,7 @@ async def get_bank_account(
     "/user/{user_id}/bank-account/{bank_account_id}",
     response_model=s.BankAccountRead,
 )
-async def finish_bank_account(
+async def revoke_bank_account(
     user_id: int,
     bank_account_id: int,
     request: Request,
@@ -432,10 +432,12 @@ async def finish_bank_account(
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
     auth.authorize(required_user, "finish", bank_account_db, oso)
-    bank_account_db = await bank_account_manager.finish(
+    bank_account_db = await bank_account_manager.revoke(
         bank_account_db, request=request
     )
-    return bank_account_db
+    return auth.get_authorized_output_fields(
+        required_user, "read", bank_account_db, oso
+    )
 
 
 @user_router.delete("/user/{user_id}/bank-account/{bank_account_id}")

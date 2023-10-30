@@ -650,8 +650,14 @@ class ReqStatus(str, Enum):
     # Indicates that the requisition was done for a bank account that was requisitioned
     # earlier by another user.
     CONFLICTED = "CO"
-    # Indicates that the user revoked his bank account.
+    # Indicates that the user revoked his bank account, meaning he's done with justifying
+    # his expenditures. All payments that are not assigned to an initiative and/or activity
+    # can be removed.
     REVOKED = "RV"
+    # Indicates that the user deleted his bank account, meaning he wants to delete as much
+    # as possible and start over. All payments are deleted, except for payments that are
+    # assigned to a justified initiative and/or a finished activity.
+    DELETED = "DE"
 
 
 class Requisition(Base, TimeStampMixin):

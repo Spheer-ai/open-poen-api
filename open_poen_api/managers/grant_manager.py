@@ -1,6 +1,6 @@
 from .base_manager import BaseManager
 from ..schemas import GrantCreate, GrantUpdate
-from ..models import Grant, UserGrantRole, User
+from ..models import Grant, UserGrantRole, User, Initiative
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
@@ -81,7 +81,7 @@ class GrantManager(BaseManager):
             select(Grant)
             .options(
                 selectinload(Grant.regulation),
-                selectinload(Grant.initiatives),
+                selectinload(Grant.initiatives).joinedload(Initiative.grant),
                 selectinload(Grant.overseer_roles).selectinload(UserGrantRole.user),
             )
             .where(Grant.id == id)
