@@ -14,7 +14,7 @@ from ..models import (
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_, delete, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from .exc import EntityNotFound
 from .exc import EntityAlreadyExists, EntityNotFound
 from .base_manager import BaseManager
@@ -40,12 +40,19 @@ class BankAccountManager(BaseManager):
 
     async def revoke(self, bank_account: BankAccount, request: Request | None):
         for req in bank_account.requisitions:
-            api_req = await self.client.requisition.get_requisition_by_id(
-                req.api_requisition_id
-            )
-            await self.client.requisition.delete_requisition(req.api_requisition_id)
-            for api_user_agreement_id in api_req["agreements"]:
-                await self.client.agreement.delete_agreement(api_user_agreement_id)
+            try:
+                if req.status not in (ReqStatus.REVOKED, ReqStatus.DELETED):
+                    await self.client.requisition.delete_requisition(
+                        req.api_requisition_id
+                    )
+            except ClientResponseError as e:
+                if e.code != 404:
+                    raise
+                audit_logger.warning(
+                    f"On revoking {bank_account} an API requisition could not be "
+                    "deleted because it was not found. This can happen if the user "
+                    "coupled two bank accounts with one requisition."
+                )
             req.status = ReqStatus.REVOKED
             self.session.add(req)
 
@@ -64,12 +71,19 @@ class BankAccountManager(BaseManager):
 
     async def delete(self, bank_account: BankAccount, request: Request | None):
         for req in bank_account.requisitions:
-            api_req = await self.client.requisition.get_requisition_by_id(
-                req.api_requisition_id
-            )
-            await self.client.requisition.delete_requisition(req.api_requisition_id)
-            for api_user_agreement_id in api_req["agreements"]:
-                await self.client.agreement.delete_agreement(api_user_agreement_id)
+            try:
+                if req.status not in (ReqStatus.REVOKED, ReqStatus.DELETED):
+                    await self.client.requisition.delete_requisition(
+                        req.api_requisition_id
+                    )
+            except ClientResponseError as e:
+                if e.code != 404:
+                    raise
+                audit_logger.warning(
+                    f"On deleting {bank_account} an API requisition could not be "
+                    "deleted because it was not found. This can happen if the user "
+                    "coupled two bank accounts with one requisition."
+                )
             req.status = ReqStatus.DELETED
             self.session.add(req)
 
@@ -141,12 +155,12 @@ class BankAccountManager(BaseManager):
             select(BankAccount)
             .options(
                 selectinload(BankAccount.requisitions),
-                selectinload(BankAccount.user_roles).selectinload(
-                    UserBankAccountRole.user
-                ),
-                selectinload(BankAccount.owner_role).selectinload(
-                    UserBankAccountRole.user
-                ),
+                selectinload(BankAccount.user_roles)
+                .joinedload(UserBankAccountRole.user)
+                .joinedload(User.profile_picture),
+                selectinload(BankAccount.owner_role)
+                .selectinload(UserBankAccountRole.user)
+                .joinedload(User.profile_picture),
             )
             .where(BankAccount.id == bank_account_id)
             .execution_options(populate_existing=True)

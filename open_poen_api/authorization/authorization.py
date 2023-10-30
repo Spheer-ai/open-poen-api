@@ -114,7 +114,7 @@ def get_authorized_output_fields(
         filtered_fields = (
             fields
             - set(resource.PROXIES)
-            - set(resource.__mapper__.relationships.keys())
+            - (set(resource.__mapper__.relationships.keys()) - set(["profile_picture"]))
         )
         fields_with_values = {}
         for f in filtered_fields:
