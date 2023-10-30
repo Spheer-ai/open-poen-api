@@ -14,36 +14,64 @@ Use the .env.example files to configure your environment variables. Afterwards r
 ##### Use Poetry
 Poetry is used for tracking dependencies and managing the virtual environment. Make sure you use Python **3.11** or higher for running this API.
 
+##### Docker
+The development for this API is done within a Docker container. I use "Dev Containers", a VSCode extension, to open the Docker container with the API in the Docker Compose file in VSCode. Debugging happens there as well, so no debugger is explicitly attached.
 
+###### Step by step:
 
-Start the API.
-```
-poetry run uvicorn open_poen_api.app:app --reload
-```
+1. Open the folder in VSCode and open it inside Dev Containers. Config files are included in this repo. Tweak if needed.
 
-Start the DB and some development tools.
+2. Once inside, you can run the API from the shell with:
 ```
-docker compose up
+poetry run uvicorn open_poen_api:app --host 0.0.0.0 --port 8000
 ```
 
-Stop DB and development tools. Add -v to wipe the DB.
+3. If you want to run the API in debug mode, I suggest you create an entry script in Python where you import the app and run it.
+
+###### Misc
+
+If you want to wipe all data (volumes) in the db for example, you can do:
 ```
 docker compose down -v
 ```
 
-Attach to the app container.
+If you need to attach to the API's container from your native shell:
 ```
 docker exec -it open-poen-api-app-1 /bin/bash
 ```
 
+##### Debugging GoCardless
+
+Part of the API is the use of an external service, GoCardless, to import payments from user bank accounts thanks to PSD2. To debug this functionality, you can use the sandbox account that they provide, which is an optional institution_id for the relevant route.
+
+The flow is as follows:
+1. The user requests Open Poen to connect.
+2. Open Poen forwards to GoCardless.
+3. GoCardless forwards to the user's bank.
+4. The bank redirects back to Gocardless.
+5. GoCardless redirects back to Open Poen.
+
+To make sure GoCardless can redirect the user back to your locally running API when you are debugging, you can use a service like "ngrok":
+```
+ngrok http 8000
+```
+
+Ngrok will then give you an URL. Set the domain name of the URL to the domain name of the API. Ngrok will then make sure the user is redirected to your locally running API:
+
+![alt text](./images/ngrok.png)
+
+So in this case we would set:
+```
+DOMAIN_NAME=9f2a-2a00-1370-819c-4201-bf7b-fc7-6d47-8401.ngrok-free.app
+```
+
 ### Gotcha's
-* Please note that the app in the docker compose will only start once you attach the debugger!
 * .env files have to end with an empty line. The script that parses these for Terraform otherwise skips the last key value pair.
 
 ### CLI commands
-Add a super_user:
+Add a superuser:
 ```
-docker exec -it open-poen-api-app-1 open-poen add-user mark@groningen.nl --superuser --role user --password "test"
+poetry run open-poen add-user mark@groningen.nl --superuser --role user --password "test"
 ```
 
 ### Interacting with the API
