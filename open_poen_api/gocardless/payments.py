@@ -86,6 +86,13 @@ async def process_requisition(
             )
         )
         account = account_q.scalars().first()
+
+        last_accessed = (
+            None
+            if metadata["last_accessed"] is None
+            else parse(metadata["last_accessed"])
+        )
+
         if not account:
             account = ent.BankAccount(
                 api_account_id=metadata["id"],

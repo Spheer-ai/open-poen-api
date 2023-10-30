@@ -297,7 +297,11 @@ async def bng_callback(
 async def gocardless_initiatite(
     user_id: int = Path(..., examples={"1": {"summary": "1", "value": 1}}),
     institution_id: str = Query(
-        ..., examples={"ING": {"summary": "ING", "value": "ING_INGBNL2A"}}
+        ...,
+        examples={
+            "ING": {"summary": "ING", "value": "ING_INGBNL2A"},
+            "SANDBOX": {"summary": "SANDBOX", "value": "SANDBOXFINANCE_SFIN0000"},
+        },
     ),
     n_days_access: int = Query(..., examples={"7": {"summary": "7", "value": 7}}),
     n_days_history: int = Query(..., examples={"7": {"summary": "7", "value": 7}}),
