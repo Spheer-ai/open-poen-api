@@ -27,6 +27,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.associationproxy import association_proxy, AssociationProxy
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.ext.asyncio import AsyncAttrs
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
 from sqlalchemy_utils import aggregated
@@ -46,7 +47,7 @@ class TimeStampMixin:
     )
 
 
-class Base(DeclarativeBase):
+class Base(AsyncAttrs, DeclarativeBase):
     PROXIES: list[str] = []
 
 
@@ -450,7 +451,13 @@ class Initiative(Base):
         Integer, ForeignKey("grant.id", ondelete="CASCADE")
     )
     grant: Mapped["Grant"] = relationship(
-        "Grant", back_populates="initiatives", lazy="noload", uselist=False
+        # Lazy is set to "select" to ensure grant is also set when an initiative
+        # is loaded as a relationship of a grant. If it's "noload", it will be
+        # set to None, and we won't be able to calculate permissions.
+        "Grant",
+        back_populates="initiatives",
+        lazy="select",
+        uselist=False,
     )
 
     PROXIES = ["initiative_owners"]
