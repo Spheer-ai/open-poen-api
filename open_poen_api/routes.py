@@ -38,8 +38,9 @@ from .authorization.authorization import SECRET_KEY, ALGORITHM
 from .authorization import authorization as auth
 from .gocardless import (
     get_nordigen_client,
-    INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS,
     get_gocardless_payments,
+    GoCardlessInstitutionList,
+    INSTITUTIONS,
 )
 from nordigen import NordigenClient
 import uuid
@@ -1468,10 +1469,7 @@ async def delete_profile_picture(
 
 
 @utils_router.get(
-    "/utils/gocardless/institutions", response_model=s.GoCardlessInstitutionList
+    "/utils/gocardless/institutions", response_model=GoCardlessInstitutionList
 )
-async def get_institutions(
-    request: Request, client: NordigenClient = Depends(get_nordigen_client)
-):
-    institutions = await client.institution.get_institutions(country="NL")
-    return s.GoCardlessInstitutionList(institutions=institutions)
+async def get_institutions(request: Request):
+    return INSTITUTIONS
