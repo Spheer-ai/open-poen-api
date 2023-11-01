@@ -15,119 +15,13 @@ ALGORITHM = "HS256"
 
 OSO = Oso()
 OSO.register_class(ent.Funder)
-OSO.register_class(ent.Regulation, fields={"id": int})
+OSO.register_class(ent.Regulation)
 OSO.register_class(ent.Attachment)
-OSO.register_class(
-    ent.User,
-    fields={
-        "id": int,
-        "is_superuser": bool,
-        "role": str,
-        "hidden": bool,
-        "initiative_roles": Relation(
-            kind="many",
-            other_type="UserInitiativeRole",
-            my_field="id",
-            other_field="user_id",
-        ),
-    },
-)
-OSO.register_class(
-    ent.UserInitiativeRole,
-    fields={
-        "initiative": Relation(
-            kind="one",
-            other_type="Initiative",
-            my_field="initiative_id",
-            other_field="id",
-        )
-    },
-)
-OSO.register_class(
-    ent.UserActivityRole,
-    fields={
-        "activity": Relation(
-            kind="one",
-            other_type="Activity",
-            my_field="activity_id",
-            other_field="id",
-        )
-    },
-)
-OSO.register_class(
-    ent.UserRegulationRole,
-    fields={
-        "regulation": Relation(
-            kind="one",
-            other_type="Regulation",
-            my_field="regulation_id",
-            other_field="id",
-        ),
-        "user_id": int,
-        "regulation_id": int,
-        "role": str,
-    },
-)
-OSO.register_class(
-    ent.Initiative,
-    fields={
-        "id": int,
-        "hidden": bool,
-        "grant": Relation(
-            kind="one",
-            other_type="Grant",
-            my_field="grant_id",
-            other_field="id",
-        ),
-        "activities": Relation(
-            kind="many",
-            other_type="Activity",
-            my_field="id",
-            other_field="initiative_id",
-        ),
-    },
-)
-OSO.register_class(
-    ent.Activity,
-    fields={
-        "user_roles": Relation(
-            kind="many",
-            other_type="UserActivityRole",
-            my_field="id",
-            other_field="activity_id",
-        ),
-        "hidden": bool,
-        "initiative": Relation(
-            kind="one",
-            other_type="Initiative",
-            my_field="initiative_id",
-            other_field="id",
-        ),
-    },
-)
-OSO.register_class(
-    ent.DebitCard,
-    fields={
-        "initiative": Relation(
-            kind="one",
-            other_type="Initiative",
-            my_field="initiative_id",
-            other_field="id",
-        )
-    },
-)
-OSO.register_class(ent.UserGrantRole)
-OSO.register_class(
-    ent.Grant,
-    fields={
-        "regulation": Relation(
-            kind="one",
-            other_type="Regulation",
-            my_field="regulation_id",
-            other_field="id",
-        ),
-    },
-)
+OSO.register_class(ent.User)
+OSO.register_class(ent.Initiative)
+OSO.register_class(ent.Activity)
+OSO.register_class(ent.DebitCard)
+OSO.register_class(ent.Grant)
 OSO.register_class(ent.BankAccount)
 OSO.register_class(ent.Payment)
 OSO.load_files(["open_poen_api/main.polar"])
@@ -220,7 +114,7 @@ def get_authorized_output_fields(
         filtered_fields = (
             fields
             - set(resource.PROXIES)
-            - set(resource.__mapper__.relationships.keys())
+            - (set(resource.__mapper__.relationships.keys()) - set(["profile_picture"]))
         )
         fields_with_values = {}
         for f in filtered_fields:

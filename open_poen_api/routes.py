@@ -38,8 +38,9 @@ from .authorization.authorization import SECRET_KEY, ALGORITHM
 from .authorization import authorization as auth
 from .gocardless import (
     get_nordigen_client,
-    INSTITUTION_ID_TO_TRANSACTION_TOTAL_DAYS,
     get_gocardless_payments,
+    GoCardlessInstitutionList,
+    INSTITUTIONS,
 )
 from nordigen import NordigenClient
 import uuid
@@ -329,7 +330,7 @@ async def gocardless_initiatite(
         ALGORITHM,
     )
 
-    init = client.initialize_session(
+    init = await client.initialize_session(
         redirect_uri=f"https://{os.environ.get('DOMAIN_NAME')}/users/{user_id}/gocardless-callback",
         institution_id=institution_id,
         reference_id=token,
@@ -400,7 +401,7 @@ async def gocardless_callback(
 
 
 @user_router.get(
-    "/user/{user_id}/bank_account/{bank_account_id}",
+    "/user/{user_id}/bank-account/{bank_account_id}",
     response_model=s.BankAccountReadLinked,
     response_model_exclude_unset=True,
 )
@@ -419,10 +420,10 @@ async def get_bank_account(
 
 
 @user_router.patch(
-    "/user/{user_id}/bank_account/{bank_account_id}",
+    "/user/{user_id}/bank-account/{bank_account_id}",
     response_model=s.BankAccountRead,
 )
-async def finish_bank_account(
+async def revoke_bank_account(
     user_id: int,
     bank_account_id: int,
     request: Request,
@@ -431,14 +432,16 @@ async def finish_bank_account(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
-    auth.authorize(required_user, "finish", bank_account_db, oso)
-    bank_account_db = await bank_account_manager.finish(
+    auth.authorize(required_user, "revoke", bank_account_db, oso)
+    bank_account_db = await bank_account_manager.revoke(
         bank_account_db, request=request
     )
-    return bank_account_db
+    return auth.get_authorized_output_fields(
+        required_user, "read", bank_account_db, oso
+    )
 
 
-@user_router.delete("/user/{user_id}/bank_account/{bank_account_id}")
+@user_router.delete("/user/{user_id}/bank-account/{bank_account_id}")
 async def delete_bank_account(
     user_id: int,
     bank_account_id: int,
@@ -454,7 +457,7 @@ async def delete_bank_account(
 
 
 @user_router.patch(
-    "/user/{user_id}/bank_account/{bank_account_id}/users",
+    "/user/{user_id}/bank-account/{bank_account_id}/users",
     response_model=s.UserReadList,
 )
 async def link_bank_account_users(
@@ -794,18 +797,28 @@ async def delete_funder(
     response_model_exclude_unset=True,
 )
 async def get_funders(
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    name: str | None = None,
 ):
-    # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.Funder, oso)
-    funders_result = await async_session.execute(q)
+    query = select(ent.Funder)
+
+    if name:
+        query = query.where(ent.Funder.name.like(f"%{name}%"))
+
+    query = query.offset(offset).limit(limit)
+
+    funders_result = await session.execute(query)
     funders_scalar = funders_result.scalars().all()
+
     filtered_funders = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in funders_scalar
     ]
+
     return s.FunderReadList(funders=filtered_funders)
 
 
@@ -937,19 +950,28 @@ async def delete_regulation(
 )
 async def get_regulations(
     funder_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    name: str | None = None,
 ):
-    # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.Regulation, oso)
-    q = q.where(ent.Regulation.funder_id == funder_id)
-    regulations_result = await async_session.execute(q)
+    query = select(ent.Regulation).where(ent.Regulation.funder_id == funder_id)
+
+    if name:
+        query = query.where(ent.Regulation.name.like(f"%{name}%"))
+
+    query = query.offset(offset).limit(limit)
+
+    regulations_result = await session.execute(query)
     regulations_scalar = regulations_result.scalars().all()
+
     filtered_regulations = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in regulations_scalar
     ]
+
     return s.RegulationReadList(regulations=filtered_regulations)
 
 
@@ -1023,11 +1045,11 @@ async def update_grant(
 
 
 @funder_router.patch(
-    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
+    "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseers",
     response_model=s.UserReadList,
     responses={204: {"description": "Grant overseer is removed"}},
 )
-async def link_overseer(
+async def link_overseers(
     funder_id: int,
     regulation_id: int,
     grant_id: int,
@@ -1082,8 +1104,13 @@ async def get_grants(
     oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
+    name: str | None = None,
 ):
     query = select(ent.Grant).where(ent.Grant.regulation_id == regulation_id)
+
+    if name:
+        query = query.where(ent.Grant.name.like(f"%{name}%"))
+
     query = query.offset(offset).limit(limit)
 
     grants_result = await async_session.execute(query)
@@ -1122,7 +1149,7 @@ async def create_initiative(
 
 @payment_router.post(
     "/payment",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
 )
 async def create_payment(
     payment: s.PaymentCreateManual,
@@ -1150,7 +1177,7 @@ async def create_payment(
 
 @payment_router.patch(
     "/payment/{payment_id}",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
     response_model_exclude_unset=True,
 )
 async def update_payment(
@@ -1170,7 +1197,7 @@ async def update_payment(
 
 @payment_router.patch(
     "/payment/{payment_id}/initiative",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
 )
 async def link_initiative(
     payment_id: int,
@@ -1205,7 +1232,7 @@ async def link_initiative(
 
 @payment_router.patch(
     "/payment/{payment_id}/activity",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
 )
 async def link_activity(
     payment_id: int,
@@ -1273,11 +1300,54 @@ async def get_bng_payments(
 )
 async def get_user_payments(
     user_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login),
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(m.required_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    initiative_name: str | None = None,
+    activity_name: str | None = None,
 ):
-    pass
+    if required_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    query = (
+        select(
+            ent.Payment.id,
+            ent.Payment.booking_date,
+            ent.Initiative.name.label("initiative_name"),
+            ent.Activity.name.label("activity_name"),
+            ent.Payment.creditor_name,
+            ent.Payment.short_user_description,
+            ent.BankAccount.iban,
+            ent.Payment.transaction_amount,
+        )
+        .join(ent.BankAccount)
+        .outerjoin(ent.Initiative)
+        .outerjoin(ent.Activity)
+        .join(
+            ent.UserBankAccountRole,
+            ent.BankAccount.id == ent.UserBankAccountRole.bank_account_id,
+        )
+        .join(ent.User)
+        .where(ent.User.id == user_id)
+        .order_by(ent.Payment.booking_date.desc())
+    )
+
+    if initiative_name:
+        query = query.where(ent.Initiative.name.like(f"%{initiative_name}%"))
+    if initiative_name:
+        query = query.where(ent.Activity.name.like(f"%{activity_name}%"))
+
+    # Distinct because the join condition on UserBankAccountRole can
+    # result in double records where a user is both owner and user.
+    query = query.distinct().offset(offset).limit(limit)
+
+    payments_result = await session.execute(query)
+    payments_scalar = payments_result.all()
+    payments = [s.PaymentReadUser(**dict(i._mapping)) for i in payments_scalar]
+
+    return s.PaymentReadList(payments=payments)
 
 
 @payment_router.get(
@@ -1312,6 +1382,7 @@ async def get_activity_payments(
 @permission_router.get("/actions", response_model=s.AuthActionsRead)
 async def get_authorized_actions(
     entity_class: s.AuthEntityClass,
+    entity_id: int | None = None,
     async_session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -1319,13 +1390,14 @@ async def get_authorized_actions(
     funder_manager: m.FunderManager = Depends(m.FunderManager),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
-    entity_id: int | None = None,
+    bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
+        s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
     }
 
     resource: ent.Base | s.AuthEntityClass
@@ -1352,12 +1424,14 @@ async def get_authorized_fields(
     ),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
+    bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
+        s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
     }
 
     resource = await class_map[entity_class].detail_load(entity_id)
@@ -1396,10 +1470,7 @@ async def delete_profile_picture(
 
 
 @utils_router.get(
-    "/utils/gocardless/institutions", response_model=s.GoCardlessInstitutionList
+    "/utils/gocardless/institutions", response_model=GoCardlessInstitutionList
 )
-async def get_institutions(
-    request: Request, client: NordigenClient = Depends(get_nordigen_client)
-):
-    institutions = client.institution.get_institutions(country="NL")
-    return s.GoCardlessInstitutionList(institutions=institutions)
+async def get_institutions(request: Request):
+    return INSTITUTIONS

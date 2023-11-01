@@ -15,3 +15,4 @@ class AuthEntityClass(str, Enum):
     FUNDER = "Funder"
     REGULATION = "Regulation"
     GRANT = "Grant"
+    BANK_ACCOUNT = "BankAccount"

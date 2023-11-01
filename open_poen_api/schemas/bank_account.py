@@ -8,7 +8,13 @@ class BankAccountRead(BaseModel):
     name: str
     created: datetime
     last_accessed: datetime
-    linked_requisitions: int
+    institution_id: str
+    institution_name: str
+    institution_logo: str | None
+    is_linked: bool
+    is_revoked: bool
+    user_count: int
+    expiration_date: datetime
 
 
 class BankAccountUsersUpdate(BaseModel):

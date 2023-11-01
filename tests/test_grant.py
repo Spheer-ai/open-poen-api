@@ -82,7 +82,7 @@ async def test_add_overseers(async_client, dummy_session, status_code):
     funder_id, regulation_id, grant_id = 1, 1, 1
     body = {"user_ids": [1]}
     response = await async_client.patch(
-        f"/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseer",
+        f"/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseers",
         json=body,
     )
     assert response.status_code == status_code

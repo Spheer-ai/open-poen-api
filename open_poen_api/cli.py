@@ -5,7 +5,7 @@ from .database import (
     create_db_and_tables,
 )
 from .schemas import UserCreateWithPassword
-from .gocardless import client, refresh_tokens
+from .gocardless import get_nordigen_client
 from .utils.utils import temp_password_generator
 from .managers.user_manager import UserManager
 from .gocardless.payments import get_gocardless_payments
@@ -71,49 +71,68 @@ def retrieve_payments(requisition_id: int, date_from: str = ""):
             typer.echo("Invalid date format. Use YYYY-MM-DD.")
             raise typer.Abort()
 
-    asyncio.run(refresh_tokens())
     asyncio.run(get_gocardless_payments(requisition_id, parsed_date_from))
 
 
 @app.command()
 def list_agreements(limit: int = 100, offset: int = 0):
-    asyncio.run(refresh_tokens())
-    agreements = client.agreement.get_agreements(limit, offset)
-    print(agreements)
+    async def async_list_agreements(limit: int = 100, offset: int = 0):
+        client = await get_nordigen_client()
+        agreements = await client.agreement.get_agreements(limit, offset)
+        print(agreements)
+
+    asyncio.run(async_list_agreements(limit, offset))
 
 
 @app.command()
 def delete_all_agreements(limit: int = 100, offset: int = 0):
-    asyncio.run(refresh_tokens())
-    agreements = client.agreement.get_agreements(limit, offset)
-    for a in agreements["results"]:
-        client.agreement.delete_agreement(a["id"])
+    async def async_delete_all_agreements(limit: int = 100, offset: int = 0):
+        client = await get_nordigen_client()
+        agreements = await client.agreement.get_agreements(limit, offset)
+        for a in agreements["results"]:
+            await client.agreement.delete_agreement(a["id"])
+
+    asyncio.run(async_delete_all_agreements(limit, offset))
 
 
 @app.command()
 def list_requisitions(limit: int = 100, offset: int = 0):
-    asyncio.run(refresh_tokens())
-    requisitions = client.requisition.get_requisitions(limit, offset)
-    print(requisitions)
+    async def async_list_requisitions(limit: int = 100, offset: int = 0):
+        client = await get_nordigen_client()
+        requisitions = await client.requisition.get_requisitions(limit, offset)
+        print(requisitions)
+
+    asyncio.run(async_list_requisitions(limit, offset))
 
 
 @app.command()
 def delete_all_requisitions(limit: int = 100, offset: int = 0):
-    asyncio.run(refresh_tokens())
-    requisitions = client.requisition.get_requisitions(limit, offset)
-    for r in requisitions["results"]:
-        client.requisition.delete_requisition(r["id"])
+    async def async_delete_all_requisitions(limit: int = 100, offset: int = 0):
+        client = await get_nordigen_client()
+        requisitions = await client.requisition.get_requisitions(limit, offset)
+        for r in requisitions["results"]:
+            await client.requisition.delete_requisition(r["id"])
+
+    asyncio.run(async_delete_all_requisitions(limit, offset))
 
 
 @app.command()
 def list_transactions(account_id: str, date_from: str, date_to: str):
-    asyncio.run(refresh_tokens())
-    transactions = client.account_api(account_id).get_transactions(date_from, date_to)
-    print(transactions)
+    async def async_list_transactions(account_id: str, date_from: str, date_to: str):
+        client = await get_nordigen_client()
+        transactions = await client.account_api(account_id).get_transactions(
+            date_from, date_to
+        )
+        print(transactions)
+
+    asyncio.run(async_list_transactions(account_id, date_from, date_to))
 
 
 @app.command()
 def list_institutions(country: str):
-    asyncio.run(refresh_tokens())
-    institutions = client.institution.get_institutions(country)
-    print(institutions)
+    async def async_list_institutions(country: str):
+        client = await get_nordigen_client()
+        institutions = await client.institution.get_institutions(country)
+        print(institutions)
+
+    asyncio.run(async_list_institutions(country))

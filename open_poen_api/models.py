@@ -27,6 +27,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.associationproxy import association_proxy, AssociationProxy
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.ext.asyncio import AsyncAttrs
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from decimal import Decimal
 from sqlalchemy_utils import aggregated
@@ -46,7 +47,7 @@ class TimeStampMixin:
     )
 
 
-class Base(DeclarativeBase):
+class Base(AsyncAttrs, DeclarativeBase):
     PROXIES: list[str] = []
 
 
@@ -413,16 +414,16 @@ class Initiative(Base):
         Boolean, default=False, nullable=False
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
     justified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="income")
     def _set_income(self):
         return get_finance_aggregate(Route.INCOME)
 
-    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="expenses")
     def _set_expenses(self):
@@ -450,7 +451,13 @@ class Initiative(Base):
         Integer, ForeignKey("grant.id", ondelete="CASCADE")
     )
     grant: Mapped["Grant"] = relationship(
-        "Grant", back_populates="initiatives", lazy="noload", uselist=False
+        # Lazy is set to "select" to ensure grant is also set when an initiative
+        # is loaded as a relationship of a grant. If it's "noload", it will be
+        # set to None, and we won't be able to calculate permissions.
+        "Grant",
+        back_populates="initiatives",
+        lazy="select",
+        uselist=False,
     )
 
     PROXIES = ["initiative_owners"]
@@ -472,10 +479,10 @@ class Activity(Base):
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     finished_description: Mapped[str] = mapped_column(String(length=512), nullable=True)
-    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
 
     income: Mapped[Decimal] = mapped_column(
-        DECIMAL(precision=8, scale=2),
+        DECIMAL(precision=10, scale=2),
         default=0,
     )
 
@@ -484,7 +491,7 @@ class Activity(Base):
         return get_finance_aggregate(Route.INCOME)
 
     expenses: Mapped[Decimal] = mapped_column(
-        DECIMAL(precision=8, scale=2),
+        DECIMAL(precision=10, scale=2),
         default=0,
     )
 
@@ -553,8 +560,8 @@ class Payment(Base):
     )
     entry_reference: Mapped[str] = mapped_column(String(length=128), nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String(length=128), nullable=True)
-    booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
     creditor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
     creditor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
     debtor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
@@ -613,13 +620,13 @@ class DebitCard(Base):
         String(length=64), unique=True, nullable=False
     )
 
-    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="income")
     def _set_income(self):
         return get_finance_aggregate(Route.INCOME)
 
-    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("payments", column="expenses")
     def _set_expenses(self):
@@ -650,8 +657,14 @@ class ReqStatus(str, Enum):
     # Indicates that the requisition was done for a bank account that was requisitioned
     # earlier by another user.
     CONFLICTED = "CO"
-    # Indicates that the user revoked his bank account.
+    # Indicates that the user revoked his bank account, meaning he's done with justifying
+    # his expenditures. All payments that are not assigned to an initiative and/or activity
+    # can be removed.
     REVOKED = "RV"
+    # Indicates that the user deleted his bank account, meaning he wants to delete as much
+    # as possible and start over. All payments are deleted, except for payments that are
+    # assigned to a justified initiative and/or a finished activity.
+    DELETED = "DE"
 
 
 class Requisition(Base, TimeStampMixin):
@@ -684,6 +697,11 @@ class Requisition(Base, TimeStampMixin):
         secondary=requisition_bank_account,
     )
 
+    def __repr__(self):
+        return (
+            f"Requisition(id='{self.id}', user='{self.user}', status='{self.status}')"
+        )
+
 
 class BankAccount(Base):
     __tablename__ = "bank_account"
@@ -693,15 +711,27 @@ class BankAccount(Base):
     iban: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_accessed: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_accessed: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    institution_id: Mapped[str] = mapped_column(String, nullable=False)
+    institution_name: Mapped[str] = mapped_column(String, nullable=True)
+    institution_logo: Mapped[str] = mapped_column(String, nullable=True)
 
-    linked_requisitions: Mapped[int] = mapped_column(Integer, default=0)
+    is_linked: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    @aggregated("requisitions", column="linked_requisitions")
-    def _set_linked_requisitions(self):
+    @aggregated("requisitions", column="is_linked")
+    def _set_is_linked(self):
         return func.coalesce(
-            func.sum(case((Requisition.status == ReqStatus.LINKED.value, 1), else_=0)),
-            0,
+            func.bool_or(Requisition.status == ReqStatus.LINKED.value), False
+        )
+
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    @aggregated("requisitions", column="is_revoked")
+    def _set_is_revoked(self):
+        return func.coalesce(
+            func.bool_and(Requisition.status == ReqStatus.REVOKED.value), False
         )
 
     user_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -710,13 +740,12 @@ class BankAccount(Base):
     def _set_user_count(self):
         return func.count()
 
-    latest_expiration_date: Mapped[datetime] = mapped_column(
+    expiration_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
-    @aggregated("requisitions", column="latest_expiration_date")
-    def _set_latest_expiration_date(self):
-        # return func.max(Requisition.created_at + Requisition.n_days_access)
+    @aggregated("requisitions", column="expiration_date")
+    def _set_expiration_date(self):
         return func.max(
             Requisition.created_at
             + text("(requisition.n_days_access || ' days')::interval")
@@ -751,6 +780,9 @@ class BankAccount(Base):
     payments: Mapped[list[Payment]] = relationship(
         "Payment", back_populates="bank_account", lazy="noload"
     )
+
+    def __repr__(self):
+        return f"BankAccount(id='{self.id}', iban='{self.iban}', name='{self.name}')"
 
     PROXIES = ["users", "owner"]
 
@@ -812,15 +844,15 @@ class Grant(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     reference: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2))
+    budget: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
 
-    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    income: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("initiatives.payments", column="income")
     def _set_income(self):
         return get_finance_aggregate(Route.INCOME)
 
-    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=8, scale=2), default=0)
+    expenses: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2), default=0)
 
     @aggregated("initiatives.payments", column="expenses")
     def _set_expenses(self):
