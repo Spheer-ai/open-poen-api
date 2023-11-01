@@ -68,6 +68,44 @@ DOMAIN_NAME=9f2a-2a00-1370-819c-4201-bf7b-fc7-6d47-8401.ngrok-free.app
 ### Gotcha's
 * .env files have to end with an empty line. The script that parses these for Terraform otherwise skips the last key value pair.
 
+##### Using Docker on MacOS's M1 chip set
+Docker will by default look for binaries for the M1 chip set when you install dependencies for the Docker image. There are not always available and therefore you'll probably run into problems. Solve this by:
+
+Building the docker image explicitly for amd64/linux (Make sure that, when you update or switch your version, you rebuild manually by running this command.):
+```
+docker image build . -f Dockerfile.dev --platform linux/amd64 -t open-poen-api-m1
+```
+
+Ensuring the `docker compose up` command uses this image by modiyfing docker-compose.yml:
+```
+version: '3.3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - 8000:8000
+      - 5678:5678
+
+etc...
+```
+
+Becomes:
+```
+version: '3.3'
+
+services:
+  app:
+    image: open-poen-api-m1
+    ports:
+      - 8000:8000
+      - 5678:5678
+
+etc...
+```
+
 ### CLI commands
 Add a superuser:
 ```
