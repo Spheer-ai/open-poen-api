@@ -1304,6 +1304,8 @@ async def get_user_payments(
     oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
+    initiative_name: str | None = None,
+    activity_name: str | None = None,
 ):
     if required_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
@@ -1328,17 +1330,22 @@ async def get_user_payments(
         )
         .join(ent.User)
         .where(ent.User.id == user_id)
-        .distinct()  # Because the join condition on UserBankAccountRole can
-        # result in double records where a user is both owner and user.
-        .offset(offset)
-        .limit(limit)
     )
+
+    if initiative_name:
+        query = query.where(ent.Initiative.name.like(f"%{initiative_name}%"))
+    if initiative_name:
+        query = query.where(ent.Activity.name.like(f"%{activity_name}%"))
+
+    # Distinct because the join condition on UserBankAccountRole can
+    # result in double records where a user is both owner and user.
+    query = query.distinct().offset(offset).limit(limit)
 
     payments_result = await session.execute(query)
     payments_scalar = payments_result.all()
-    payments_mapping = [dict(i._mapping) for i in payments_scalar]
+    payments = [s.PaymentReadUser(**dict(i._mapping)) for i in payments_scalar]
 
-    return s.PaymentReadList(payments=payments_mapping)
+    return s.PaymentReadList(payments=payments)
 
 
 @payment_router.get(
@@ -1373,6 +1380,7 @@ async def get_activity_payments(
 @permission_router.get("/actions", response_model=s.AuthActionsRead)
 async def get_authorized_actions(
     entity_class: s.AuthEntityClass,
+    entity_id: int | None = None,
     async_session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
@@ -1380,13 +1388,14 @@ async def get_authorized_actions(
     funder_manager: m.FunderManager = Depends(m.FunderManager),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
-    entity_id: int | None = None,
+    bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
+        s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
     }
 
     resource: ent.Base | s.AuthEntityClass
@@ -1413,12 +1422,14 @@ async def get_authorized_fields(
     ),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
+    bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
+        s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
     }
 
     resource = await class_map[entity_class].detail_load(entity_id)

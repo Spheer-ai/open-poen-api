@@ -213,9 +213,11 @@ async def test_get_user_detail(
     "get_mock_user, status_code",
     [
         (userowner, 200),
+        (superuser, 403),
     ],
     ids=[
-        "User owner sees everything",
+        "User owner sees own payments",
+        "Superuser cannot see other user's payments",
     ],
     indirect=["get_mock_user"],
 )
@@ -223,3 +225,5 @@ async def test_get_user_payments(async_client, dummy_session, status_code):
     user_id = 1
     response = await async_client.get(f"payments/user/{user_id}")
     assert response.status_code == status_code
+    if response.status_code == 200:
+        assert len(response.json()["payments"]) == 2
