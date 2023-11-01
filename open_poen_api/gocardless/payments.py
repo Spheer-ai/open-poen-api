@@ -1,7 +1,7 @@
 from .. import models as ent
 from sqlalchemy import select, and_, inspect, not_
 from sqlalchemy.ext.asyncio import AsyncSession
-from .utils import get_nordigen_client
+from .utils import get_nordigen_client, INSTITUTIONS
 from datetime import datetime, timedelta
 from collections.abc import MutableMapping
 from dateutil.parser import parse
@@ -109,6 +109,13 @@ async def process_requisition(
                 name=details["account"]["ownerName"],
                 created=parse(metadata["created"]),
                 last_accessed=last_accessed,
+                institution_id=metadata["institution_id"],
+                institution_name=INSTITUTIONS.get_institution_name(
+                    metadata["institution_id"]
+                ),
+                institution_logo=INSTITUTIONS.get_institution_logo(
+                    metadata["institution_id"]
+                ),
                 requisitions=[requisition],
             )
             session.add(account)

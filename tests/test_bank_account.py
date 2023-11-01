@@ -14,7 +14,15 @@ from tests.conftest import (
         (
             userowner,
             200,
-            ["owner", "name", "iban", "expiration_date"],
+            [
+                "owner",
+                "name",
+                "iban",
+                "expiration_date",
+                "institution_logo",
+                "is_linked",
+                "is_revoked",
+            ],
             ["api_account_id"],
         ),
         (user, 403, [], []),

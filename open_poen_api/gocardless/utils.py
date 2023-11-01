@@ -64,7 +64,7 @@ class GocardlessInstitution(BaseModel):
     bic: str
     transaction_total_days: int
     countries: list[str]
-    logo: str
+    logo: str | None
 
 
 class GoCardlessInstitutionList(BaseModel):
@@ -78,6 +78,27 @@ class GoCardlessInstitutionList(BaseModel):
         id_to_days = {i.id: i.transaction_total_days for i in self.institutions}
         return id_to_days[institution_id]
 
+    def get_institution_name(self, institution_id: str):
+        id_to_name = {i.id: i.name for i in self.institutions}
+        return id_to_name.get(institution_id)
+
+    def get_institution_logo(self, institution_id: str):
+        id_to_logo = {i.id: i.logo for i in self.institutions}
+        return id_to_logo.get(institution_id)
+
 
 # Get information on all institutions once at app startup.
-INSTITUTIONS = GoCardlessInstitutionList(institutions=asyncio.run(get_institutions()))
+INSTITUTIONS = GoCardlessInstitutionList(
+    institutions=asyncio.run(get_institutions())
+    # Add an institution for the sandbox for testing purposes.
+    + [
+        GocardlessInstitution(
+            id="SANDBOXFINANCE_SFIN0000",
+            name="Sandbox",
+            bic="Sandbox",
+            transaction_total_days=90,
+            countries=["NL"],
+            logo=None,
+        )
+    ]
+)

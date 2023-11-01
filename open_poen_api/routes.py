@@ -1331,6 +1331,7 @@ async def get_user_payments(
         )
         .join(ent.User)
         .where(ent.User.id == user_id)
+        .order_by(ent.Payment.booking_date.desc())
     )
 
     if initiative_name:

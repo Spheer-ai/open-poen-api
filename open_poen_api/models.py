@@ -560,7 +560,7 @@ class Payment(Base):
     )
     entry_reference: Mapped[str] = mapped_column(String(length=128), nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String(length=128), nullable=True)
-    booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
     creditor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
     creditor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
@@ -714,14 +714,24 @@ class BankAccount(Base):
     last_accessed: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    institution_id: Mapped[str] = mapped_column(String, nullable=False)
+    institution_name: Mapped[str] = mapped_column(String, nullable=True)
+    institution_logo: Mapped[str] = mapped_column(String, nullable=True)
 
-    linked_requisitions: Mapped[int] = mapped_column(Integer, default=0)
+    is_linked: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    @aggregated("requisitions", column="linked_requisitions")
-    def _set_linked_requisitions(self):
+    @aggregated("requisitions", column="is_linked")
+    def _set_is_linked(self):
         return func.coalesce(
-            func.sum(case((Requisition.status == ReqStatus.LINKED.value, 1), else_=0)),
-            0,
+            func.bool_or(Requisition.status == ReqStatus.LINKED.value), False
+        )
+
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    @aggregated("requisitions", column="is_revoked")
+    def _set_is_revoked(self):
+        return func.coalesce(
+            func.bool_and(Requisition.status == ReqStatus.REVOKED.value), False
         )
 
     user_count: Mapped[int] = mapped_column(Integer, default=0)
