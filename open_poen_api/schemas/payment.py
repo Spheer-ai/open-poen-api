@@ -5,22 +5,15 @@ from ..models import Route, PaymentType
 from typing import Literal
 
 
-class PaymentRead(BaseModel):
+class PaymentReadUser(BaseModel):
     id: int
     booking_date: datetime
+    initiative_name: str | None
+    activity_name: str | None
+    creditor_name: str | None
+    short_user_description: str | None
+    iban: str | None
     transaction_amount: TransactionAmount
-    creditor_name: str
-    creditor_account: str
-    debtor_name: str
-    debtor_account: str
-    route: Route
-    type: PaymentType
-    remittance_information_unstructured: str
-    remittance_information_structured: str
-    short_user_description: str
-    long_user_description: str
-    # TODO: Add more fields from other entities such as initiative name,
-    # activity name, bank account IBAN, etc.
 
 
 class BasePaymentCreate(BaseModel):
@@ -91,4 +84,7 @@ class PaymentActivityUpdate(BaseModel):
 
 
 class PaymentReadList(BaseModel):
-    payments: list[PaymentRead]
+    payments: list[PaymentReadUser]
+
+    class Config:
+        orm_mode = True

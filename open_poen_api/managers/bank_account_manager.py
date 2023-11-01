@@ -87,6 +87,8 @@ class BankAccountManager(BaseManager):
             req.status = ReqStatus.DELETED
             self.session.add(req)
 
+        # TODO: Make sure an error is returned if there are payments for this bank
+        # account that are coupled to a finished or justified activity or initiative.
         await self.session.execute(
             delete(Payment).where(
                 Payment.bank_account_id == bank_account.id,

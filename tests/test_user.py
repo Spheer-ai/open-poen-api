@@ -207,3 +207,19 @@ async def test_get_user_detail(
     assert response.status_code == status_code
     assert all([i in response.json() for i in fields_present])
     assert all([i not in response.json() for i in fields_not_present])
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [
+        (userowner, 200),
+    ],
+    ids=[
+        "User owner sees everything",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_user_payments(async_client, dummy_session, status_code):
+    user_id = 1
+    response = await async_client.get(f"payments/user/{user_id}")
+    assert response.status_code == status_code

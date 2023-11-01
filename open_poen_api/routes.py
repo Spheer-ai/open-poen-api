@@ -1148,7 +1148,7 @@ async def create_initiative(
 
 @payment_router.post(
     "/payment",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
 )
 async def create_payment(
     payment: s.PaymentCreateManual,
@@ -1176,7 +1176,7 @@ async def create_payment(
 
 @payment_router.patch(
     "/payment/{payment_id}",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
     response_model_exclude_unset=True,
 )
 async def update_payment(
@@ -1196,7 +1196,7 @@ async def update_payment(
 
 @payment_router.patch(
     "/payment/{payment_id}/initiative",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
 )
 async def link_initiative(
     payment_id: int,
@@ -1231,7 +1231,7 @@ async def link_initiative(
 
 @payment_router.patch(
     "/payment/{payment_id}/activity",
-    response_model=s.PaymentRead,
+    response_model=s.PaymentReadUser,
 )
 async def link_activity(
     payment_id: int,
@@ -1299,11 +1299,46 @@ async def get_bng_payments(
 )
 async def get_user_payments(
     user_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login),
+    session: AsyncSession = Depends(get_async_session),
+    required_user=Depends(m.required_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
 ):
-    pass
+    if required_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    query = (
+        select(
+            ent.Payment.id,
+            ent.Payment.booking_date,
+            ent.Initiative.name.label("initiative_name"),
+            ent.Activity.name.label("activity_name"),
+            ent.Payment.creditor_name,
+            ent.Payment.short_user_description,
+            ent.BankAccount.iban,
+            ent.Payment.transaction_amount,
+        )
+        .join(ent.BankAccount)
+        .outerjoin(ent.Initiative)
+        .outerjoin(ent.Activity)
+        .join(
+            ent.UserBankAccountRole,
+            ent.BankAccount.id == ent.UserBankAccountRole.bank_account_id,
+        )
+        .join(ent.User)
+        .where(ent.User.id == user_id)
+        .distinct()  # Because the join condition on UserBankAccountRole can
+        # result in double records where a user is both owner and user.
+        .offset(offset)
+        .limit(limit)
+    )
+
+    payments_result = await session.execute(query)
+    payments_scalar = payments_result.all()
+    payments_mapping = [dict(i._mapping) for i in payments_scalar]
+
+    return s.PaymentReadList(payments=payments_mapping)
 
 
 @payment_router.get(

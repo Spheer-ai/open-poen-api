@@ -771,6 +771,9 @@ class BankAccount(Base):
         "Payment", back_populates="bank_account", lazy="noload"
     )
 
+    def __repr__(self):
+        return f"BankAccount(id='{self.id}', iban='{self.iban}', name='{self.name}')"
+
     PROXIES = ["users", "owner"]
 
 
