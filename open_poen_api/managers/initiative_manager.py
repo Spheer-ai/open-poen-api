@@ -151,8 +151,7 @@ class InitiativeManager(BaseManager):
             select(Initiative)
             .options(
                 joinedload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
-                joinedload(Initiative.activities),
-                joinedload(Initiative.debit_cards),
+                selectinload(Initiative.activities),
                 joinedload(Initiative.grant).joinedload(Grant.regulation),
             )
             .where(Initiative.id == id)

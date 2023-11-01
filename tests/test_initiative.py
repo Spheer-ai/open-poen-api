@@ -28,7 +28,7 @@ from open_poen_api.managers import InitiativeManager
         "User cannot",
         "Administrator can",
         "Anon cannot",
-        "Policy officer can",
+        "Grant officer can",
     ],
     indirect=["get_mock_user"],
 )
@@ -61,7 +61,7 @@ async def test_create_initiative(async_client, dummy_session, status_code):
         "User cannot",
         "Administrator can",
         "Anon cannot",
-        "Policy officer can",
+        "Grant officer can",
     ],
     indirect=["get_mock_user"],
 )
@@ -88,7 +88,7 @@ async def test_delete_initiative(async_client, dummy_session, status_code):
         "User cannot",
         "Administrator can",
         "Anon cannot",
-        "Policy officer can",
+        "Grant officer can",
     ],
     indirect=["get_mock_user"],
 )
@@ -153,11 +153,11 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
     ],
     ids=[
         "Superuser edits loc",
-        "Policy officer edits loc",
+        "Grant officer edits loc",
         "Initiative owner cannot edit loc",
         "User cannot edit loc",
         "Superuser can hide",
-        "Policy officer can hide",
+        "Grant officer can hide",
         "Initiative owner cannot hide",
         "User cannot hide",
         "Duplicate name fails",

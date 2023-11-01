@@ -80,9 +80,9 @@ class GrantManager(BaseManager):
         query_result_q = await self.session.execute(
             select(Grant)
             .options(
-                selectinload(Grant.regulation),
+                joinedload(Grant.regulation),
                 selectinload(Grant.initiatives),
-                selectinload(Grant.overseer_roles).selectinload(UserGrantRole.user),
+                selectinload(Grant.overseer_roles).joinedload(UserGrantRole.user),
             )
             .where(Grant.id == id)
         )

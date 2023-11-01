@@ -514,7 +514,7 @@ async def update_initiative(
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    initiative_db = await initiative_manager.min_load(initiative_id)
+    initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
     auth.authorize_input_fields(required_user, "edit", initiative_db, initiative)
     edited_initiative = await initiative_manager.update(
@@ -561,7 +561,7 @@ async def delete_initiative(
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    initiative_db = await initiative_manager.min_load(initiative_id)
+    initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "delete", initiative_db, oso)
     await initiative_manager.delete(initiative_db, request=request)
     return Response(status_code=204)
@@ -573,20 +573,42 @@ async def delete_initiative(
     response_model_exclude_unset=True,
 )
 async def get_initiatives(
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    name: str | None = None,
+    only_mine: bool = False,
 ):
-    # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
-    initiatives_result = await async_session.execute(q)
+    if only_mine and optional_user is None:
+        raise HTTPException(
+            status_code=400,
+            detail="only_mine can only be set to True if the user is logged in",
+        )
+
+    query = select(ent.Initiative).join(ent.Grant).join(ent.Regulation)
+
+    if only_mine:
+        query = (
+            query.join(ent.UserInitiativeRole)
+            .join(ent.User)
+            .where(ent.User.id == optional_user.id)
+        )
+
+    if name:
+        query = query.where(ent.Initiative.name.like(f"%{name}%"))
+
+    query = query.offset(offset).limit(limit)
+
+    initiatives_result = await session.execute(query)
     initiatives_scalar = initiatives_result.scalars().all()
-    # TODO: This part is resulting in a lot of extra separate queries for authorization.
-    # Check if this goes away if we join load the neccessary relationships.
+
     filtered_initiatives = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in initiatives_scalar
     ]
+
     return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
@@ -1138,7 +1160,7 @@ async def create_initiative(
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    grant_db = await grant_manager.min_load(grant_id)
+    grant_db = await grant_manager.detail_load(grant_id)
     auth.authorize(required_user, "create_initiative", grant_db, oso)
     # TODO: Validate funder_id, regulation_id and grant_id.
     initiative_db = await initiative_manager.create(
