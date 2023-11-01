@@ -179,7 +179,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     [
         (superuser, 24, 200),
         (admin, 24, 200),
-        (grant_officer, 23, 200),
+        (grant_officer, 24, 200),
         (initiative_owner, 22, 200),
         (activity_owner, 22, 200),
         (user, 21, 200),
@@ -188,7 +188,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     ids=[
         "Superuser sees everything",
         "Administrator sees everything",
-        "Policy officer sees own hidden initiatives",
+        "Grant officer sees everything",
         "initiative_owner sees own hidden initiative",
         "activity_owner sees own hidden initiative",
         "User sees non hidden",
@@ -200,7 +200,7 @@ async def test_get_initiatives_list(
     async_client, dummy_session, status_code, result_length
 ):
     await hide_instance(dummy_session, Initiative, 1)
-    response = await async_client.get("/initiatives")
+    response = await async_client.get("/initiatives?limit=100")
     assert response.status_code == status_code
     assert len(response.json()["initiatives"]) == result_length
 

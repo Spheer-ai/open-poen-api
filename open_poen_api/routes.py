@@ -574,7 +574,7 @@ async def delete_initiative(
 )
 async def get_initiatives(
     session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login),
+    optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
@@ -587,13 +587,61 @@ async def get_initiatives(
             detail="only_mine can only be set to True if the user is logged in",
         )
 
-    query = select(ent.Initiative).join(ent.Grant).join(ent.Regulation)
+    query = select(ent.Initiative)
 
-    if only_mine:
-        query = (
-            query.join(ent.UserInitiativeRole)
-            .join(ent.User)
-            .where(ent.User.id == optional_user.id)
+    if optional_user is None:
+        query = query.where(ent.Initiative.hidden == False)
+    else:
+        query = query.where(
+            or_(
+                ent.Initiative.hidden == False,
+                ent.Initiative.id.in_(  # You can see initiatives of your activities.
+                    select(ent.Activity.initiative_id).where(
+                        ent.Activity.id.in_(
+                            [i.activity_id for i in optional_user.activity_roles]
+                        )
+                    )
+                ),
+                ent.Initiative.id.in_(  # You can see your own initiatives.
+                    [i.initiative_id for i in optional_user.initiative_roles]
+                ),
+                ent.Initiative.id.in_(  # You can see initiatives where you're overseer.
+                    select(ent.Initiative.id)
+                    .join(ent.Grant)
+                    .where(
+                        ent.Grant.id.in_(
+                            [i.grant_id for i in optional_user.overseer_roles]
+                        )
+                    )
+                ),
+                # Being a policy or grant officer on one regulation is enough to
+                # see everything.
+                literal(len(optional_user.grant_officer_regulation_roles) > 0),
+                literal(len(optional_user.policy_officer_regulation_roles) > 0),
+                # Administrators or super users can see everything.
+                literal(optional_user.role == ent.UserRole.ADMINISTRATOR),
+                literal(optional_user.is_superuser),
+            )
+        )
+
+    query = query.options(
+        joinedload(ent.Initiative.grant).joinedload(ent.Grant.regulation)
+    )
+
+    if only_mine and optional_user is not None:
+        query = query.where(
+            or_(
+                ent.Initiative.id.in_(  # You can see initiatives of your activities.
+                    select(ent.Activity.initiative_id).where(
+                        ent.Activity.id.in_(
+                            [i.activity_id for i in optional_user.activity_roles]
+                        )
+                    )
+                ),
+                ent.Initiative.id.in_(  # You can see your own initiatives.
+                    [i.initiative_id for i in optional_user.initiative_roles]
+                ),
+            )
         )
 
     if name:
