@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta
+from fastapi import FastAPI
 from nordigen import NordigenClient
 import os
 import asyncio
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from ..database import create_db_and_tables
 
 lock = asyncio.Lock()
 
@@ -87,18 +90,40 @@ class GoCardlessInstitutionList(BaseModel):
         return id_to_logo.get(institution_id)
 
 
-# Get information on all institutions once at app startup.
-INSTITUTIONS = GoCardlessInstitutionList(
-    institutions=asyncio.run(get_institutions())
-    # Add an institution for the sandbox for testing purposes.
-    + [
-        GocardlessInstitution(
-            id="SANDBOXFINANCE_SFIN0000",
-            name="Sandbox",
-            bic="Sandbox",
-            transaction_total_days=90,
-            countries=["NL"],
-            logo=None,
-        )
-    ]
-)
+# INSTITUTIONS: None | GoCardlessInstitutionList = None
+
+INSTITUTIONS = {}
+
+
+@asynccontextmanager
+async def set_institution_list(app: FastAPI):
+    global INSTITUTIONS
+
+    await create_db_and_tables()
+
+    # Get information on all institutions once at app startup.
+    institutions = GoCardlessInstitutionList(
+        institutions=await get_institutions()
+        # Add an institution for the sandbox for testing purposes.
+        + [
+            GocardlessInstitution(
+                id="SANDBOXFINANCE_SFIN0000",
+                name="Sandbox",
+                bic="Sandbox",
+                transaction_total_days=90,
+                countries=["NL"],
+                logo=None,
+            )
+        ]
+    )
+
+    INSTITUTIONS["x"] = institutions
+
+    # async def foo():
+    #     return institutions
+
+    yield
+
+
+def get_static_institutions():
+    return INSTITUTIONS

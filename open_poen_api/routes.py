@@ -1473,4 +1473,4 @@ async def delete_profile_picture(
     "/utils/gocardless/institutions", response_model=GoCardlessInstitutionList
 )
 async def get_institutions(request: Request):
-    return INSTITUTIONS
+    return INSTITUTIONS["x"]

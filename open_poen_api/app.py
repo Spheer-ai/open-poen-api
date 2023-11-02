@@ -16,6 +16,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
 import os
 from .logger import audit_logger
+from .gocardless.utils import set_institution_list
 
 tags_metadata = [
     {"name": "auth"},
@@ -38,6 +39,7 @@ app = FastAPI(
     title="Open Poen API",
     description="Creating transparency in how public funds are spent.",
     openapi_tags=tags_metadata,
+    lifespan=set_institution_list,
 )
 
 app.include_router(

@@ -110,10 +110,10 @@ async def process_requisition(
                 created=parse(metadata["created"]),
                 last_accessed=last_accessed,
                 institution_id=metadata["institution_id"],
-                institution_name=INSTITUTIONS.get_institution_name(
+                institution_name=INSTITUTIONS["x"].get_institution_name(
                     metadata["institution_id"]
                 ),
-                institution_logo=INSTITUTIONS.get_institution_logo(
+                institution_logo=INSTITUTIONS["x"].get_institution_logo(
                     metadata["institution_id"]
                 ),
                 requisitions=[requisition],

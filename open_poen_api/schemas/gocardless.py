@@ -4,7 +4,7 @@ from ..gocardless import INSTITUTIONS
 
 
 def validate_institution_id(institution_id: str):
-    if institution_id not in INSTITUTIONS.institution_ids:
+    if institution_id not in INSTITUTIONS["x"].institution_ids:
         raise HTTPException(status_code=400, detail="institution_id is not selectable")
     return institution_id
 
@@ -24,7 +24,7 @@ def validate_n_days_access(n_days_access: int):
 
 
 def validate_n_days_history(institution_id: str, n_days_history: int):
-    max_n_days = INSTITUTIONS.get_transaction_total_days(institution_id)
+    max_n_days = INSTITUTIONS["x"].get_transaction_total_days(institution_id)
     if n_days_history > max_n_days:
         raise HTTPException(
             status_code=400,
