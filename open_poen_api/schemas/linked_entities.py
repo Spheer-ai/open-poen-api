@@ -59,8 +59,6 @@ class UserReadLinked(UserRead):
     grants: list[GrantRead]
 
     @validator(
-        "initiatives",
-        "activities",
         "used_bank_accounts",
         "owned_bank_accounts",
         "grant_officer_regulations",

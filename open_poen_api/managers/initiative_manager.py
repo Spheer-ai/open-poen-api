@@ -155,6 +155,7 @@ class InitiativeManager(BaseManager):
                 joinedload(Initiative.grant).joinedload(Grant.regulation),
             )
             .where(Initiative.id == id)
+            .execution_options(populate_existing=True)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:

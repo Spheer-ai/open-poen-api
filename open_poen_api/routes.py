@@ -86,14 +86,14 @@ async def create_user(
 )
 async def get_user(
     user_id: int,
-    required_login=Depends(m.required_login),
+    optional_login: ent.User | None = Depends(m.optional_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
     session=Depends(get_async_session),
 ):
     user_db = await user_manager.detail_load(user_id)
-    auth.authorize(required_login, "read", user_db, oso)
-    return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
+    auth.authorize(optional_login, "read", user_db, oso)
+    return auth.get_authorized_output_fields(optional_login, "read", user_db, oso)
 
 
 @user_router.patch(
