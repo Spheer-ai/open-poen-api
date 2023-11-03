@@ -40,7 +40,7 @@ from .gocardless import (
     get_nordigen_client,
     get_gocardless_payments,
     GoCardlessInstitutionList,
-    INSTITUTIONS,
+    get_institutions,
 )
 from nordigen import NordigenClient
 import uuid
@@ -311,9 +311,9 @@ async def gocardless_initiatite(
     user_manager: m.UserManager = Depends(m.UserManager),
     client: NordigenClient = Depends(get_nordigen_client),
 ):
-    s.validate_institution_id(institution_id)
-    s.validate_n_days_access(n_days_access)
-    s.validate_n_days_history(institution_id, n_days_history)
+    await s.validate_institution_id(institution_id)
+    await s.validate_n_days_access(n_days_access)
+    await s.validate_n_days_history(institution_id, n_days_history)
 
     # TODO: Ensure only users can link for themselves.
     user = await user_manager.min_load(user_id)
@@ -1542,5 +1542,8 @@ async def delete_profile_picture(
 @utils_router.get(
     "/utils/gocardless/institutions", response_model=GoCardlessInstitutionList
 )
-async def get_institutions(request: Request):
-    return INSTITUTIONS["x"]
+async def get_institutions(
+    request: Request,
+    institutions: GoCardlessInstitutionList = Depends(get_institutions),
+):
+    return institutions

@@ -1,6 +1,6 @@
 from .utils import (
     refresh_tokens,
-    INSTITUTIONS,
+    get_institutions,
     get_nordigen_client,
     GocardlessInstitution,
     GoCardlessInstitutionList,

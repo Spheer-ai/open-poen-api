@@ -32,6 +32,7 @@ pillow = "^10.0.1"
 azure-storage-blob = "^12.18.2"
 aiohttp = "^3.8.6"
 nordigen = {git = "https://github.com/marcus302/nordigen-python", rev = "feature/make-async"}
+aiocache = "^0.12.2"
 
 
 [tool.poetry.group.dev.dependencies]

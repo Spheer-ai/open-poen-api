@@ -1,15 +1,18 @@
-from fastapi import Query, HTTPException
+from fastapi import Query, HTTPException, Depends
 from pydantic import BaseModel
-from ..gocardless import INSTITUTIONS
+from ..gocardless import get_institutions, GoCardlessInstitutionList
 
 
-def validate_institution_id(institution_id: str):
-    if institution_id not in INSTITUTIONS["x"].institution_ids:
+async def validate_institution_id(
+    institution_id: str,
+):
+    institutions = await get_institutions()
+    if institution_id not in institutions.ids:
         raise HTTPException(status_code=400, detail="institution_id is not selectable")
     return institution_id
 
 
-def validate_n_days_access(n_days_access: int):
+async def validate_n_days_access(n_days_access: int):
     if n_days_access > 90:
         raise HTTPException(
             status_code=400,
@@ -23,8 +26,12 @@ def validate_n_days_access(n_days_access: int):
     return n_days_access
 
 
-def validate_n_days_history(institution_id: str, n_days_history: int):
-    max_n_days = INSTITUTIONS["x"].get_transaction_total_days(institution_id)
+async def validate_n_days_history(
+    institution_id: str,
+    n_days_history: int,
+):
+    institutions = await get_institutions()
+    max_n_days = institutions.get_transaction_total_days(institution_id)
     if n_days_history > max_n_days:
         raise HTTPException(
             status_code=400,

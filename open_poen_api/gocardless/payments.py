@@ -1,7 +1,7 @@
 from .. import models as ent
 from sqlalchemy import select, and_, inspect, not_
 from sqlalchemy.ext.asyncio import AsyncSession
-from .utils import get_nordigen_client, INSTITUTIONS
+from .utils import get_nordigen_client, get_institutions
 from datetime import datetime, timedelta
 from collections.abc import MutableMapping
 from dateutil.parser import parse
@@ -45,6 +45,7 @@ async def process_requisition(
     processed_accounts: set[str],
 ):
     client = await get_nordigen_client()
+    institutions = await get_institutions()
 
     api_requisition = await client.requisition.get_requisition_by_id(
         requisition.api_requisition_id
@@ -110,12 +111,8 @@ async def process_requisition(
                 created=parse(metadata["created"]),
                 last_accessed=last_accessed,
                 institution_id=metadata["institution_id"],
-                institution_name=INSTITUTIONS["x"].get_institution_name(
-                    metadata["institution_id"]
-                ),
-                institution_logo=INSTITUTIONS["x"].get_institution_logo(
-                    metadata["institution_id"]
-                ),
+                institution_name=institutions.get_name(metadata["institution_id"]),
+                institution_logo=institutions.get_logo(metadata["institution_id"]),
                 requisitions=[requisition],
             )
             session.add(account)
