@@ -672,11 +672,12 @@ async def create_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    initiative_db = await initiative_manager.min_load(initiative_id)
+    initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "create_activity", initiative_db, oso)
     activity_db = await activity_manager.create(
         activity, initiative_id, request=request
     )
+    activity_db = await activity_manager.detail_load(activity_db.id)
     return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
 
 
@@ -692,7 +693,7 @@ async def get_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.detail_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(optional_user, "read", activity_db, oso)
     return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
 
@@ -711,7 +712,7 @@ async def update_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.min_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
     auth.authorize_input_fields(required_user, "edit", activity_db, activity)
     edited_activity = await activity_manager.update(
@@ -735,7 +736,7 @@ async def link_activity_owners(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.detail_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "link_owners", activity_db, oso)
     activity_db = await activity_manager.make_users_owner(
         activity_db, activity.user_ids, request=request
@@ -760,7 +761,7 @@ async def delete_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.min_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "delete", activity_db, oso)
     await activity_manager.delete(activity_db, request=request)
     return Response(status_code=204)
@@ -1231,9 +1232,7 @@ async def create_payment(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     if payment.activity_id is not None:
-        activity_db = await activity_manager.min_load(
-            payment.initiative_id, payment.activity_id
-        )
+        activity_db = await activity_manager.min_load(payment.activity_id)
         auth.authorize(required_user, "create_payment", activity_db, oso)
     else:
         initiative_db = await initiative_manager.min_load(payment.initiative_id)

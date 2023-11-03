@@ -216,7 +216,7 @@ async def test_get_initiatives_list(
     ],
     ids=[
         "Superuser can see address",
-        "Policy officer can see address",
+        "Grant officer can see address",
         "Initiative owner can see address",
         "User cannot see address",
         "Anon cannot see address",

@@ -258,7 +258,7 @@ async def dummy_session(async_session):
     initiative = await initiative_manager.min_load(1)
     await initiative_manager.make_users_owner(initiative, user_ids=[12])
 
-    activity = await activity_manager.min_load(1, 1)
+    activity = await activity_manager.min_load(1)
     await activity_manager.make_users_owner(activity, user_ids=[13])
 
     bank_account_roles = [

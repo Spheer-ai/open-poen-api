@@ -150,7 +150,7 @@ class InitiativeManager(BaseManager):
         query_result_q = await self.session.execute(
             select(Initiative)
             .options(
-                joinedload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
+                selectinload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
                 selectinload(Initiative.activities),
                 joinedload(Initiative.grant).joinedload(Grant.regulation),
             )
