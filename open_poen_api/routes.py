@@ -432,7 +432,9 @@ async def revoke_bank_account(
     required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    session: AsyncSession = Depends(get_async_session),
 ):
+    session.expunge(required_user)
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
     auth.authorize(required_user, "revoke", bank_account_db, oso)
     bank_account_db = await bank_account_manager.revoke(
@@ -451,7 +453,9 @@ async def delete_bank_account(
     required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    session: AsyncSession = Depends(get_async_session),
 ):
+    session.expunge(required_user)
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
     auth.authorize(required_user, "delete", bank_account_db, oso)
     await bank_account_manager.delete(bank_account_db, request=request)
