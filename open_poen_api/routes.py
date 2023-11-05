@@ -411,7 +411,9 @@ async def get_bank_account(
     required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    session: AsyncSession = Depends(get_async_session),
 ):
+    session.expunge(required_user)
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
     auth.authorize(required_user, "read", bank_account_db, oso)
     return auth.get_authorized_output_fields(
