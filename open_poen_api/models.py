@@ -391,11 +391,10 @@ class LegalEntity(str, Enum):
 
 class Initiative(Base):
     __tablename__ = "initiative"
+    __table_args__ = (UniqueConstraint("name", name="unique initiative name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(
-        String(length=64), nullable=False, index=True, unique=True
-    )
+    name: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(length=512), nullable=False)
     purpose: Mapped[str] = mapped_column(String(length=64), nullable=False)
     target_audience: Mapped[str] = mapped_column(String(length=64), nullable=False)
@@ -469,7 +468,11 @@ class Initiative(Base):
 
 class Activity(Base):
     __tablename__ = "activity"
-    __table_args__ = (UniqueConstraint("name", "initiative_id"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "name", "initiative_id", name="unique activity name per initiative"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(length=64), nullable=False)
@@ -794,9 +797,14 @@ class BankAccount(Base):
 
 class Regulation(Base):
     __tablename__ = "regulation"
+    __table_args__ = (
+        UniqueConstraint(
+            "name", "funder_id", name="unique regulation names per funder"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str] = mapped_column(String(512), nullable=False)
 
     grant_officer_roles: Mapped[list[UserRegulationRole]] = relationship(
@@ -843,7 +851,10 @@ class Regulation(Base):
 class Grant(Base):
     __tablename__ = "grant"
     __table_args__ = (
-        UniqueConstraint("name", "regulation_id", name="_name_regulation_uc"),
+        UniqueConstraint(
+            "name", "regulation_id", name="unique grant names per regulation"
+        ),
+        UniqueConstraint("reference", name="unique grant reference"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -891,9 +902,10 @@ class Grant(Base):
 
 class Funder(Base):
     __tablename__ = "funder"
+    __table_args__ = (UniqueConstraint("name", name="unique funder name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
     url: Mapped[str] = mapped_column(String(512))
 
     regulations: Mapped[list[Regulation]] = relationship(

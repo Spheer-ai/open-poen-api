@@ -44,7 +44,7 @@ from .gocardless import (
 )
 from nordigen import NordigenClient
 import uuid
-from .exc import PaymentCouplingOrder
+from .exc import PaymentCouplingError
 
 
 user_router = APIRouter(tags=["user"])
@@ -1229,11 +1229,12 @@ async def create_payment(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
+    # TODO: Make sure initiative_id in the schema is congruent with activity_id.
     if payment.activity_id is not None:
-        activity_db = await activity_manager.min_load(payment.activity_id)
+        activity_db = await activity_manager.detail_load(payment.activity_id)
         auth.authorize(required_user, "create_payment", activity_db, oso)
     else:
-        initiative_db = await initiative_manager.min_load(payment.initiative_id)
+        initiative_db = await initiative_manager.detail_load(payment.initiative_id)
         auth.authorize(required_user, "create_payment", initiative_db, oso)
 
     payment_db = await payment_manager.create(
@@ -1278,8 +1279,12 @@ async def link_initiative(
 ):
     payment_db = await payment_manager.detail_load(payment_id)
     if payment_db.activity_id is not None:
-        raise PaymentCouplingOrder(
+        raise PaymentCouplingError(
             message="Payment is still linked to an activity. First decouple it."
+        )
+    if payment_db.type == ent.PaymentType.MANUAL and payment.initiative_id is None:
+        raise PaymentCouplingError(
+            message="It's not possible to uncouple a manual payment from its initiative."
         )
     auth.authorize(required_user, "link_initiative", payment_db, oso)
 
@@ -1319,7 +1324,7 @@ async def link_activity(
 ):
     payment_db = await payment_manager.detail_load(payment_id)
     if payment_db.initiative_id is None:
-        raise PaymentCouplingOrder(
+        raise PaymentCouplingError(
             message="Payment is not linked to an initiative. First couple it."
         )
     auth.authorize(required_user, "link_activity", payment_db, oso)
@@ -1400,8 +1405,8 @@ async def get_user_payments(
             ent.Payment.transaction_amount,
         )
         .join(ent.BankAccount)
-        .outerjoin(ent.Initiative)
-        .outerjoin(ent.Activity)
+        .outerjoin(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
+        .outerjoin(ent.Activity, ent.Payment.activity_id == ent.Activity.id)
         .join(
             ent.UserBankAccountRole,
             ent.BankAccount.id == ent.UserBankAccountRole.bank_account_id,

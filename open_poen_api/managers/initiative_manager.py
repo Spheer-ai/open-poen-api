@@ -4,7 +4,7 @@ from fastapi import Depends, Request, HTTPException
 from ..models import Initiative, User, UserInitiativeRole, DebitCard, Grant
 from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
-from ..exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from .base_manager import BaseManager
@@ -22,13 +22,7 @@ class InitiativeManager(BaseManager):
                 initiative_create, Initiative, request, grant_id=grant_id
             )
         except IntegrityError as e:
-            # There seems to be no way to check for this specific case without making
-            # this check work only for Postgres. SQL-Alchemy does not return consistent
-            # exceptions for different databases.
-            if f"Key (name)=({initiative_create.name}) already exists." in str(e):
-                raise EntityAlreadyExists(
-                    message=f"Name '{initiative_create.name}' is already in use"
-                )
+            raise_err_if_unique_constraint("unique initiative name", e)
             raise
         return initiative
 
@@ -42,9 +36,9 @@ class InitiativeManager(BaseManager):
             initiative = await self.base_update(
                 initiative_update, initiative_db, request
             )
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique initiative name", e)
+            raise
         return initiative
 
     async def delete(

@@ -112,7 +112,7 @@ async def test_officer_can_have_double_role(async_client, dummy_session, status_
         (superuser, {"name": "Another Name"}, 200),
         (user, {"name": "Another Name"}, 403),
         (grant_officer, {"name": "Another name"}, 403),
-        (superuser, {"name": "Healthcare Quality Assurance"}, 400),
+        (superuser, {"name": "Consumer Safety Guidelines"}, 409),
     ],
     ids=[
         "Superuser can",

@@ -62,7 +62,7 @@ async def test_delete_funder(async_client, dummy_session, status_code):
         (superuser, {"name": "Another Name"}, 200),
         (user, {"name": "Another Name"}, 403),
         (grant_officer, {"name": "Another Name"}, 403),
-        (superuser, {"name": "EcoFuture Fund"}, 400),
+        (superuser, {"name": "EcoFuture Fund"}, 409),
     ],
     ids=[
         "Superuser can",

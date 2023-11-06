@@ -1,3 +1,6 @@
+from sqlalchemy.exc import IntegrityError
+
+
 class CustomException(Exception):
     def __init__(self, message: str, status_code: int):
         self.message = message
@@ -30,6 +33,16 @@ class FileTooLarge(CustomException):
         super().__init__(message, status_code=413)
 
 
-class PaymentCouplingOrder(CustomException):
+class PaymentCouplingError(CustomException):
     def __init__(self, message: str):
         super().__init__(message, status_code=409)
+
+
+def raise_err_if_unique_constraint(constraint_name: str, error: IntegrityError):
+    """There seems to be no way to check for this specific case without making
+    this check work only for Postgres. SQL-Alchemy does not return consistent
+    exceptions for different databases."""
+    if constraint_name in str(error):
+        raise EntityAlreadyExists(
+            message=f"The following unique constraint was violated: '{constraint_name}'."
+        )

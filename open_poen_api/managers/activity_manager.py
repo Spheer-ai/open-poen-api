@@ -6,8 +6,7 @@ from ..models import Activity, UserActivityRole, User, Initiative, Grant, Regula
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload, joinedload
-from ..exc import EntityNotFound
-from ..exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from .base_manager import BaseManager
 
 
@@ -22,9 +21,9 @@ class ActivityManager(BaseManager):
             activity = await self.base_create(
                 activity_create, Activity, request, initiative_id=initiative_id
             )
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique activity name per initiative", e)
+            raise
         return activity
 
     async def update(
@@ -35,9 +34,9 @@ class ActivityManager(BaseManager):
     ) -> Activity:
         try:
             activity = await self.base_update(activity_update, activity_db, request)
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique activity name per initiative", e)
+            raise
         return activity
 
     async def delete(self, activity: Activity, request: Request | None = None) -> None:

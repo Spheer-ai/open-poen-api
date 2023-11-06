@@ -99,7 +99,7 @@ async def test_add_overseers(async_client, dummy_session, status_code):
         (admin, {"name": "Another Name"}, 200),
         (user, {"name": "Another Name"}, 403),
         (grant_officer, {"name": "Another name"}, 200),
-        (superuser, {"name": "Cultural Heritage Preservation Fund"}, 400),
+        (superuser, {"name": "Cultural Heritage Preservation Fund"}, 409),
     ],
     ids=[
         "Superuser can",

@@ -134,7 +134,7 @@ async def test_add_activity_owner(async_client, dummy_session, ids, status_code)
         (activity_owner, {"description": "New description."}, 200),
         (user, {"description": "New description."}, 403),
         (anon, {"description": "New description."}, 403),
-        (superuser, {"name": "Community Cleanup Day"}, 400),
+        (superuser, {"name": "Community Cleanup Day"}, 409),
     ],
     ids=[
         "Superuser can hide",

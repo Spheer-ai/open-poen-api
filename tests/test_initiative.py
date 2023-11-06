@@ -50,7 +50,7 @@ async def test_create_initiative(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
-        (superuser, 400),
+        (superuser, 409),
     ],
     ids=[
         "Duplicate name fails with 400",
@@ -67,7 +67,8 @@ async def test_duplicate_name(async_client, dummy_session, status_code):
     )
     assert response.status_code == status_code
     assert (
-        response.json() == "Name 'Clean Energy Research Initiative' is already in use"
+        response.json()
+        == "The following unique constraint was violated: 'unique initiative name'."
     )
 
 
@@ -173,7 +174,7 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
         (grant_officer, {"hidden": True}, 200),
         (initiative_owner, {"hidden": True}, 403),
         (user, {"hidden": True}, 403),
-        (superuser, {"name": "Community Health Initiative"}, 400),
+        (superuser, {"name": "Community Health Initiative"}, 409),
     ],
     ids=[
         "Superuser edits loc",
