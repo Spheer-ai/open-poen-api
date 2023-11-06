@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from .managers.user_manager import fastapi_users, auth_backend
-from .managers import CustomException
+from .exc import CustomException
 from .database import create_db_and_tables
 from .routes import (
     user_router,

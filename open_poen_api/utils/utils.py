@@ -8,7 +8,7 @@ import datetime
 from azure.storage.blob.aio import BlobServiceClient
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from pydantic import BaseModel
-from ..managers.exc import UnsupportedFileType, FileTooLarge
+from ..exc import UnsupportedFileType, FileTooLarge
 
 DEBUG = os.environ.get("ENVIRONMENT") == "debug"
 

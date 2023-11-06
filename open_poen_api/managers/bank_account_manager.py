@@ -15,8 +15,8 @@ from ..models import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_, delete, or_
 from sqlalchemy.orm import selectinload, joinedload
-from .exc import EntityNotFound
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound
 from .base_manager import BaseManager
 import asyncio
 from ..gocardless import get_nordigen_client

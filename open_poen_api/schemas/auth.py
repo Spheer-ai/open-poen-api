@@ -16,3 +16,5 @@ class AuthEntityClass(str, Enum):
     REGULATION = "Regulation"
     GRANT = "Grant"
     BANK_ACCOUNT = "BankAccount"
+    INITIATIVE = "Initiative"
+    ACTIVITY = "Activity"

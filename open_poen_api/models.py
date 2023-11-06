@@ -583,6 +583,7 @@ class Payment(Base):
     long_user_description: Mapped[str] = mapped_column(
         String(length=128), nullable=True
     )
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     activity_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("activity.id", ondelete="SET NULL"), nullable=True

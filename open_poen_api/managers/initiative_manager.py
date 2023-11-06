@@ -4,7 +4,7 @@ from fastapi import Depends, Request, HTTPException
 from ..models import Initiative, User, UserInitiativeRole, DebitCard, Grant
 from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from .base_manager import BaseManager

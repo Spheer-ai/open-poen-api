@@ -26,6 +26,7 @@ class BasePaymentCreate(BaseModel):
     route: Route
     short_user_description: str
     long_user_description: str
+    hidden: bool = Field(default=False)
 
 
 class PaymentCreateManual(BasePaymentCreate):
@@ -72,6 +73,7 @@ class PaymentUpdate(BaseModel):
     route: Route
     short_user_description: str
     long_user_description: str
+    hidden: bool
 
 
 class PaymentInitiativeUpdate(BaseModel):
@@ -88,3 +90,7 @@ class PaymentReadList(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class PaymentUncoupled(BaseModel):
+    message: str

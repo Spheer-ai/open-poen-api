@@ -6,8 +6,8 @@ from ..models import Activity, UserActivityRole, User, Initiative, Grant, Regula
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload, joinedload
-from .exc import EntityNotFound
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound
 from .base_manager import BaseManager
 
 

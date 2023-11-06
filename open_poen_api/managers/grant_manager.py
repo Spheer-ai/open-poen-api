@@ -3,7 +3,7 @@ from ..schemas import GrantCreate, GrantUpdate
 from ..models import Grant, UserGrantRole, User, Initiative
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 

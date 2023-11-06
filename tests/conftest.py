@@ -43,6 +43,7 @@ from fastapi import UploadFile
 import asyncio
 
 
+bankaccount_owner = 1
 superuser = 6
 userowner = 1
 user = 7

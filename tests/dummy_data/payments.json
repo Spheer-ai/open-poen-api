@@ -78,5 +78,21 @@
         "activity_id": null,
         "debit_card_id": null,
         "bank_account_id": 1
+    },
+    {
+        "booking_date": "2023-10-03T10:30:00Z",
+        "transaction_amount": 150.75,
+        "creditor_name": "UtilityCorp",
+        "creditor_account": "NL34RSTU5678901234",
+        "debtor_name": "Michael Smith",
+        "debtor_account": "NL89YZAB0123456789",
+        "route": "uitgaven",
+        "short_user_description": "Monthly utilities",
+        "long_user_description": "Payment for electricity and water utilities for October.",
+        "type": "GoCardless",
+        "initiative_id": 1,
+        "activity_id": null,
+        "debit_card_id": null,
+        "bank_account_id": 1
     }
 ]

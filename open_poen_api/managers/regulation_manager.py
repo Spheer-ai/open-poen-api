@@ -3,7 +3,7 @@ from ..schemas import RegulationCreate, RegulationUpdate
 from ..models import Regulation, UserRegulationRole, User, RegulationRole
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 

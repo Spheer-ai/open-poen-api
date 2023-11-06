@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from .exc import EntityNotFound
+from ..exc import EntityNotFound
 from ..models import Base, User
 from typing import Type, TypeVar
 from pydantic import BaseModel

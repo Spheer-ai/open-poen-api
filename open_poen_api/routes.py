@@ -11,7 +11,7 @@ from fastapi import (
     Body,
     Path,
 )
-from typing import Annotated
+from typing import Annotated, Union
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
@@ -44,6 +44,7 @@ from .gocardless import (
 )
 from nordigen import NordigenClient
 import uuid
+from .exc import PaymentCouplingOrder
 
 
 user_router = APIRouter(tags=["user"])
@@ -159,7 +160,7 @@ async def get_users(
         )
 
     if email:
-        query = query.where(ent.User.email.like(f"%{email}%"))
+        query = query.where(ent.User.email.ilike(f"%{email}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -642,9 +643,9 @@ async def get_initiatives(
         )
 
     if name:
-        query = query.where(ent.Initiative.name.like(f"%{name}%"))
+        query = query.where(ent.Initiative.name.ilike(f"%{name}%"))
 
-    query = query.offset(offset).limit(limit)
+    query = query.order_by(ent.Initiative.id.desc()).offset(offset).limit(limit)
 
     initiatives_result = await session.execute(query)
     initiatives_scalar = initiatives_result.scalars().all()
@@ -875,7 +876,7 @@ async def get_funders(
     query = select(ent.Funder)
 
     if name:
-        query = query.where(ent.Funder.name.like(f"%{name}%"))
+        query = query.where(ent.Funder.name.ilike(f"%{name}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -1028,7 +1029,7 @@ async def get_regulations(
     query = select(ent.Regulation).where(ent.Regulation.funder_id == funder_id)
 
     if name:
-        query = query.where(ent.Regulation.name.like(f"%{name}%"))
+        query = query.where(ent.Regulation.name.ilike(f"%{name}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -1177,7 +1178,7 @@ async def get_grants(
     query = select(ent.Grant).where(ent.Grant.regulation_id == regulation_id)
 
     if name:
-        query = query.where(ent.Grant.name.like(f"%{name}%"))
+        query = query.where(ent.Grant.name.ilike(f"%{name}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -1263,7 +1264,8 @@ async def update_payment(
 
 @payment_router.patch(
     "/payment/{payment_id}/initiative",
-    response_model=s.PaymentReadUser,
+    response_model=Union[s.InitiativeRead, s.PaymentUncoupled],
+    response_model_exclude_unset=True,
 )
 async def link_initiative(
     payment_id: int,
@@ -1276,9 +1278,8 @@ async def link_initiative(
 ):
     payment_db = await payment_manager.detail_load(payment_id)
     if payment_db.activity_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Payment is still linked to an activity. First decouple it.",
+        raise PaymentCouplingOrder(
+            message="Payment is still linked to an activity. First decouple it."
         )
     auth.authorize(required_user, "link_initiative", payment_db, oso)
 
@@ -1291,14 +1292,21 @@ async def link_initiative(
         payment.initiative_id,
         request=request,
     )
-    # Important for up to date relations. Has to be in this async context.
-    await payment_manager.session.refresh(payment_db)
-    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+    if payment.initiative_id is not None:
+        return auth.get_authorized_output_fields(
+            required_user, "read", initiative_db, oso
+        )
+    else:
+        return s.PaymentUncoupled(
+            message="Payment was successfully uncoupled from the initiative."
+        )
 
 
 @payment_router.patch(
     "/payment/{payment_id}/activity",
-    response_model=s.PaymentReadUser,
+    response_model=Union[s.ActivityRead, s.PaymentUncoupled],
+    response_model_exclude_unset=True,
 )
 async def link_activity(
     payment_id: int,
@@ -1310,25 +1318,28 @@ async def link_activity(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    if payment_db.initiative_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Payment is not linked to an initiative. First couple it.",
+    if payment_db.initiative_id is None:
+        raise PaymentCouplingOrder(
+            message="Payment is not linked to an initiative. First couple it."
         )
     auth.authorize(required_user, "link_activity", payment_db, oso)
 
     if payment.activity_id is not None:
-        activity_db = await activity_manager.detail_load(
-            payment.initiative_id, payment.activity_id
-        )
+        activity_db = await activity_manager.detail_load(payment.activity_id)
         auth.authorize(required_user, "link_payment", activity_db, oso)
 
     payment_db = await payment_manager.assign_payment_to_activity(
         payment_db, payment.activity_id, request=request
     )
-    # Important for up to date relations. Has to be in this async context.
-    await payment_manager.session.refresh(payment_db)
-    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+    if payment.activity_id is not None:
+        return auth.get_authorized_output_fields(
+            required_user, "read", activity_db, oso
+        )
+    else:
+        return s.PaymentUncoupled(
+            message="Payment was successfully uncoupled from the activity."
+        )
 
 
 @payment_router.delete("/payment/{payment_id}")
@@ -1401,9 +1412,9 @@ async def get_user_payments(
     )
 
     if initiative_name:
-        query = query.where(ent.Initiative.name.like(f"%{initiative_name}%"))
+        query = query.where(ent.Initiative.name.ilike(f"%{initiative_name}%"))
     if initiative_name:
-        query = query.where(ent.Activity.name.like(f"%{activity_name}%"))
+        query = query.where(ent.Activity.name.ilike(f"%{activity_name}%"))
 
     # Distinct because the join condition on UserBankAccountRole can
     # result in double records where a user is both owner and user.
@@ -1449,7 +1460,6 @@ async def get_activity_payments(
 async def get_authorized_actions(
     entity_class: s.AuthEntityClass,
     entity_id: int | None = None,
-    async_session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
     user_manager: m.UserManager = Depends(m.UserManager),
@@ -1457,6 +1467,8 @@ async def get_authorized_actions(
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
@@ -1464,6 +1476,8 @@ async def get_authorized_actions(
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
+        s.AuthEntityClass.INITIATIVE: initiative_manager,
+        s.AuthEntityClass.ACTIVITY: activity_manager,
     }
 
     resource: ent.Base | s.AuthEntityClass
@@ -1491,6 +1505,8 @@ async def get_authorized_fields(
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
@@ -1498,6 +1514,8 @@ async def get_authorized_fields(
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
+        s.AuthEntityClass.INITIATIVE: initiative_manager,
+        s.AuthEntityClass.ACTIVITY: activity_manager,
     }
 
     resource = await class_map[entity_class].detail_load(entity_id)

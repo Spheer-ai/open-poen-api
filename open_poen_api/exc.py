@@ -12,7 +12,7 @@ class CustomException(Exception):
 
 class EntityAlreadyExists(CustomException):
     def __init__(self, message: str):
-        super().__init__(message, status_code=400)
+        super().__init__(message, status_code=409)
 
 
 class EntityNotFound(CustomException):
@@ -28,3 +28,8 @@ class UnsupportedFileType(CustomException):
 class FileTooLarge(CustomException):
     def __init__(self, message: str):
         super().__init__(message, status_code=413)
+
+
+class PaymentCouplingOrder(CustomException):
+    def __init__(self, message: str):
+        super().__init__(message, status_code=409)

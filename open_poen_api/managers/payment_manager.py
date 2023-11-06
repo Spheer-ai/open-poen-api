@@ -10,8 +10,8 @@ from ..models import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
-from .exc import EntityNotFound
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound
 from .base_manager import BaseManager
 
 
@@ -62,6 +62,9 @@ class PaymentManager(BaseManager):
         payment.initiative_id = initiative_id
         self.session.add(payment)
         await self.session.commit()
+        await self.after_update(
+            payment, {"initiative_id": initiative_id}, request=request
+        )
         return payment
 
     async def assign_payment_to_activity(
@@ -70,6 +73,7 @@ class PaymentManager(BaseManager):
         payment.activity_id = activity_id
         self.session.add(payment)
         await self.session.commit()
+        await self.after_update(payment, {"activity_id": activity_id}, request=request)
         return payment
 
     async def detail_load(self, id: int):
