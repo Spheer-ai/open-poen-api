@@ -165,7 +165,6 @@ class BankAccountManager(BaseManager):
                 .joinedload(User.profile_picture),
             )
             .where(BankAccount.id == bank_account_id)
-            .execution_options(populate_existing=True)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:

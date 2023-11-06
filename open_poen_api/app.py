@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from .managers.user_manager import fastapi_users, auth_backend
 from .managers import CustomException
-from .database import create_db_and_tables, get_async_session
+from .database import create_db_and_tables
 from .routes import (
     user_router,
     initiative_router,
@@ -11,8 +11,6 @@ from .routes import (
     permission_router,
     utils_router,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
 import os
 from .logger import audit_logger
@@ -60,9 +58,18 @@ app.include_router(utils_router)
 @app.exception_handler(CustomException)
 async def custom_exception_handler(request: Request, exc: CustomException):
     audit_logger.info(
-        f"Exception occurred with status code {exc.status_code} and message {exc.message}"
+        f"Custom Exception occurred with status code {exc.status_code} and message:\n{exc.message}"
     )
     return JSONResponse(status_code=exc.status_code, content=exc.message)
+
+
+@app.exception_handler(Exception)
+async def all_exception_handler(request: Request, exc: Exception):
+    audit_logger.error(f"Unexpected exception occurred with stack trace:\n{str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An error occurred on the server."},
+    )
 
 
 if os.environ["ENVIRONMENT"] == "debug":

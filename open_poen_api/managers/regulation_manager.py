@@ -5,7 +5,7 @@ from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 from .exc import EntityAlreadyExists, EntityNotFound
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 
 class RegulationManager(BaseManager):
@@ -95,14 +95,14 @@ class RegulationManager(BaseManager):
         query_result_q = await self.session.execute(
             select(Regulation)
             .options(
-                selectinload(Regulation.grant_officer_roles).selectinload(
+                selectinload(Regulation.grant_officer_roles).joinedload(
                     UserRegulationRole.user
                 ),
-                selectinload(Regulation.policy_officer_roles).selectinload(
+                selectinload(Regulation.policy_officer_roles).joinedload(
                     UserRegulationRole.user
                 ),
                 selectinload(Regulation.grants),
-                selectinload(Regulation.funder),
+                joinedload(Regulation.funder),
             )
             .where(Regulation.id == id)
         )

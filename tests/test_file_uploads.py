@@ -16,10 +16,10 @@ from sqlalchemy.orm import selectinload, joinedload
 @pytest.mark.parametrize(
     "get_mock_user, file_name, status_code",
     [
-        (superuser, "./tests/dummy_data/test.png", 200),
+        (userowner, "./tests/dummy_data/test.png", 200),
     ],
     ids=[
-        "Superuser can upload",
+        "User owner can upload",
     ],
     indirect=["get_mock_user"],
 )
@@ -35,16 +35,14 @@ async def test_upload_files(
     files = [("file", ("name.png", file_content, "image/png"))]
 
     response = await async_client.post(
-        f"/user/6/profile-picture",
+        f"/user/1/profile-picture",
         files=files,
     )
 
     assert response.status_code == status_code
     if status_code == 200:
-        q = await dummy_session.execute(
-            select(User).options(joinedload(User.profile_picture))
-        )
-        r = q.scalars().first().profile_picture
+        q = await dummy_session.get(User, 1)
+        r = q.profile_picture
         assert r.attachment_url is not None
         assert r.attachment_thumbnail_url_128 is not None
         assert r.attachment_thumbnail_url_256 is not None
@@ -54,8 +52,7 @@ async def test_upload_files(
 
     assert response.status_code == 204
     if response.status_code == 204:
-        q = await dummy_session.execute(
-            select(User).options(joinedload(User.profile_picture))
-        )
-        r = q.scalars().first().profile_picture
+        q = await dummy_session.get(User, 1)
+        await dummy_session.refresh(q)
+        r = q.profile_picture
         assert r is None

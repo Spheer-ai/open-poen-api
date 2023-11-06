@@ -76,6 +76,7 @@ async def create_user(
         **user.dict(), password=temp_password_generator(size=16)
     )
     user_db = await user_manager.create(user_with_password, request=request)
+    await user_db.awaitable_attrs.profile_picture
     return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
 
 
@@ -623,10 +624,6 @@ async def get_initiatives(
                 literal(optional_user.is_superuser),
             )
         )
-
-    query = query.options(
-        joinedload(ent.Initiative.grant).joinedload(ent.Grant.regulation)
-    )
 
     if only_mine and optional_user is not None:
         query = query.where(

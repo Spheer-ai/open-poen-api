@@ -1,16 +1,8 @@
-from fastapi import Depends, Request, UploadFile
+from fastapi import Depends, Request, Response, UploadFile
+
+from open_poen_api.models import User
 from ..database import get_user_db, get_async_session
-from ..models import (
-    User,
-    UserInitiativeRole,
-    UserActivityRole,
-    UserBankAccountRole,
-    UserRegulationRole,
-    UserGrantRole,
-    Attachment,
-    AttachmentEntityType,
-    AttachmentAttachmentType,
-)
+from .. import models as ent
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from ..utils.email import MessageSchema, conf, env
@@ -36,6 +28,8 @@ from sqlalchemy import and_
 from .base_manager_ex_current_user import BaseManagerExCurrentUser
 from typing import Any, Dict, cast
 from pydantic import EmailStr
+from ..logger import audit_logger
+from ..schemas import UserCreateWithPassword
 
 
 WEBSITE_NAME = os.environ["WEBSITE_NAME"]
@@ -44,7 +38,7 @@ SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 
 class UserManagerExCurrentUser(
     IntegerIDMixin,
-    BaseUserManager[User, int],
+    BaseUserManager[ent.User, int],
     BaseManagerExCurrentUser,
 ):
     reset_password_token_secret = SECRET_KEY
@@ -54,7 +48,9 @@ class UserManagerExCurrentUser(
         super().__init__(*args, **kwargs)
         self.session = session
 
-    async def on_after_register(self, user: User, request: Optional[Request] = None):
+    async def on_after_register(
+        self, user: ent.User, request: Optional[Request] = None
+    ):
         email = cast(EmailStr, user.email)
         template = env.get_template("on_after_register.txt")
         body = template.render(user=user)
@@ -65,11 +61,12 @@ class UserManagerExCurrentUser(
             subtype=MessageType.plain,
         )
         fm = FastMail(conf)
-        await fm.send_message(message)  # TODO: Make async.
+        await fm.send_message(message)
         await self.after_create(user, request)
+        audit_logger.info(f"{user} has been registered.")
 
     async def on_after_forgot_password(
-        self, user: User, token: str, request: Optional[Request] = None
+        self, user: ent.User, token: str, request: Optional[Request] = None
     ):
         email = cast(EmailStr, user.email)
         template = env.get_template("on_after_forgot_password.txt")
@@ -82,14 +79,28 @@ class UserManagerExCurrentUser(
             subtype=MessageType.plain,
         )
         fm = FastMail(conf)
-        await fm.send_message(message)  # TODO: Make async.
+        await fm.send_message(message)
+        audit_logger.info(f"{user} has requested a new password.")
+
+    async def on_after_login(
+        self,
+        user: User,
+        request: Request | None = None,
+        response: Response | None = None,
+    ) -> None:
+        audit_logger.info(f"{user} has logged in.")
+
+    async def on_after_reset_password(
+        self, user: User, request: Request | None = None
+    ) -> None:
+        audit_logger.info(f"{user} has reset his or her password.")
 
     async def create(
         self,
         user_create: schemas.UC,
         safe: bool = False,
         request: Request | None = None,
-    ) -> User:
+    ) -> ent.User:
         try:
             return await super().create(user_create, request=request)
         except UserAlreadyExists:
@@ -98,10 +109,10 @@ class UserManagerExCurrentUser(
     async def update(
         self,
         user_update: schemas.UU,
-        user: User,
+        user: ent.User,
         safe: bool = False,
         request: Request | None = None,
-    ) -> User:
+    ) -> ent.User:
         try:
             return await super().update(user_update, user, request=request)
         except UserAlreadyExists:
@@ -109,7 +120,7 @@ class UserManagerExCurrentUser(
 
     async def on_after_update(
         self,
-        user: User,
+        user: ent.User,
         update_dict: Dict[str, Any],
         request: Request | None = None,
     ):
@@ -117,37 +128,57 @@ class UserManagerExCurrentUser(
 
     async def on_after_delete(
         self,
-        user: User,
+        user: ent.User,
         request: Request | None = None,
     ):
         await self.after_delete(user, request)
 
+    async def requesting_user_load(self, id: int):
+        query_result_q = await self.session.execute(
+            select(ent.User)
+            .options(
+                selectinload(ent.User.initiative_roles),
+                selectinload(ent.User.activity_roles),
+                selectinload(ent.User.user_bank_account_roles),
+                selectinload(ent.User.owner_bank_account_roles),
+                selectinload(ent.User.grant_officer_regulation_roles),
+                selectinload(ent.User.policy_officer_regulation_roles),
+                selectinload(ent.User.overseer_roles),
+            )
+            .where(ent.User.id == id)
+            .execution_options(populate_existing=True)
+        )
+        user = query_result_q.scalars().one()
+        return user
+
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
-            select(User)
+            select(ent.User)
             .options(
-                selectinload(User.requisitions),
-                selectinload(User.initiative_roles).joinedload(
-                    UserInitiativeRole.initiative
+                selectinload(ent.User.initiative_roles).joinedload(
+                    ent.UserInitiativeRole.initiative
                 ),
-                selectinload(User.activity_roles).joinedload(UserActivityRole.activity),
-                selectinload(User.user_bank_account_roles).joinedload(
-                    UserBankAccountRole.bank_account
+                selectinload(ent.User.activity_roles).joinedload(
+                    ent.UserActivityRole.activity
                 ),
-                selectinload(User.owner_bank_account_roles).joinedload(
-                    UserBankAccountRole.bank_account
+                selectinload(ent.User.user_bank_account_roles).joinedload(
+                    ent.UserBankAccountRole.bank_account
                 ),
-                selectinload(User.grant_officer_regulation_roles).joinedload(
-                    UserRegulationRole.regulation
+                selectinload(ent.User.owner_bank_account_roles).joinedload(
+                    ent.UserBankAccountRole.bank_account
                 ),
-                selectinload(User.policy_officer_regulation_roles).joinedload(
-                    UserRegulationRole.regulation
+                selectinload(ent.User.grant_officer_regulation_roles).joinedload(
+                    ent.UserRegulationRole.regulation
                 ),
-                selectinload(User.overseer_roles).joinedload(UserGrantRole.grant),
-                joinedload(User.profile_picture),
+                selectinload(ent.User.policy_officer_regulation_roles).joinedload(
+                    ent.UserRegulationRole.regulation
+                ),
+                selectinload(ent.User.overseer_roles).joinedload(
+                    ent.UserGrantRole.grant
+                ),
+                joinedload(ent.User.profile_picture),
             )
-            .where(User.id == id)
-            .execution_options(populate_existing=True)
+            .where(ent.User.id == id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
@@ -155,21 +186,21 @@ class UserManagerExCurrentUser(
         return query_result
 
     async def min_load(self, id: int):
-        query_result = await self.session.get(User, id)
+        query_result = await self.session.get(ent.User, id)
         if query_result is None:
             raise EntityNotFound(message="User not found")
         return query_result
 
     async def set_profile_picture(
-        self, file: UploadFile, user: User, request: Request | None = None
+        self, file: UploadFile, user: ent.User, request: Request | None = None
     ) -> None:
         filename = f"{user.id}_user_profile_picture"
         ppu = await upload_profile_picture(file, filename)
         if user.profile_picture is None:
-            profile_picture = Attachment(
+            profile_picture = ent.Attachment(
                 entity_id=user.id,
-                entity_type=AttachmentEntityType.USER,
-                attachment_type=AttachmentAttachmentType.PROFILE_PICTURE,
+                entity_type=ent.AttachmentEntityType.USER,
+                attachment_type=ent.AttachmentAttachmentType.PROFILE_PICTURE,
             )
         else:
             profile_picture = user.profile_picture
@@ -190,7 +221,7 @@ class UserManagerExCurrentUser(
         await self.after_update(user, {"profile_picture": "created"}, request=request)
 
     async def delete_profile_picture(
-        self, user: User, request: Request | None = None
+        self, user: ent.User, request: Request | None = None
     ) -> None:
         if user.profile_picture is None:
             return
@@ -217,7 +248,7 @@ auth_backend = AuthenticationBackend(
     name="jwt", transport=bearer_transport, get_strategy=get_jwt_strategy
 )
 
-fastapi_users = FastAPIUsers[User, int](_get_user_manager, [auth_backend])
+fastapi_users = FastAPIUsers[ent.User, int](_get_user_manager, [auth_backend])
 
 get_user_manager_context = contextlib.asynccontextmanager(_get_user_manager)
 
@@ -230,8 +261,9 @@ def with_joins(original_dependency):
         if user is None:
             return None
 
-        detail_user = await user_manager.detail_load(user.id)
-        return detail_user
+        user = await user_manager.requesting_user_load(user.id)
+        user_manager.session.expunge(user)
+        return user
 
     return _user_with_extra_joins
 
@@ -246,7 +278,7 @@ class UserManager(UserManagerExCurrentUser):
         self,
         user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
         session: AsyncSession = Depends(get_async_session),
-        current_user: User | None = Depends(optional_login),
+        current_user: ent.User | None = Depends(optional_login),
     ):
         super().__init__(session, user_db)
         self.current_user = current_user

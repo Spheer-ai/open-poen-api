@@ -81,9 +81,6 @@ class ActivityManager(BaseManager):
             select(Activity)
             .options(
                 selectinload(Activity.user_roles).joinedload(UserActivityRole.user),
-                joinedload(Activity.initiative)
-                .joinedload(Initiative.grant)
-                .joinedload(Grant.regulation),
             )
             .where(Activity.id == activity_id)
         )

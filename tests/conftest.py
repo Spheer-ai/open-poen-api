@@ -290,7 +290,7 @@ async def get_mock_user(request, dummy_session):
 
     db = await get_user_db(dummy_session).__anext__()
     user_manager = m.UserManager(db, dummy_session, None)
-    user_instance = await user_manager.detail_load(request.param)
+    user_instance = await user_manager.requesting_user_load(request.param)
 
     async def func():
         return user_instance

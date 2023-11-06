@@ -50,6 +50,30 @@ async def test_create_initiative(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
+        (superuser, 400),
+    ],
+    ids=[
+        "Duplicate name fails with 400",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_duplicate_name(async_client, dummy_session, status_code):
+    funder_id, regulation_id, grant_id = 1, 1, 1
+    body = initiative_info
+    body.update({"name": "Clean Energy Research Initiative"})
+    response = await async_client.post(
+        f"/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/initiative",
+        json=body,
+    )
+    assert response.status_code == status_code
+    assert (
+        response.json() == "Name 'Clean Energy Research Initiative' is already in use"
+    )
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [
         (superuser, 204),
         (user, 403),
         (admin, 204),

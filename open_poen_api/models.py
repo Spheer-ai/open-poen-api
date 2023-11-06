@@ -117,10 +117,10 @@ class ProfilePictureMixin:
     def profile_picture(cls) -> Mapped[Attachment | None]:
         return relationship(
             "Attachment",
-            lazy="noload",
+            lazy="joined",
             primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
             f"Attachment.entity_type=='{cls.entity_type}', Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
-            cascade="all",
+            cascade="all, delete-orphan",
             uselist=False,
         )
 
@@ -457,7 +457,7 @@ class Initiative(Base):
         # set to None, and we won't be able to calculate permissions.
         "Grant",
         back_populates="initiatives",
-        lazy="select",
+        lazy="joined",
         uselist=False,
     )
 
@@ -513,7 +513,7 @@ class Activity(Base):
         Integer, ForeignKey("initiative.id", ondelete="CASCADE")
     )
     initiative: Mapped[Initiative] = relationship(
-        "Initiative", back_populates="activities", lazy="select", uselist=False
+        "Initiative", back_populates="activities", lazy="joined", uselist=False
     )
     payments: Mapped[list["Payment"]] = relationship(
         "Payment", back_populates="activity", lazy="noload"
@@ -588,13 +588,13 @@ class Payment(Base):
         Integer, ForeignKey("activity.id", ondelete="SET NULL"), nullable=True
     )
     activity: Mapped[Optional[Activity]] = relationship(
-        "Activity", back_populates="payments", lazy="noload", uselist=False
+        "Activity", back_populates="payments", lazy="joined", uselist=False
     )
     initiative_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
     initiative: Mapped[Optional[Initiative]] = relationship(
-        "Initiative", back_populates="payments", lazy="noload", uselist=False
+        "Initiative", back_populates="payments", lazy="joined", uselist=False
     )
     debit_card_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("debitcard.id"), nullable=True
@@ -606,7 +606,7 @@ class Payment(Base):
         Integer, ForeignKey("bank_account.id"), nullable=True
     )
     bank_account: Mapped[Optional["BankAccount"]] = relationship(
-        "BankAccount", back_populates="payments", lazy="noload"
+        "BankAccount", back_populates="payments", lazy="joined"
     )
 
     def __repr__(self):
@@ -866,7 +866,7 @@ class Grant(Base):
         Integer, ForeignKey("regulation.id", ondelete="CASCADE")
     )
     regulation: Mapped[Regulation] = relationship(
-        "Regulation", back_populates="grants", lazy="noload", uselist=False
+        "Regulation", back_populates="grants", lazy="joined", uselist=False
     )
     initiatives: Mapped[list[Initiative]] = relationship(
         "Initiative",

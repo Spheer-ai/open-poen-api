@@ -21,10 +21,15 @@ class InitiativeManager(BaseManager):
             initiative = await self.base_create(
                 initiative_create, Initiative, request, grant_id=grant_id
             )
-        except IntegrityError:
-            # TODO: Make sure this is not another IntegrityError.
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            # There seems to be no way to check for this specific case without making
+            # this check work only for Postgres. SQL-Alchemy does not return consistent
+            # exceptions for different databases.
+            if f"Key (name)=({initiative_create.name}) already exists." in str(e):
+                raise EntityAlreadyExists(
+                    message=f"Name '{initiative_create.name}' is already in use"
+                )
+            raise
         return initiative
 
     async def update(
@@ -152,10 +157,8 @@ class InitiativeManager(BaseManager):
             .options(
                 selectinload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
                 selectinload(Initiative.activities),
-                joinedload(Initiative.grant).joinedload(Grant.regulation),
             )
             .where(Initiative.id == id)
-            .execution_options(populate_existing=True)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
