@@ -1256,7 +1256,7 @@ async def update_payment(
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    payment_db = await payment_manager.min_load(payment_id)
+    payment_db = await payment_manager.detail_load(payment_id)
     auth.authorize(required_user, "edit", payment_db, oso)
     auth.authorize_input_fields(required_user, "edit", payment_db, payment)
     edited_payment = await payment_manager.update(payment, payment_db, request=request)
@@ -1332,6 +1332,7 @@ async def link_activity(
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
         auth.authorize(required_user, "link_payment", activity_db, oso)
+        assert activity_db.initiative_id == payment.initiative_id
 
     payment_db = await payment_manager.assign_payment_to_activity(
         payment_db, payment.activity_id, request=request
@@ -1355,7 +1356,7 @@ async def delete_payment(
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    payment_db = await payment_manager.min_load(payment_id)
+    payment_db = await payment_manager.detail_load(payment_id)
     auth.authorize(required_user, "delete", payment_db, oso)
     await payment_manager.delete(payment_db, request=request)
     return Response(status_code=204)
@@ -1389,6 +1390,7 @@ async def get_user_payments(
     limit: int = 20,
     initiative_name: str | None = None,
     activity_name: str | None = None,
+    iban: str | None = None,
 ):
     if required_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
@@ -1420,6 +1422,8 @@ async def get_user_payments(
         query = query.where(ent.Initiative.name.ilike(f"%{initiative_name}%"))
     if initiative_name:
         query = query.where(ent.Activity.name.ilike(f"%{activity_name}%"))
+    if iban:
+        query = query.where(ent.BankAccount.iban.ilike(f"%{iban}%"))
 
     # Distinct because the join condition on UserBankAccountRole can
     # result in double records where a user is both owner and user.
