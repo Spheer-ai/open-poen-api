@@ -7,7 +7,7 @@ class BankAccountRead(BaseModel):
     iban: str
     name: str
     created: datetime
-    last_accessed: datetime
+    last_accessed: datetime | None
     institution_id: str
     institution_name: str
     institution_logo: str | None

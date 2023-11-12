@@ -45,6 +45,7 @@ from .gocardless import (
 from nordigen import NordigenClient
 import uuid
 from .exc import PaymentCouplingError
+from .logger import audit_logger
 
 
 user_router = APIRouter(tags=["user"])
@@ -365,18 +366,26 @@ async def gocardless_callback(
     details: str | None = None,
     session: AsyncSession = Depends(get_async_session),
 ):
+    url = os.environ["SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"]
+
     if error is not None:
-        raise HTTPException(status_code=500, detail=details)
+        audit_logger.error(f"Third party GoCardless callback error with {error=}")
+        return RedirectResponse(url.format(message="third-party-error"))
 
     try:
         payload = jwt.decode(ref, SECRET_KEY, algorithms=[ALGORITHM])
     except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="JWT token expired")
+        audit_logger.error(f"JTW token expired on GoCardless callback")
+        return RedirectResponse(url=url.format(message="jwt-token-expired"))
     except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate JWT token")
+        audit_logger.error(f"JWT token could not be validated on GoCardless callback")
+        return RedirectResponse(url=url.format(message="jwt-validation-error"))
 
     if payload["user_id"] != user_id:
-        raise HTTPException(status_code=404, detail="User not found")
+        audit_logger.error(
+            f"User could not be found on GoCardless callback with {user_id=}"
+        )
+        return RedirectResponse(url=url.format(message="user-404"))
 
     requisition_q = await session.execute(
         select(ent.Requisition).where(
@@ -388,7 +397,8 @@ async def gocardless_callback(
     )
     requisition = requisition_q.scalars().first()
     if requisition is None:
-        raise HTTPException(status_code=404, detail="Requisition not found")
+        audit_logger.error(f"Requisition could not be found on Gocardless callback")
+        return RedirectResponse(url=url.format(message="requisition-404"))
 
     requisition.callback_handled = True
     session.add(requisition)
@@ -399,7 +409,8 @@ async def gocardless_callback(
         requisition.id,
         datetime.today() - timedelta(days=requisition.n_days_history + 1),
     )
-    return RedirectResponse(url=os.environ["SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"])
+    url = url.format(message="success")
+    return RedirectResponse(url=url)
 
 
 @user_router.get(
