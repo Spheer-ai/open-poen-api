@@ -88,6 +88,12 @@ async def process_requisition(
             else parse(metadata["last_accessed"])
         )
 
+        created = None if metadata["created"] is None else parse(metadata["created"])
+
+        name = details.get("account", None)
+        if name is not None:
+            name = name.get("ownerName", None)
+
         account_log_str = (
             account if account else f"unsaved account with api id {account_api_id}"
         )
@@ -107,8 +113,8 @@ async def process_requisition(
             account = ent.BankAccount(
                 api_account_id=metadata["id"],
                 iban=metadata["iban"],
-                name=details["account"]["ownerName"],
-                created=parse(metadata["created"]),
+                name=name,
+                created=created,
                 last_accessed=last_accessed,
                 institution_id=metadata["institution_id"],
                 institution_name=institutions.get_name(metadata["institution_id"]),

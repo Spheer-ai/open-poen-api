@@ -714,8 +714,10 @@ class BankAccount(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     api_account_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     iban: Mapped[str] = mapped_column(String(128), nullable=False)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
-    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_accessed: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
