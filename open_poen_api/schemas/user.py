@@ -33,9 +33,9 @@ class UserCreate(schemas.CreateUpdateDictModel):
     # is a required field there. We add users by invite only, where they get
     # a random password assigned and a password reset link to change it.
     email: EmailStr
-    first_name: str | None = None
-    last_name: str | None = None
-    biography: str | None = None
+    first_name: str | None = Field(None, max_length=64)
+    last_name: str | None = Field(None, max_length=64)
+    biography: str | None = Field(None, max_length=512)
     role: UserRole = Field(default=UserRole.USER)
     is_active: bool | None = True
     is_superuser: bool | None = False
@@ -44,7 +44,7 @@ class UserCreate(schemas.CreateUpdateDictModel):
 
 
 class UserCreateWithPassword(UserCreate):
-    password: str
+    password: str = Field(max_length=128)
 
 
 class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
@@ -58,8 +58,8 @@ class UserUpdate(schemas.BaseUserUpdate, NotNullValidatorMixin):
         "hidden",
     ]
 
-    first_name: str | None
-    last_name: str | None
-    biography: str | None
+    first_name: str | None = Field(max_length=64)
+    last_name: str | None = Field(max_length=64)
+    biography: str | None = Field(max_length=512)
     role: UserRole | None
     hidden: bool | None

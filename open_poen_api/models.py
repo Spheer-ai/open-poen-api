@@ -581,10 +581,10 @@ class Payment(Base):
         String(length=512), nullable=True
     )
     short_user_description: Mapped[str] = mapped_column(
-        String(length=512), nullable=True
+        String(length=128), nullable=True
     )
     long_user_description: Mapped[str] = mapped_column(
-        String(length=128), nullable=True
+        String(length=512), nullable=True
     )
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
