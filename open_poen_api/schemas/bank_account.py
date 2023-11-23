@@ -5,9 +5,9 @@ from datetime import datetime
 class BankAccountRead(BaseModel):
     id: int
     iban: str
-    name: str
-    created: datetime
-    last_accessed: datetime
+    name: str | None
+    created: datetime | None
+    last_accessed: datetime | None
     institution_id: str
     institution_name: str
     institution_logo: str | None

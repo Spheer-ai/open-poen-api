@@ -28,7 +28,7 @@ from open_poen_api.managers import InitiativeManager
         "User cannot",
         "Administrator can",
         "Anon cannot",
-        "Policy officer can",
+        "Grant officer can",
     ],
     indirect=["get_mock_user"],
 )
@@ -50,6 +50,31 @@ async def test_create_initiative(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
+        (superuser, 409),
+    ],
+    ids=[
+        "Duplicate name fails with 400",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_duplicate_name(async_client, dummy_session, status_code):
+    funder_id, regulation_id, grant_id = 1, 1, 1
+    body = initiative_info
+    body.update({"name": "Clean Energy Research Initiative"})
+    response = await async_client.post(
+        f"/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/initiative",
+        json=body,
+    )
+    assert response.status_code == status_code
+    assert (
+        response.json()
+        == "The following unique constraint was violated: 'unique initiative name'."
+    )
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, status_code",
+    [
         (superuser, 204),
         (user, 403),
         (admin, 204),
@@ -61,7 +86,7 @@ async def test_create_initiative(async_client, dummy_session, status_code):
         "User cannot",
         "Administrator can",
         "Anon cannot",
-        "Policy officer can",
+        "Grant officer can",
     ],
     indirect=["get_mock_user"],
 )
@@ -88,7 +113,7 @@ async def test_delete_initiative(async_client, dummy_session, status_code):
         "User cannot",
         "Administrator can",
         "Anon cannot",
-        "Policy officer can",
+        "Grant officer can",
     ],
     indirect=["get_mock_user"],
 )
@@ -149,15 +174,15 @@ async def test_add_debit_cards(async_client, dummy_session, status_code):
         (grant_officer, {"hidden": True}, 200),
         (initiative_owner, {"hidden": True}, 403),
         (user, {"hidden": True}, 403),
-        (superuser, {"name": "Community Health Initiative"}, 400),
+        (superuser, {"name": "Community Health Initiative"}, 409),
     ],
     ids=[
         "Superuser edits loc",
-        "Policy officer edits loc",
+        "Grant officer edits loc",
         "Initiative owner cannot edit loc",
         "User cannot edit loc",
         "Superuser can hide",
-        "Policy officer can hide",
+        "Grant officer can hide",
         "Initiative owner cannot hide",
         "User cannot hide",
         "Duplicate name fails",
@@ -179,7 +204,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     [
         (superuser, 24, 200),
         (admin, 24, 200),
-        (grant_officer, 23, 200),
+        (grant_officer, 24, 200),
         (initiative_owner, 22, 200),
         (activity_owner, 22, 200),
         (user, 21, 200),
@@ -188,7 +213,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     ids=[
         "Superuser sees everything",
         "Administrator sees everything",
-        "Policy officer sees own hidden initiatives",
+        "Grant officer sees everything",
         "initiative_owner sees own hidden initiative",
         "activity_owner sees own hidden initiative",
         "User sees non hidden",
@@ -200,7 +225,7 @@ async def test_get_initiatives_list(
     async_client, dummy_session, status_code, result_length
 ):
     await hide_instance(dummy_session, Initiative, 1)
-    response = await async_client.get("/initiatives")
+    response = await async_client.get("/initiatives?limit=100")
     assert response.status_code == status_code
     assert len(response.json()["initiatives"]) == result_length
 
@@ -216,7 +241,7 @@ async def test_get_initiatives_list(
     ],
     ids=[
         "Superuser can see address",
-        "Policy officer can see address",
+        "Grant officer can see address",
         "Initiative owner can see address",
         "User cannot see address",
         "Anon cannot see address",

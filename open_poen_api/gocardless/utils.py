@@ -4,8 +4,7 @@ from nordigen import NordigenClient
 import os
 import asyncio
 from pydantic import BaseModel
-from contextlib import asynccontextmanager
-from ..database import create_db_and_tables
+from aiocache import cached
 
 lock = asyncio.Lock()
 
@@ -56,11 +55,6 @@ async def get_nordigen_client():
     return CLIENT
 
 
-async def get_institutions():
-    client = await get_nordigen_client()
-    return await client.institution.get_institutions(country="NL")
-
-
 class GocardlessInstitution(BaseModel):
     id: str
     name: str
@@ -74,36 +68,29 @@ class GoCardlessInstitutionList(BaseModel):
     institutions: list[GocardlessInstitution]
 
     @property
-    def institution_ids(self):
+    def ids(self):
         return [i.id for i in self.institutions]
 
     def get_transaction_total_days(self, institution_id: str):
         id_to_days = {i.id: i.transaction_total_days for i in self.institutions}
         return id_to_days[institution_id]
 
-    def get_institution_name(self, institution_id: str):
+    def get_name(self, institution_id: str):
         id_to_name = {i.id: i.name for i in self.institutions}
         return id_to_name.get(institution_id)
 
-    def get_institution_logo(self, institution_id: str):
+    def get_logo(self, institution_id: str):
         id_to_logo = {i.id: i.logo for i in self.institutions}
         return id_to_logo.get(institution_id)
 
 
-# INSTITUTIONS: None | GoCardlessInstitutionList = None
-
-INSTITUTIONS = {}
-
-
-@asynccontextmanager
-async def set_institution_list(app: FastAPI):
-    global INSTITUTIONS
-
-    await create_db_and_tables()
-
-    # Get information on all institutions once at app startup.
-    institutions = GoCardlessInstitutionList(
-        institutions=await get_institutions()
+# Get up to date information on all institutions once every hour.
+@cached(ttl=60 * 60)
+async def get_institutions():
+    client = await get_nordigen_client()
+    institution_list = await client.institution.get_institutions(country="NL")
+    return GoCardlessInstitutionList(
+        institutions=institution_list
         # Add an institution for the sandbox for testing purposes.
         + [
             GocardlessInstitution(
@@ -116,14 +103,3 @@ async def set_institution_list(app: FastAPI):
             )
         ]
     )
-
-    INSTITUTIONS["x"] = institutions
-
-    # async def foo():
-    #     return institutions
-
-    yield
-
-
-def get_static_institutions():
-    return INSTITUTIONS

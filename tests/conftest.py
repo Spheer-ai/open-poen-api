@@ -43,6 +43,7 @@ from fastapi import UploadFile
 import asyncio
 
 
+bankaccount_owner = 1
 superuser = 6
 userowner = 1
 user = 7
@@ -258,7 +259,7 @@ async def dummy_session(async_session):
     initiative = await initiative_manager.min_load(1)
     await initiative_manager.make_users_owner(initiative, user_ids=[12])
 
-    activity = await activity_manager.min_load(1, 1)
+    activity = await activity_manager.min_load(1)
     await activity_manager.make_users_owner(activity, user_ids=[13])
 
     bank_account_roles = [
@@ -290,7 +291,7 @@ async def get_mock_user(request, dummy_session):
 
     db = await get_user_db(dummy_session).__anext__()
     user_manager = m.UserManager(db, dummy_session, None)
-    user_instance = await user_manager.detail_load(request.param)
+    user_instance = await user_manager.requesting_user_load(request.param)
 
     async def func():
         return user_instance

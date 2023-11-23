@@ -3,7 +3,7 @@ from ..schemas import FunderCreate, FunderUpdate
 from ..models import Funder
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -14,9 +14,9 @@ class FunderManager(BaseManager):
     ) -> Funder:
         try:
             funder = await self.base_create(funder_create, Funder, request)
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique_funder_name", e)
+            raise
         return funder
 
     async def update(
@@ -27,10 +27,9 @@ class FunderManager(BaseManager):
     ) -> Funder:
         try:
             funder = await self.base_update(funder_update, funder_db, request)
-        except:
-            IntegrityError
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique funder name", e)
+            raise
         return funder
 
     async def delete(self, funder: Funder, request: Request | None = None) -> None:

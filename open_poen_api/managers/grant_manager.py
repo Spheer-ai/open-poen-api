@@ -3,7 +3,7 @@ from ..schemas import GrantCreate, GrantUpdate
 from ..models import Grant, UserGrantRole, User, Initiative
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -22,9 +22,9 @@ class GrantManager(BaseManager):
                 request,
                 regulation_id=regulation_id,
             )
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique grant names per regulation", e)
+            raise
         return grant
 
     async def update(
@@ -35,9 +35,9 @@ class GrantManager(BaseManager):
     ) -> Grant:
         try:
             grant = await self.base_update(grant_update, grant_db, request)
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique grant names per regulation", e)
+            raise
         return grant
 
     async def delete(self, grant: Grant, request: Request | None = None):
@@ -80,9 +80,9 @@ class GrantManager(BaseManager):
         query_result_q = await self.session.execute(
             select(Grant)
             .options(
-                selectinload(Grant.regulation),
+                joinedload(Grant.regulation),
                 selectinload(Grant.initiatives),
-                selectinload(Grant.overseer_roles).selectinload(UserGrantRole.user),
+                selectinload(Grant.overseer_roles).joinedload(UserGrantRole.user),
             )
             .where(Grant.id == id)
         )

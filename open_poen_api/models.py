@@ -117,10 +117,10 @@ class ProfilePictureMixin:
     def profile_picture(cls) -> Mapped[Attachment | None]:
         return relationship(
             "Attachment",
-            lazy="noload",
+            lazy="joined",
             primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
             f"Attachment.entity_type=='{cls.entity_type}', Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
-            cascade="all",
+            cascade="all, delete-orphan",
             uselist=False,
         )
 
@@ -244,20 +244,18 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
         uselist=False,
         back_populates="user",
         lazy="noload",
-        cascade="all",
     )
     requisitions: Mapped[list["Requisition"]] = relationship(
         "Requisition",
         back_populates="user",
         lazy="noload",
-        cascade="all",
     )
 
     initiative_roles: Mapped[list[UserInitiativeRole]] = relationship(
         "UserInitiativeRole",
         back_populates="user",
         lazy="noload",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     initiatives: AssociationProxy[list["Initiative"]] = association_proxy(
         "initiative_roles", "initiative"
@@ -266,7 +264,7 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
         "UserActivityRole",
         back_populates="user",
         lazy="noload",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     activities: AssociationProxy[list["Activity"]] = association_proxy(
         "activity_roles", "activity"
@@ -277,7 +275,7 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.USER.value}')",
         overlaps="owner_bank_account_roles, user",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     used_bank_accounts: AssociationProxy[list["BankAccount"]] = association_proxy(
         "user_bank_account_roles", "bank_account"
@@ -288,7 +286,7 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserBankAccountRole.user_id, UserBankAccountRole.role=='{BankAccountRole.OWNER.value}')",
         overlaps="user_bank_account_roles, user",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     owned_bank_accounts: AssociationProxy[list["BankAccount"]] = association_proxy(
         "owner_bank_account_roles", "bank_account"
@@ -299,7 +297,7 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
         overlaps="policy_officer_regulation_roles, user",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     grant_officer_regulations: AssociationProxy[list["Regulation"]] = association_proxy(
         "grant_officer_regulation_roles", "regulation"
@@ -310,7 +308,7 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
         lazy="noload",
         primaryjoin=f"and_(User.id==UserRegulationRole.user_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
         overlaps="grant_officer_regulation_roles, user",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     policy_officer_regulations: AssociationProxy[
         list["Regulation"]
@@ -320,7 +318,7 @@ class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
         "UserGrantRole",
         back_populates="user",
         lazy="noload",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     grants: AssociationProxy[list["Grant"]] = association_proxy(
         "overseer_roles", "grant"
@@ -393,11 +391,10 @@ class LegalEntity(str, Enum):
 
 class Initiative(Base):
     __tablename__ = "initiative"
+    __table_args__ = (UniqueConstraint("name", name="unique initiative name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(
-        String(length=64), nullable=False, index=True, unique=True
-    )
+    name: Mapped[str] = mapped_column(String(length=64), nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(length=512), nullable=False)
     purpose: Mapped[str] = mapped_column(String(length=64), nullable=False)
     target_audience: Mapped[str] = mapped_column(String(length=64), nullable=False)
@@ -433,13 +430,16 @@ class Initiative(Base):
         "UserInitiativeRole",
         back_populates="initiative",
         lazy="noload",
-        cascade="delete",
+        cascade="all, delete-orphan",
     )
     initiative_owners: AssociationProxy[list[User]] = association_proxy(
         "user_roles", "user"
     )
     activities: Mapped[list["Activity"]] = relationship(
-        "Activity", back_populates="initiative", lazy="noload", cascade="delete"
+        "Activity",
+        back_populates="initiative",
+        lazy="noload",
+        cascade="all, delete-orphan",
     )
     payments: Mapped[list["Payment"]] = relationship(
         "Payment", back_populates="initiative", lazy="noload"
@@ -456,7 +456,7 @@ class Initiative(Base):
         # set to None, and we won't be able to calculate permissions.
         "Grant",
         back_populates="initiatives",
-        lazy="select",
+        lazy="joined",
         uselist=False,
     )
 
@@ -468,7 +468,11 @@ class Initiative(Base):
 
 class Activity(Base):
     __tablename__ = "activity"
-    __table_args__ = (UniqueConstraint("name", "initiative_id"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "name", "initiative_id", name="unique activity name per initiative"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(length=64), nullable=False)
@@ -503,7 +507,7 @@ class Activity(Base):
         "UserActivityRole",
         back_populates="activity",
         lazy="noload",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     activity_owners: AssociationProxy[list[User]] = association_proxy(
         "user_roles", "user"
@@ -512,7 +516,7 @@ class Activity(Base):
         Integer, ForeignKey("initiative.id", ondelete="CASCADE")
     )
     initiative: Mapped[Initiative] = relationship(
-        "Initiative", back_populates="activities", lazy="noload", uselist=False
+        "Initiative", back_populates="activities", lazy="joined", uselist=False
     )
     payments: Mapped[list["Payment"]] = relationship(
         "Payment", back_populates="activity", lazy="noload"
@@ -582,18 +586,19 @@ class Payment(Base):
     long_user_description: Mapped[str] = mapped_column(
         String(length=128), nullable=True
     )
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     activity_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("activity.id", ondelete="SET NULL"), nullable=True
     )
     activity: Mapped[Optional[Activity]] = relationship(
-        "Activity", back_populates="payments", lazy="noload", uselist=False
+        "Activity", back_populates="payments", lazy="joined", uselist=False
     )
     initiative_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("initiative.id", ondelete="SET NULL"), nullable=True
     )
     initiative: Mapped[Optional[Initiative]] = relationship(
-        "Initiative", back_populates="payments", lazy="noload", uselist=False
+        "Initiative", back_populates="payments", lazy="joined", uselist=False
     )
     debit_card_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("debitcard.id"), nullable=True
@@ -605,7 +610,7 @@ class Payment(Base):
         Integer, ForeignKey("bank_account.id"), nullable=True
     )
     bank_account: Mapped[Optional["BankAccount"]] = relationship(
-        "BankAccount", back_populates="payments", lazy="noload"
+        "BankAccount", back_populates="payments", lazy="joined"
     )
 
     def __repr__(self):
@@ -709,8 +714,10 @@ class BankAccount(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     api_account_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     iban: Mapped[str] = mapped_column(String(128), nullable=False)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
-    created: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_accessed: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -778,7 +785,10 @@ class BankAccount(Base):
     owner: AssociationProxy[User] = association_proxy("owner_role", "user")
 
     payments: Mapped[list[Payment]] = relationship(
-        "Payment", back_populates="bank_account", lazy="noload"
+        "Payment",
+        back_populates="bank_account",
+        lazy="noload",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self):
@@ -789,9 +799,14 @@ class BankAccount(Base):
 
 class Regulation(Base):
     __tablename__ = "regulation"
+    __table_args__ = (
+        UniqueConstraint(
+            "name", "funder_id", name="unique regulation names per funder"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str] = mapped_column(String(512), nullable=False)
 
     grant_officer_roles: Mapped[list[UserRegulationRole]] = relationship(
@@ -799,7 +814,7 @@ class Regulation(Base):
         lazy="noload",
         primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.GRANT_OFFICER.value}')",
         overlaps="policy_officer_roles, regulation",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     grant_officers: AssociationProxy[list[User]] = association_proxy(
         "grant_officer_roles", "user"
@@ -810,7 +825,7 @@ class Regulation(Base):
         lazy="noload",
         primaryjoin=f"and_(Regulation.id==UserRegulationRole.regulation_id, UserRegulationRole.role=='{RegulationRole.POLICY_OFFICER.value}')",
         overlaps="grant_officer_roles, regulation",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     policy_officers: AssociationProxy[list[User]] = association_proxy(
         "policy_officer_roles", "user"
@@ -820,7 +835,7 @@ class Regulation(Base):
         "Grant",
         back_populates="regulation",
         lazy="noload",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
     funder_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("funder.id", ondelete="CASCADE")
@@ -838,7 +853,10 @@ class Regulation(Base):
 class Grant(Base):
     __tablename__ = "grant"
     __table_args__ = (
-        UniqueConstraint("name", "regulation_id", name="_name_regulation_uc"),
+        UniqueConstraint(
+            "name", "regulation_id", name="unique grant names per regulation"
+        ),
+        UniqueConstraint("reference", name="unique grant reference"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -862,15 +880,18 @@ class Grant(Base):
         Integer, ForeignKey("regulation.id", ondelete="CASCADE")
     )
     regulation: Mapped[Regulation] = relationship(
-        "Regulation", back_populates="grants", lazy="noload", uselist=False
+        "Regulation", back_populates="grants", lazy="joined", uselist=False
     )
     initiatives: Mapped[list[Initiative]] = relationship(
-        "Initiative", back_populates="grant", lazy="noload", cascade="all"
+        "Initiative",
+        back_populates="grant",
+        lazy="noload",
+        cascade="all, delete-orphan",
     )
     overseer_roles: Mapped[list[UserGrantRole]] = relationship(
         "UserGrantRole",
         lazy="noload",
-        cascade="all",
+        cascade="all, delete-orphan",
         back_populates="grant",
     )
     overseers: AssociationProxy[list[User]] = association_proxy(
@@ -883,16 +904,17 @@ class Grant(Base):
 
 class Funder(Base):
     __tablename__ = "funder"
+    __table_args__ = (UniqueConstraint("name", name="unique funder name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
     url: Mapped[str] = mapped_column(String(512))
 
     regulations: Mapped[list[Regulation]] = relationship(
         "Regulation",
         back_populates="funder",
         lazy="noload",
-        cascade="all",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self):

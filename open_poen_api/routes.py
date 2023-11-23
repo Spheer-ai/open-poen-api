@@ -11,7 +11,7 @@ from fastapi import (
     Body,
     Path,
 )
-from typing import Annotated
+from typing import Annotated, Union
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
@@ -40,10 +40,12 @@ from .gocardless import (
     get_nordigen_client,
     get_gocardless_payments,
     GoCardlessInstitutionList,
-    INSTITUTIONS,
+    get_institutions,
 )
 from nordigen import NordigenClient
 import uuid
+from .exc import PaymentCouplingError
+from .logger import audit_logger
 
 
 user_router = APIRouter(tags=["user"])
@@ -76,6 +78,7 @@ async def create_user(
         **user.dict(), password=temp_password_generator(size=16)
     )
     user_db = await user_manager.create(user_with_password, request=request)
+    await user_db.awaitable_attrs.profile_picture
     return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
 
 
@@ -86,14 +89,14 @@ async def create_user(
 )
 async def get_user(
     user_id: int,
-    required_login=Depends(m.required_login),
+    optional_login: ent.User | None = Depends(m.optional_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
     session=Depends(get_async_session),
 ):
     user_db = await user_manager.detail_load(user_id)
-    auth.authorize(required_login, "read", user_db, oso)
-    return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
+    auth.authorize(optional_login, "read", user_db, oso)
+    return auth.get_authorized_output_fields(optional_login, "read", user_db, oso)
 
 
 @user_router.patch(
@@ -158,7 +161,7 @@ async def get_users(
         )
 
     if email:
-        query = query.where(ent.User.email.like(f"%{email}%"))
+        query = query.where(ent.User.email.ilike(f"%{email}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -311,9 +314,9 @@ async def gocardless_initiatite(
     user_manager: m.UserManager = Depends(m.UserManager),
     client: NordigenClient = Depends(get_nordigen_client),
 ):
-    s.validate_institution_id(institution_id)
-    s.validate_n_days_access(n_days_access)
-    s.validate_n_days_history(institution_id, n_days_history)
+    await s.validate_institution_id(institution_id)
+    await s.validate_n_days_access(n_days_access)
+    await s.validate_n_days_history(institution_id, n_days_history)
 
     # TODO: Ensure only users can link for themselves.
     user = await user_manager.min_load(user_id)
@@ -363,18 +366,26 @@ async def gocardless_callback(
     details: str | None = None,
     session: AsyncSession = Depends(get_async_session),
 ):
+    url = os.environ["SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"]
+
     if error is not None:
-        raise HTTPException(status_code=500, detail=details)
+        audit_logger.error(f"Third party GoCardless callback error with {error=}")
+        return RedirectResponse(url.format(message="third-party-error"))
 
     try:
         payload = jwt.decode(ref, SECRET_KEY, algorithms=[ALGORITHM])
     except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="JWT token expired")
+        audit_logger.error(f"JTW token expired on GoCardless callback")
+        return RedirectResponse(url=url.format(message="jwt-token-expired"))
     except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate JWT token")
+        audit_logger.error(f"JWT token could not be validated on GoCardless callback")
+        return RedirectResponse(url=url.format(message="jwt-validation-error"))
 
     if payload["user_id"] != user_id:
-        raise HTTPException(status_code=404, detail="User not found")
+        audit_logger.error(
+            f"User could not be found on GoCardless callback with {user_id=}"
+        )
+        return RedirectResponse(url=url.format(message="user-404"))
 
     requisition_q = await session.execute(
         select(ent.Requisition).where(
@@ -386,7 +397,8 @@ async def gocardless_callback(
     )
     requisition = requisition_q.scalars().first()
     if requisition is None:
-        raise HTTPException(status_code=404, detail="Requisition not found")
+        audit_logger.error(f"Requisition could not be found on Gocardless callback")
+        return RedirectResponse(url=url.format(message="requisition-404"))
 
     requisition.callback_handled = True
     session.add(requisition)
@@ -397,7 +409,8 @@ async def gocardless_callback(
         requisition.id,
         datetime.today() - timedelta(days=requisition.n_days_history + 1),
     )
-    return RedirectResponse(url=os.environ["SPA_GOCARDLESS_CALLBACK_REDIRECT_URL"])
+    url = url.format(message="success")
+    return RedirectResponse(url=url)
 
 
 @user_router.get(
@@ -520,7 +533,7 @@ async def update_initiative(
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    initiative_db = await initiative_manager.min_load(initiative_id)
+    initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
     auth.authorize_input_fields(required_user, "edit", initiative_db, initiative)
     edited_initiative = await initiative_manager.update(
@@ -567,7 +580,7 @@ async def delete_initiative(
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    initiative_db = await initiative_manager.min_load(initiative_id)
+    initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "delete", initiative_db, oso)
     await initiative_manager.delete(initiative_db, request=request)
     return Response(status_code=204)
@@ -579,20 +592,86 @@ async def delete_initiative(
     response_model_exclude_unset=True,
 )
 async def get_initiatives(
-    async_session: AsyncSession = Depends(get_async_session),
-    optional_user=Depends(m.optional_login),
+    session: AsyncSession = Depends(get_async_session),
+    optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    name: str | None = None,
+    only_mine: bool = False,
 ):
-    # TODO: pagination.
-    q = auth.get_authorized_query(optional_user, "read", ent.Initiative, oso)
-    initiatives_result = await async_session.execute(q)
+    if only_mine and optional_user is None:
+        raise HTTPException(
+            status_code=400,
+            detail="only_mine can only be set to True if the user is logged in",
+        )
+
+    query = select(ent.Initiative)
+
+    if optional_user is None:
+        query = query.where(ent.Initiative.hidden == False)
+    else:
+        query = query.where(
+            or_(
+                ent.Initiative.hidden == False,
+                ent.Initiative.id.in_(  # You can see initiatives of your activities.
+                    select(ent.Activity.initiative_id).where(
+                        ent.Activity.id.in_(
+                            [i.activity_id for i in optional_user.activity_roles]
+                        )
+                    )
+                ),
+                ent.Initiative.id.in_(  # You can see your own initiatives.
+                    [i.initiative_id for i in optional_user.initiative_roles]
+                ),
+                ent.Initiative.id.in_(  # You can see initiatives where you're overseer.
+                    select(ent.Initiative.id)
+                    .join(ent.Grant)
+                    .where(
+                        ent.Grant.id.in_(
+                            [i.grant_id for i in optional_user.overseer_roles]
+                        )
+                    )
+                ),
+                # Being a policy or grant officer on one regulation is enough to
+                # see everything.
+                literal(len(optional_user.grant_officer_regulation_roles) > 0),
+                literal(len(optional_user.policy_officer_regulation_roles) > 0),
+                # Administrators or super users can see everything.
+                literal(optional_user.role == ent.UserRole.ADMINISTRATOR),
+                literal(optional_user.is_superuser),
+            )
+        )
+
+    if only_mine and optional_user is not None:
+        query = query.where(
+            or_(
+                ent.Initiative.id.in_(  # You can see initiatives of your activities.
+                    select(ent.Activity.initiative_id).where(
+                        ent.Activity.id.in_(
+                            [i.activity_id for i in optional_user.activity_roles]
+                        )
+                    )
+                ),
+                ent.Initiative.id.in_(  # You can see your own initiatives.
+                    [i.initiative_id for i in optional_user.initiative_roles]
+                ),
+            )
+        )
+
+    if name:
+        query = query.where(ent.Initiative.name.ilike(f"%{name}%"))
+
+    query = query.order_by(ent.Initiative.id.desc()).offset(offset).limit(limit)
+
+    initiatives_result = await session.execute(query)
     initiatives_scalar = initiatives_result.scalars().all()
-    # TODO: This part is resulting in a lot of extra separate queries for authorization.
-    # Check if this goes away if we join load the neccessary relationships.
+
     filtered_initiatives = [
         auth.get_authorized_output_fields(optional_user, "read", i, oso)
         for i in initiatives_scalar
     ]
+
     return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
@@ -608,11 +687,12 @@ async def create_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    initiative_db = await initiative_manager.min_load(initiative_id)
+    initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "create_activity", initiative_db, oso)
     activity_db = await activity_manager.create(
         activity, initiative_id, request=request
     )
+    activity_db = await activity_manager.detail_load(activity_db.id)
     return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
 
 
@@ -628,7 +708,7 @@ async def get_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.detail_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(optional_user, "read", activity_db, oso)
     return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
 
@@ -647,7 +727,7 @@ async def update_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.min_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
     auth.authorize_input_fields(required_user, "edit", activity_db, activity)
     edited_activity = await activity_manager.update(
@@ -671,7 +751,7 @@ async def link_activity_owners(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.detail_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "link_owners", activity_db, oso)
     activity_db = await activity_manager.make_users_owner(
         activity_db, activity.user_ids, request=request
@@ -696,7 +776,7 @@ async def delete_activity(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    activity_db = await activity_manager.min_load(initiative_id, activity_id)
+    activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "delete", activity_db, oso)
     await activity_manager.delete(activity_db, request=request)
     return Response(status_code=204)
@@ -813,7 +893,7 @@ async def get_funders(
     query = select(ent.Funder)
 
     if name:
-        query = query.where(ent.Funder.name.like(f"%{name}%"))
+        query = query.where(ent.Funder.name.ilike(f"%{name}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -966,7 +1046,7 @@ async def get_regulations(
     query = select(ent.Regulation).where(ent.Regulation.funder_id == funder_id)
 
     if name:
-        query = query.where(ent.Regulation.name.like(f"%{name}%"))
+        query = query.where(ent.Regulation.name.ilike(f"%{name}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -1115,7 +1195,7 @@ async def get_grants(
     query = select(ent.Grant).where(ent.Grant.regulation_id == regulation_id)
 
     if name:
-        query = query.where(ent.Grant.name.like(f"%{name}%"))
+        query = query.where(ent.Grant.name.ilike(f"%{name}%"))
 
     query = query.offset(offset).limit(limit)
 
@@ -1144,7 +1224,7 @@ async def create_initiative(
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    grant_db = await grant_manager.min_load(grant_id)
+    grant_db = await grant_manager.detail_load(grant_id)
     auth.authorize(required_user, "create_initiative", grant_db, oso)
     # TODO: Validate funder_id, regulation_id and grant_id.
     initiative_db = await initiative_manager.create(
@@ -1166,13 +1246,12 @@ async def create_payment(
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
+    # TODO: Make sure initiative_id in the schema is congruent with activity_id.
     if payment.activity_id is not None:
-        activity_db = await activity_manager.min_load(
-            payment.initiative_id, payment.activity_id
-        )
+        activity_db = await activity_manager.detail_load(payment.activity_id)
         auth.authorize(required_user, "create_payment", activity_db, oso)
     else:
-        initiative_db = await initiative_manager.min_load(payment.initiative_id)
+        initiative_db = await initiative_manager.detail_load(payment.initiative_id)
         auth.authorize(required_user, "create_payment", initiative_db, oso)
 
     payment_db = await payment_manager.create(
@@ -1194,7 +1273,7 @@ async def update_payment(
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    payment_db = await payment_manager.min_load(payment_id)
+    payment_db = await payment_manager.detail_load(payment_id)
     auth.authorize(required_user, "edit", payment_db, oso)
     auth.authorize_input_fields(required_user, "edit", payment_db, payment)
     edited_payment = await payment_manager.update(payment, payment_db, request=request)
@@ -1203,7 +1282,8 @@ async def update_payment(
 
 @payment_router.patch(
     "/payment/{payment_id}/initiative",
-    response_model=s.PaymentReadUser,
+    response_model=Union[s.InitiativeRead, s.PaymentUncoupled],
+    response_model_exclude_unset=True,
 )
 async def link_initiative(
     payment_id: int,
@@ -1216,9 +1296,12 @@ async def link_initiative(
 ):
     payment_db = await payment_manager.detail_load(payment_id)
     if payment_db.activity_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Payment is still linked to an activity. First decouple it.",
+        raise PaymentCouplingError(
+            message="Payment is still linked to an activity. First decouple it."
+        )
+    if payment_db.type == ent.PaymentType.MANUAL and payment.initiative_id is None:
+        raise PaymentCouplingError(
+            message="It's not possible to uncouple a manual payment from its initiative."
         )
     auth.authorize(required_user, "link_initiative", payment_db, oso)
 
@@ -1231,14 +1314,21 @@ async def link_initiative(
         payment.initiative_id,
         request=request,
     )
-    # Important for up to date relations. Has to be in this async context.
-    await payment_manager.session.refresh(payment_db)
-    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+    if payment.initiative_id is not None:
+        return auth.get_authorized_output_fields(
+            required_user, "read", initiative_db, oso
+        )
+    else:
+        return s.PaymentUncoupled(
+            message="Payment was successfully uncoupled from the initiative."
+        )
 
 
 @payment_router.patch(
     "/payment/{payment_id}/activity",
-    response_model=s.PaymentReadUser,
+    response_model=Union[s.ActivityRead, s.PaymentUncoupled],
+    response_model_exclude_unset=True,
 )
 async def link_activity(
     payment_id: int,
@@ -1250,25 +1340,29 @@ async def link_activity(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    if payment_db.initiative_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Payment is not linked to an initiative. First couple it.",
+    if payment_db.initiative_id is None:
+        raise PaymentCouplingError(
+            message="Payment is not linked to an initiative. First couple it."
         )
     auth.authorize(required_user, "link_activity", payment_db, oso)
 
     if payment.activity_id is not None:
-        activity_db = await activity_manager.detail_load(
-            payment.initiative_id, payment.activity_id
-        )
+        activity_db = await activity_manager.detail_load(payment.activity_id)
         auth.authorize(required_user, "link_payment", activity_db, oso)
+        assert activity_db.initiative_id == payment.initiative_id
 
     payment_db = await payment_manager.assign_payment_to_activity(
         payment_db, payment.activity_id, request=request
     )
-    # Important for up to date relations. Has to be in this async context.
-    await payment_manager.session.refresh(payment_db)
-    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+    if payment.activity_id is not None:
+        return auth.get_authorized_output_fields(
+            required_user, "read", activity_db, oso
+        )
+    else:
+        return s.PaymentUncoupled(
+            message="Payment was successfully uncoupled from the activity."
+        )
 
 
 @payment_router.delete("/payment/{payment_id}")
@@ -1279,7 +1373,7 @@ async def delete_payment(
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    payment_db = await payment_manager.min_load(payment_id)
+    payment_db = await payment_manager.detail_load(payment_id)
     auth.authorize(required_user, "delete", payment_db, oso)
     await payment_manager.delete(payment_db, request=request)
     return Response(status_code=204)
@@ -1313,6 +1407,7 @@ async def get_user_payments(
     limit: int = 20,
     initiative_name: str | None = None,
     activity_name: str | None = None,
+    iban: str | None = None,
 ):
     if required_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
@@ -1329,8 +1424,8 @@ async def get_user_payments(
             ent.Payment.transaction_amount,
         )
         .join(ent.BankAccount)
-        .outerjoin(ent.Initiative)
-        .outerjoin(ent.Activity)
+        .outerjoin(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
+        .outerjoin(ent.Activity, ent.Payment.activity_id == ent.Activity.id)
         .join(
             ent.UserBankAccountRole,
             ent.BankAccount.id == ent.UserBankAccountRole.bank_account_id,
@@ -1341,9 +1436,11 @@ async def get_user_payments(
     )
 
     if initiative_name:
-        query = query.where(ent.Initiative.name.like(f"%{initiative_name}%"))
+        query = query.where(ent.Initiative.name.ilike(f"%{initiative_name}%"))
     if initiative_name:
-        query = query.where(ent.Activity.name.like(f"%{activity_name}%"))
+        query = query.where(ent.Activity.name.ilike(f"%{activity_name}%"))
+    if iban:
+        query = query.where(ent.BankAccount.iban.ilike(f"%{iban}%"))
 
     # Distinct because the join condition on UserBankAccountRole can
     # result in double records where a user is both owner and user.
@@ -1389,7 +1486,6 @@ async def get_activity_payments(
 async def get_authorized_actions(
     entity_class: s.AuthEntityClass,
     entity_id: int | None = None,
-    async_session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
     user_manager: m.UserManager = Depends(m.UserManager),
@@ -1397,6 +1493,8 @@ async def get_authorized_actions(
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
@@ -1404,6 +1502,8 @@ async def get_authorized_actions(
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
+        s.AuthEntityClass.INITIATIVE: initiative_manager,
+        s.AuthEntityClass.ACTIVITY: activity_manager,
     }
 
     resource: ent.Base | s.AuthEntityClass
@@ -1431,6 +1531,8 @@ async def get_authorized_fields(
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
 ):
     class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
         s.AuthEntityClass.USER: user_manager,
@@ -1438,6 +1540,8 @@ async def get_authorized_fields(
         s.AuthEntityClass.REGULATION: regulation_manager,
         s.AuthEntityClass.GRANT: grant_manager,
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
+        s.AuthEntityClass.INITIATIVE: initiative_manager,
+        s.AuthEntityClass.ACTIVITY: activity_manager,
     }
 
     resource = await class_map[entity_class].detail_load(entity_id)
@@ -1478,5 +1582,8 @@ async def delete_profile_picture(
 @utils_router.get(
     "/utils/gocardless/institutions", response_model=GoCardlessInstitutionList
 )
-async def get_institutions(request: Request):
-    return INSTITUTIONS["x"]
+async def get_institutions(
+    request: Request,
+    institutions: GoCardlessInstitutionList = Depends(get_institutions),
+):
+    return institutions

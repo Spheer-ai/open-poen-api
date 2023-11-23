@@ -4,7 +4,7 @@ from fastapi import Depends, Request, HTTPException
 from ..models import Initiative, User, UserInitiativeRole, DebitCard, Grant
 from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from .base_manager import BaseManager
@@ -21,10 +21,9 @@ class InitiativeManager(BaseManager):
             initiative = await self.base_create(
                 initiative_create, Initiative, request, grant_id=grant_id
             )
-        except IntegrityError:
-            # TODO: Make sure this is not another IntegrityError.
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique initiative name", e)
+            raise
         return initiative
 
     async def update(
@@ -37,9 +36,9 @@ class InitiativeManager(BaseManager):
             initiative = await self.base_update(
                 initiative_update, initiative_db, request
             )
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique initiative name", e)
+            raise
         return initiative
 
     async def delete(
@@ -150,10 +149,8 @@ class InitiativeManager(BaseManager):
         query_result_q = await self.session.execute(
             select(Initiative)
             .options(
-                joinedload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
-                joinedload(Initiative.activities),
-                joinedload(Initiative.debit_cards),
-                joinedload(Initiative.grant).joinedload(Grant.regulation),
+                selectinload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
+                selectinload(Initiative.activities),
             )
             .where(Initiative.id == id)
         )

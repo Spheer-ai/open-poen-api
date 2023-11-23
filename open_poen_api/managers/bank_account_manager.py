@@ -15,8 +15,8 @@ from ..models import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_, delete, or_
 from sqlalchemy.orm import selectinload, joinedload
-from .exc import EntityNotFound
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound
 from .base_manager import BaseManager
 import asyncio
 from ..gocardless import get_nordigen_client
@@ -165,7 +165,6 @@ class BankAccountManager(BaseManager):
                 .joinedload(User.profile_picture),
             )
             .where(BankAccount.id == bank_account_id)
-            .execution_options(populate_existing=True)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:

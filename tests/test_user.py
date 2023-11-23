@@ -17,7 +17,7 @@ import asyncio
         (superuser, {"email": "test@example.com"}, 200),
         (user, {"email": "test@example.com"}, 403),
         (anon, {"email": "test@example.com"}, 403),
-        (superuser, {"email": "user1@example.com"}, 400),
+        (superuser, {"email": "user1@example.com"}, 409),
     ],
     ids=[
         "Superuser can",
@@ -226,4 +226,4 @@ async def test_get_user_payments(async_client, dummy_session, status_code):
     response = await async_client.get(f"payments/user/{user_id}")
     assert response.status_code == status_code
     if response.status_code == 200:
-        assert len(response.json()["payments"]) == 2
+        assert len(response.json()["payments"]) == 3

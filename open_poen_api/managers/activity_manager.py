@@ -2,12 +2,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
 from ..schemas import ActivityCreate, ActivityUpdate
-from ..models import Activity, UserActivityRole, User, Initiative
+from ..models import Activity, UserActivityRole, User, Initiative, Grant, Regulation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_
-from sqlalchemy.orm import selectinload
-from .exc import EntityNotFound
-from .exc import EntityAlreadyExists, EntityNotFound
+from sqlalchemy.orm import selectinload, joinedload
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from .base_manager import BaseManager
 
 
@@ -22,9 +21,9 @@ class ActivityManager(BaseManager):
             activity = await self.base_create(
                 activity_create, Activity, request, initiative_id=initiative_id
             )
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique activity name per initiative", e)
+            raise
         return activity
 
     async def update(
@@ -35,9 +34,9 @@ class ActivityManager(BaseManager):
     ) -> Activity:
         try:
             activity = await self.base_update(activity_update, activity_db, request)
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique activity name per initiative", e)
+            raise
         return activity
 
     async def delete(self, activity: Activity, request: Request | None = None) -> None:
@@ -76,19 +75,18 @@ class ActivityManager(BaseManager):
         await self.session.commit()
         return activity
 
-    async def detail_load(self, initiative_id: int, activity_id: int):
+    async def detail_load(self, activity_id: int):
         query_result_q = await self.session.execute(
             select(Activity)
             .options(
-                selectinload(Activity.user_roles).selectinload(UserActivityRole.user),
-                selectinload(Activity.initiative),
+                selectinload(Activity.user_roles).joinedload(UserActivityRole.user),
             )
-            .where(and_(Initiative.id == initiative_id, Activity.id == activity_id))
+            .where(Activity.id == activity_id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
             raise EntityNotFound(message="Activity not found")
         return query_result
 
-    async def min_load(self, initiative_id: int, activity_id: int) -> Activity:
+    async def min_load(self, activity_id: int) -> Activity:
         return await self.base_min_load(Activity, activity_id)

@@ -11,7 +11,7 @@ from .managers.user_manager import UserManager
 from .gocardless.payments import get_gocardless_payments
 
 # from fastapi_users.exceptions import UserAlreadyExists
-from .managers.exc import EntityAlreadyExists
+from .exc import EntityAlreadyExists
 import asyncio
 from rich import print
 from datetime import datetime

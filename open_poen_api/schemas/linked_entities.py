@@ -34,9 +34,8 @@ class InitiativeReadLinked(InitiativeRead):
     grant: GrantRead
     initiative_owners: list[UserRead]
     activities: list[ActivityRead]
-    debit_cards: list[DebitCardRead] | None
 
-    @validator("initiative_owners", "activities", "debit_cards", pre=True)
+    @validator("initiative_owners", pre=True)
     def apply_operation(cls, v):
         return list(v)
 
@@ -60,8 +59,6 @@ class UserReadLinked(UserRead):
     grants: list[GrantRead]
 
     @validator(
-        "initiatives",
-        "activities",
         "used_bank_accounts",
         "owned_bank_accounts",
         "grant_officer_regulations",

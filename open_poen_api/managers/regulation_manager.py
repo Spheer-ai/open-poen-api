@@ -3,9 +3,9 @@ from ..schemas import RegulationCreate, RegulationUpdate
 from ..models import Regulation, UserRegulationRole, User, RegulationRole
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
-from .exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 
 class RegulationManager(BaseManager):
@@ -19,9 +19,9 @@ class RegulationManager(BaseManager):
             regulation = await self.base_create(
                 regulation_create, Regulation, request, funder_id=funder_id
             )
-        except IntegrityError:
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in use")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique regulation names per funder", e)
+            raise
         return regulation
 
     async def update(
@@ -34,10 +34,9 @@ class RegulationManager(BaseManager):
             regulation = await self.base_update(
                 regulation_update, regulation_db, request
             )
-        except:
-            IntegrityError
-            await self.session.rollback()
-            raise EntityAlreadyExists(message="Name is already in u4se")
+        except IntegrityError as e:
+            raise_err_if_unique_constraint("unique regulation names per funder", e)
+            raise
         return regulation
 
     async def delete(self, regulation: Regulation, request: Request | None = None):
@@ -95,14 +94,14 @@ class RegulationManager(BaseManager):
         query_result_q = await self.session.execute(
             select(Regulation)
             .options(
-                selectinload(Regulation.grant_officer_roles).selectinload(
+                selectinload(Regulation.grant_officer_roles).joinedload(
                     UserRegulationRole.user
                 ),
-                selectinload(Regulation.policy_officer_roles).selectinload(
+                selectinload(Regulation.policy_officer_roles).joinedload(
                     UserRegulationRole.user
                 ),
                 selectinload(Regulation.grants),
-                selectinload(Regulation.funder),
+                joinedload(Regulation.funder),
             )
             .where(Regulation.id == id)
         )

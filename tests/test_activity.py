@@ -119,7 +119,7 @@ async def test_add_activity_owner(async_client, dummy_session, ids, status_code)
     assert response.status_code == status_code
     if status_code == 200:
         am = ActivityManager(dummy_session, None)
-        db_activity = await am.detail_load(initiative_id, activity_id)
+        db_activity = await am.detail_load(activity_id)
         assert set([i.id for i in db_activity.activity_owners]) == set(ids)
 
 
@@ -134,7 +134,7 @@ async def test_add_activity_owner(async_client, dummy_session, ids, status_code)
         (activity_owner, {"description": "New description."}, 200),
         (user, {"description": "New description."}, 403),
         (anon, {"description": "New description."}, 403),
-        (superuser, {"name": "Community Cleanup Day"}, 400),
+        (superuser, {"name": "Community Cleanup Day"}, 409),
     ],
     ids=[
         "Superuser can hide",
