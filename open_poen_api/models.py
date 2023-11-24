@@ -557,11 +557,10 @@ def get_finance_aggregate(route: Route):
 
 class Payment(Base):
     __tablename__ = "payment"
+    __table_args__ = (UniqueConstraint("transaction_id", name="unique transaction id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    transaction_id: Mapped[str] = mapped_column(
-        String, unique=True, nullable=True, index=True
-    )
+    transaction_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
     entry_reference: Mapped[str] = mapped_column(String, nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String, nullable=True)
     booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
