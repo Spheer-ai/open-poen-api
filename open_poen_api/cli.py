@@ -53,6 +53,20 @@ def add_user(
     asyncio.run(async_add_user(email, superuser, role, password))
 
 
+async def async_add_superusers(emails: list[str], password: str):
+    await asyncio.gather(
+        *[async_add_user(email, True, "user", password) for email in emails]
+    )
+
+
+@app.command()
+def add_superusers(
+    emails: list[str],
+    password: str = "random",
+):
+    asyncio.run(async_add_superusers(emails, password))
+
+
 @app.command()
 def reset_db():
     confirmation = typer.confirm(
