@@ -110,6 +110,7 @@ class Attachment(Base):
 
 
 class ProfilePictureMixin:
+    id: int
     id_column: str
     entity_type: str
 
@@ -389,7 +390,10 @@ class LegalEntity(str, Enum):
     GEEN = "geen (natuurlijk persoon)"
 
 
-class Initiative(Base):
+class Initiative(ProfilePictureMixin, Base):
+    id_column = "Initiative.id"
+    entity_type = AttachmentEntityType.INITIATIVE.value
+
     __tablename__ = "initiative"
     __table_args__ = (UniqueConstraint("name", name="unique initiative name"),)
 
@@ -466,7 +470,10 @@ class Initiative(Base):
         return f"Initiative(id={self.id}, name='{self.name}')"
 
 
-class Activity(Base):
+class Activity(ProfilePictureMixin, Base):
+    id_column = "Activity.id"
+    entity_type = AttachmentEntityType.ACTIVITY.value
+
     __tablename__ = "activity"
     __table_args__ = (
         UniqueConstraint(
