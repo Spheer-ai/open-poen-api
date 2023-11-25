@@ -40,12 +40,20 @@ from .gocardless import (
     get_nordigen_client,
     get_gocardless_payments,
     GoCardlessInstitutionList,
-    get_institutions,
 )
+from .gocardless import get_institutions as get_institutions_from_gocardless
 from nordigen import NordigenClient
 import uuid
-from .exc import PaymentCouplingError
+from .exc import PaymentCouplingError, NotAuthorized
 from .logger import audit_logger
+from .query import (
+    get_initiatives_q,
+    get_users_q,
+    get_funders_q,
+    get_regulations_q,
+    get_grants_q,
+    get_user_payments_q,
+)
 
 
 user_router = APIRouter(tags=["user"])
@@ -146,24 +154,7 @@ async def get_users(
     limit: int = 20,
     email: str | None = None,
 ):
-    query = select(ent.User).options(joinedload(ent.User.profile_picture))
-
-    if optional_user is None:
-        query = query.where(ent.User.hidden == False)
-    else:
-        query = query.where(
-            or_(
-                ent.User.hidden == False,
-                ent.User.id == optional_user.id,
-                literal(optional_user.role == ent.UserRole.ADMINISTRATOR),
-                literal(optional_user.is_superuser),
-            )
-        )
-
-    if email:
-        query = query.where(ent.User.email.ilike(f"%{email}%"))
-
-    query = query.offset(offset).limit(limit)
+    query = get_users_q(optional_user, email, offset, limit)
 
     users_result = await session.execute(query)
     users_scalar = users_result.scalars().all()
@@ -594,70 +585,7 @@ async def get_initiatives(
     name: str | None = None,
     only_mine: bool = False,
 ):
-    if only_mine and optional_user is None:
-        raise HTTPException(
-            status_code=400,
-            detail="only_mine can only be set to True if the user is logged in",
-        )
-
-    query = select(ent.Initiative)
-
-    if optional_user is None:
-        query = query.where(ent.Initiative.hidden == False)
-    else:
-        query = query.where(
-            or_(
-                ent.Initiative.hidden == False,
-                ent.Initiative.id.in_(  # You can see initiatives of your activities.
-                    select(ent.Activity.initiative_id).where(
-                        ent.Activity.id.in_(
-                            [i.activity_id for i in optional_user.activity_roles]
-                        )
-                    )
-                ),
-                ent.Initiative.id.in_(  # You can see your own initiatives.
-                    [i.initiative_id for i in optional_user.initiative_roles]
-                ),
-                ent.Initiative.id.in_(  # You can see initiatives where you're overseer.
-                    select(ent.Initiative.id)
-                    .join(ent.Grant)
-                    .where(
-                        ent.Grant.id.in_(
-                            [i.grant_id for i in optional_user.overseer_roles]
-                        )
-                    )
-                ),
-                # Being a policy or grant officer on one regulation is enough to
-                # see everything.
-                literal(len(optional_user.grant_officer_regulation_roles) > 0),
-                literal(len(optional_user.policy_officer_regulation_roles) > 0),
-                # Administrators or super users can see everything.
-                literal(optional_user.role == ent.UserRole.ADMINISTRATOR),
-                literal(optional_user.is_superuser),
-            )
-        )
-
-    if only_mine and optional_user is not None:
-        query = query.where(
-            or_(
-                ent.Initiative.id.in_(  # You can see initiatives of your activities.
-                    select(ent.Activity.initiative_id).where(
-                        ent.Activity.id.in_(
-                            [i.activity_id for i in optional_user.activity_roles]
-                        )
-                    )
-                ),
-                ent.Initiative.id.in_(  # You can see your own initiatives.
-                    [i.initiative_id for i in optional_user.initiative_roles]
-                ),
-            )
-        )
-
-    if name:
-        query = query.where(ent.Initiative.name.ilike(f"%{name}%"))
-
-    query = query.order_by(ent.Initiative.id.desc()).offset(offset).limit(limit)
-
+    query = get_initiatives_q(optional_user, name, only_mine, offset, limit)
     initiatives_result = await session.execute(query)
     initiatives_scalar = initiatives_result.scalars().all()
 
@@ -884,12 +812,7 @@ async def get_funders(
     limit: int = 20,
     name: str | None = None,
 ):
-    query = select(ent.Funder)
-
-    if name:
-        query = query.where(ent.Funder.name.ilike(f"%{name}%"))
-
-    query = query.offset(offset).limit(limit)
+    query = get_funders_q(name, offset, limit)
 
     funders_result = await session.execute(query)
     funders_scalar = funders_result.scalars().all()
@@ -1037,12 +960,7 @@ async def get_regulations(
     limit: int = 20,
     name: str | None = None,
 ):
-    query = select(ent.Regulation).where(ent.Regulation.funder_id == funder_id)
-
-    if name:
-        query = query.where(ent.Regulation.name.ilike(f"%{name}%"))
-
-    query = query.offset(offset).limit(limit)
+    query = get_regulations_q(funder_id, name, offset, limit)
 
     regulations_result = await session.execute(query)
     regulations_scalar = regulations_result.scalars().all()
@@ -1186,12 +1104,7 @@ async def get_grants(
     limit: int = 20,
     name: str | None = None,
 ):
-    query = select(ent.Grant).where(ent.Grant.regulation_id == regulation_id)
-
-    if name:
-        query = query.where(ent.Grant.name.ilike(f"%{name}%"))
-
-    query = query.offset(offset).limit(limit)
+    query = get_grants_q(regulation_id, name, offset, limit)
 
     grants_result = await async_session.execute(query)
     grants_scalar = grants_result.scalars().all()
@@ -1404,41 +1317,11 @@ async def get_user_payments(
     iban: str | None = None,
 ):
     if required_user.id != user_id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise NotAuthorized("Not authorized")
 
-    query = (
-        select(
-            ent.Payment.id,
-            ent.Payment.booking_date,
-            ent.Initiative.name.label("initiative_name"),
-            ent.Activity.name.label("activity_name"),
-            ent.Payment.creditor_name,
-            ent.Payment.short_user_description,
-            ent.BankAccount.iban,
-            ent.Payment.transaction_amount,
-        )
-        .join(ent.BankAccount)
-        .outerjoin(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
-        .outerjoin(ent.Activity, ent.Payment.activity_id == ent.Activity.id)
-        .join(
-            ent.UserBankAccountRole,
-            ent.BankAccount.id == ent.UserBankAccountRole.bank_account_id,
-        )
-        .join(ent.User)
-        .where(ent.User.id == user_id)
-        .order_by(ent.Payment.booking_date.desc())
+    query = get_user_payments_q(
+        user_id, initiative_name, activity_name, iban, offset, limit
     )
-
-    if initiative_name:
-        query = query.where(ent.Initiative.name.ilike(f"%{initiative_name}%"))
-    if initiative_name:
-        query = query.where(ent.Activity.name.ilike(f"%{activity_name}%"))
-    if iban:
-        query = query.where(ent.BankAccount.iban.ilike(f"%{iban}%"))
-
-    # Distinct because the join condition on UserBankAccountRole can
-    # result in double records where a user is both owner and user.
-    query = query.distinct().offset(offset).limit(limit)
 
     payments_result = await session.execute(query)
     payments_scalar = payments_result.all()
@@ -1578,6 +1461,6 @@ async def delete_profile_picture(
 )
 async def get_institutions(
     request: Request,
-    institutions: GoCardlessInstitutionList = Depends(get_institutions),
+    institutions: GoCardlessInstitutionList = Depends(get_institutions_from_gocardless),
 ):
     return institutions

@@ -38,6 +38,16 @@ class PaymentCouplingError(CustomException):
         super().__init__(message, status_code=409)
 
 
+class UnprocessableContent(CustomException):
+    def __init__(self, message: str):
+        super().__init__(message, status_code=422)
+
+
+class NotAuthorized(CustomException):
+    def __init__(self, message: str):
+        super().__init__(message, status_code=403)
+
+
 def raise_err_if_unique_constraint(constraint_name: str, error: IntegrityError):
     """There seems to be no way to check for this specific case without making
     this check work only for Postgres. SQL-Alchemy does not return consistent
