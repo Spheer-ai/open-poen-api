@@ -1,6 +1,7 @@
 from .. import models as ent
 from sqlalchemy import select, and_, inspect, not_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from .utils import get_nordigen_client, get_institutions
 from datetime import datetime, timedelta
 from collections.abc import MutableMapping
@@ -11,10 +12,8 @@ from sqlalchemy.orm import selectinload
 from asyncio import sleep
 from ..database import async_session_maker
 from ..logger import audit_logger
+from .payment_schema import Payment, AccountMetadata, AccountDetails
 
-
-CAMEL_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
-ALLOWED_PAYMENT_FIELDS = [f.key for f in inspect(ent.Payment).attrs]
 # Retrieve payments in chunks of N days.
 PAYMENT_RETRIEVAL_INTERVAL = 14
 # Don't process requisitions with these statuses. Requisitions with
@@ -27,15 +26,28 @@ EXCLUDED_STATUSES = [
 ]
 
 
-def _flatten(d, parent_key="", sep="_"):
-    items = []
-    for k, v in d.items():
-        new_key = parent_key + sep + k if parent_key else k
-        if isinstance(v, MutableMapping):
-            items.extend(_flatten(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+def should_be_skipped(
+    account: ent.BankAccount | None,
+    account_api_id: str,
+    metadata: AccountMetadata,
+    processed_accounts: set[str],
+):
+    # Skip if the account is 1) already processed, or 2) is not ready. If any of these
+    # is not true, add the account to the set of processed accounts and continue to
+    # process it.
+    account_log_str = (
+        account if account else f"unsaved account with api id {account_api_id}"
+    )
+    if account_api_id in processed_accounts:
+        audit_logger.info(f"Skipping {account_log_str} because it's already processed.")
+        return True
+    elif metadata.status != "READY":
+        audit_logger.info(f"Skipping {account_log_str} because it's not ready.")
+        return True
+    else:
+        audit_logger.info(f"Processing {account_log_str}.")
+        processed_accounts.add(account_api_id)
+        return False
 
 
 async def process_requisition(
@@ -53,23 +65,32 @@ async def process_requisition(
     await sleep(0.5)
 
     requisition.status = ent.ReqStatus(api_requisition["status"])
-    session.add(requisition)
     await session.commit()
 
     if not requisition.status == ent.ReqStatus.LINKED:
-        audit_logger.info(f"Skipping {requisition} because of its status.")
+        audit_logger.info(
+            f"Skipping {requisition} because of its status {requisition.status}."
+        )
         return
 
     for account_api_id in api_requisition["accounts"]:
         api_account = client.account_api(account_api_id)
         metadata = await api_account.get_metadata()
+        parsed_metadata = AccountMetadata(**metadata)
         await sleep(0.5)
         details = await api_account.get_details()
+        parsed_details = AccountDetails(**details)
         await sleep(0.5)
+
+        if parsed_metadata.id is None:
+            audit_logger.info(
+                f"Skipping account with id {account_api_id} because its parsed metadata id is None."
+            )
+            continue
 
         account_q = await session.execute(
             select(ent.BankAccount)
-            .where(ent.BankAccount.api_account_id == metadata["id"])
+            .where(ent.BankAccount.api_account_id == parsed_metadata.id)
             .options(
                 selectinload(ent.BankAccount.requisitions),
                 selectinload(ent.BankAccount.user_roles).selectinload(
@@ -82,41 +103,19 @@ async def process_requisition(
         )
         account = account_q.scalars().first()
 
-        last_accessed = (
-            None
-            if metadata["last_accessed"] is None
-            else parse(metadata["last_accessed"])
-        )
-
-        created = None if metadata["created"] is None else parse(metadata["created"])
-
-        name = details.get("account", None)
-        if name is not None:
-            name = name.get("ownerName", None)
-
-        account_log_str = (
-            account if account else f"unsaved account with api id {account_api_id}"
-        )
-
-        if account_api_id in processed_accounts:
-            audit_logger.info(
-                f"Skipping {account_log_str} because it's already processed."
-            )
+        if should_be_skipped(
+            account, account_api_id, parsed_metadata, processed_accounts
+        ):
             continue
-        elif metadata["status"] != "READY":
-            audit_logger.info(f"Skipping {account_log_str} because it's not ready.")
-            continue
-        else:
-            processed_accounts.add(account_api_id)
 
         if not account:
             account = ent.BankAccount(
-                api_account_id=metadata["id"],
-                iban=metadata["iban"],
-                name=name,
-                created=created,
-                last_accessed=last_accessed,
-                institution_id=metadata["institution_id"],
+                api_account_id=parsed_metadata.id,
+                iban=parsed_metadata.iban,
+                name=parsed_details.get_name(),
+                created=parsed_metadata.created,
+                last_accessed=parsed_metadata.last_accessed,
+                institution_id=parsed_metadata.institution_id,
                 institution_name=institutions.get_name(metadata["institution_id"]),
                 institution_logo=institutions.get_logo(metadata["institution_id"]),
                 requisitions=[requisition],
@@ -135,88 +134,67 @@ async def process_requisition(
             if requisition.user is not account.owner:
                 # In this case a third user requisitioned this bank account earlier.
                 requisition.status = ent.ReqStatus.CONFLICTED
-                session.add(requisition)
                 await session.commit()
             if requisition not in account.requisitions:
                 account.requisitions.append(requisition)
-            account.last_accessed = last_accessed
-            session.add(account)
+            account.last_accessed = parsed_metadata.last_accessed
             await session.commit()
 
         date_to = datetime.now()
         cur_start_date = date_from
-        while cur_start_date < date_to:
-            cur_end_date = min(
-                cur_start_date + timedelta(days=PAYMENT_RETRIEVAL_INTERVAL), date_to
-            )
-            audit_logger.info(
-                f"Retrieving payments for user {requisition.user} with period {cur_start_date.strftime('%Y-%m-%d')} till {cur_end_date.strftime('%Y-%m-%d')}."
-            )
-            api_transactions = await api_account.get_transactions(
-                date_from=cur_start_date.strftime("%Y-%m-%d"),
-                date_to=cur_end_date.strftime("%Y-%m-%d"),
-            )
-            await sleep(0.5)
+        async with async_session_maker() as payment_session:
+            while cur_start_date < date_to:
+                cur_end_date = min(
+                    cur_start_date + timedelta(days=PAYMENT_RETRIEVAL_INTERVAL), date_to
+                )
+                audit_logger.info(
+                    f"Retrieving payments for user {requisition.user} with period {cur_start_date.strftime('%Y-%m-%d')} till {cur_end_date.strftime('%Y-%m-%d')}."
+                )
+                api_transactions = await api_account.get_transactions(
+                    date_from=cur_start_date.strftime("%Y-%m-%d"),
+                    date_to=cur_end_date.strftime("%Y-%m-%d"),
+                )
+                await sleep(0.5)
 
-            skipped, imported = 0, 0
-            for payment in api_transactions["transactions"]["booked"]:
-                payment = {
-                    CAMEL_CASE_PATTERN.sub("_", k).lower(): v
-                    for (k, v) in payment.items()
-                }
-                payment["booking_date"] = parse(payment["booking_date"])
-                payment["transaction_amount"] = Decimal(
-                    payment["transaction_amount"]["amount"]
-                )
-                route = (
-                    ent.Route.INCOME
-                    if payment["transaction_amount"] > 0
-                    else ent.Route.EXPENSES
-                )
-                payment = {k: (v if v != "" else None) for (k, v) in payment.items()}
-                payment_db_q = await session.execute(
-                    select(ent.Payment).where(
-                        ent.Payment.transaction_id == payment["transaction_id"]
+                skipped, imported = 0, 0
+                for payment in api_transactions["transactions"]["booked"]:
+                    parsed_payment = Payment(**payment)
+                    if parsed_payment.transaction_id is None:
+                        audit_logger.warning(
+                            f"Skipping a parsed payment {parsed_payment} because its transaction_id is None."
+                        )
+                        continue
+                    new_payment = ent.Payment(
+                        **parsed_payment.to_dict(),
+                        bank_account_id=account.id,
                     )
+
+                    payment_session.add(new_payment)
+                    try:
+                        await payment_session.commit()
+                    except IntegrityError as e:
+                        if "unique transaction id" in str(e):
+                            audit_logger.info(
+                                f"Skipping a parsed payment because its transaction_id {parsed_payment.transaction_id} is already in the database."
+                            )
+                        await payment_session.rollback()
+                        skipped += 1
+                        continue
+                    imported += 1
+
+                audit_logger.info(
+                    f"Retrieved {imported} and skipped {skipped} payments."
                 )
-                payment_db = payment_db_q.scalars().first()
-                if payment_db:
-                    skipped += 1
-                    audit_logger.info(f"Skipping payment {payment_db}.")
-                    continue
-
-                if (
-                    "creditor_account" in payment.keys()
-                    and payment["creditor_account"] is not None
-                ):
-                    payment["creditor_account"] = payment["creditor_account"]["iban"]
-                if (
-                    "debtor_account" in payment.keys()
-                    and payment["debtor_account"] is not None
-                ):
-                    payment["debtor_account"] = payment["debtor_account"]["iban"]
-
-                new_payment = ent.Payment(
-                    **{k: v for k, v in payment.items() if k in ALLOWED_PAYMENT_FIELDS},
-                    route=route,
-                    type=ent.PaymentType.GOCARDLESS,
-                    bank_account_id=account.id,
-                )
-                session.add(new_payment)
-                await session.commit()
-                imported += 1
-
-            audit_logger.info(f"Retrieved {imported} and skipped {skipped} payments.")
-            cur_start_date = cur_end_date + timedelta(days=1)
+                cur_start_date = cur_end_date + timedelta(days=1)
 
 
 async def get_gocardless_payments(
     requisition_id: int | None = None,
     date_from: datetime = datetime.today() - timedelta(days=7),
 ):
-    async with async_session_maker() as session:
-        processed_accounts: set[str] = set()
+    processed_accounts: set[str] = set()
 
+    async with async_session_maker() as session:
         if requisition_id is not None:
             requisition_q = await session.execute(
                 select(ent.Requisition)
@@ -233,17 +211,17 @@ async def get_gocardless_payments(
             requisition = requisition_q.scalars().first()
             if not requisition:
                 raise ValueError("No valid Requisition found")
-            await process_requisition(
-                session, requisition, date_from, processed_accounts
-            )
-        else:
+            requisitions = [requisition]
+        elif requisition_id is None:
             requisition_q_list = (
                 select(ent.Requisition)
                 .options(selectinload(ent.Requisition.user))
                 .where(not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)))
                 .execution_options(yield_per=256)
             )
-            for requisition in await session.scalars(requisition_q_list):
-                await process_requisition(
-                    session, requisition, date_from, processed_accounts
-                )
+            requisitions = [i for i in await session.scalars(requisition_q_list)]
+        else:
+            raise ValueError()
+
+        for i in requisitions:
+            await process_requisition(session, i, date_from, processed_accounts)

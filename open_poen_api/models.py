@@ -557,35 +557,30 @@ def get_finance_aggregate(route: Route):
 
 class Payment(Base):
     __tablename__ = "payment"
+    __table_args__ = (UniqueConstraint("transaction_id", name="unique transaction id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    transaction_id: Mapped[str] = mapped_column(
-        String(length=64), unique=True, nullable=True, index=True
-    )
-    entry_reference: Mapped[str] = mapped_column(String(length=128), nullable=True)
-    end_to_end_id: Mapped[str] = mapped_column(String(length=128), nullable=True)
+    transaction_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    entry_reference: Mapped[str] = mapped_column(String, nullable=True)
+    end_to_end_id: Mapped[str] = mapped_column(String, nullable=True)
     booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
-    creditor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
-    creditor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
-    debtor_name: Mapped[str] = mapped_column(String(length=128), nullable=True)
-    debtor_account: Mapped[str] = mapped_column(String(length=128), nullable=True)
+    creditor_name: Mapped[str] = mapped_column(String, nullable=True)
+    creditor_account: Mapped[str] = mapped_column(String, nullable=True)
+    debtor_name: Mapped[str] = mapped_column(String, nullable=True)
+    debtor_account: Mapped[str] = mapped_column(String, nullable=True)
     route: Mapped[Route] = mapped_column(ChoiceType(Route, impl=VARCHAR(length=32)))
     type: Mapped[PaymentType] = mapped_column(
         ChoiceType(PaymentType, impl=VARCHAR(length=32))
     )
     remittance_information_unstructured: Mapped[str] = mapped_column(
-        String(length=512), nullable=True
+        String, nullable=True
     )
     remittance_information_structured: Mapped[str] = mapped_column(
-        String(length=512), nullable=True
+        String, nullable=True
     )
-    short_user_description: Mapped[str] = mapped_column(
-        String(length=128), nullable=True
-    )
-    long_user_description: Mapped[str] = mapped_column(
-        String(length=512), nullable=True
-    )
+    short_user_description: Mapped[str] = mapped_column(String, nullable=True)
+    long_user_description: Mapped[str] = mapped_column(String, nullable=True)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     activity_id: Mapped[int | None] = mapped_column(
@@ -676,9 +671,9 @@ class Requisition(Base, TimeStampMixin):
     __tablename__ = "requisition"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    institution_id: Mapped[str] = mapped_column(String(length=32), nullable=False)
-    api_requisition_id: Mapped[str] = mapped_column(String(length=128), nullable=False)
-    reference_id: Mapped[str] = mapped_column(String(length=36), nullable=False)
+    institution_id: Mapped[str] = mapped_column(String, nullable=False)
+    api_requisition_id: Mapped[str] = mapped_column(String, nullable=False)
+    reference_id: Mapped[str] = mapped_column(String, nullable=False)
     callback_handled: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
@@ -712,9 +707,9 @@ class BankAccount(Base):
     __tablename__ = "bank_account"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    api_account_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    iban: Mapped[str] = mapped_column(String(128), nullable=False)
-    name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    api_account_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    iban: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
     created: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
