@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 from .mixins import NotNullValidatorMixin
 
 
@@ -19,12 +19,12 @@ class FunderReadList(BaseModel):
 
 
 class FunderCreate(BaseModel):
-    name: str
+    name: str = Field(max_length=128)
     url: HttpUrl
 
 
 class FunderUpdate(NotNullValidatorMixin):
     NOT_NULL_FIELDS: list[str] = ["name", "url"]
 
-    name: str | None
+    name: str | None = Field(max_length=128)
     url: HttpUrl | None

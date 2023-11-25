@@ -19,13 +19,13 @@ class PaymentReadUser(BaseModel):
 class BasePaymentCreate(BaseModel):
     booking_date: datetime
     transaction_amount: TransactionAmount
-    creditor_name: str
-    creditor_account: str
-    debtor_name: str
-    debtor_account: str
+    creditor_name: str = Field(max_length=128)
+    creditor_account: str = Field(max_length=128)
+    debtor_name: str = Field(max_length=128)
+    debtor_account: str = Field(max_length=128)
     route: Route
-    short_user_description: str
-    long_user_description: str
+    short_user_description: str = Field(max_length=128)
+    long_user_description: str = Field(max_length=512)
     hidden: bool = Field(default=False)
 
 
@@ -66,13 +66,13 @@ class PaymentCreateAll(BasePaymentCreate):
 class PaymentUpdate(BaseModel):
     booking_date: datetime
     transaction_amount: TransactionAmount
-    creditor_name: str
-    creditor_account: str
-    debtor_name: str
-    debtor_account: str
+    creditor_name: str = Field(max_length=128)
+    creditor_account: str = Field(max_length=128)
+    debtor_name: str = Field(max_length=128)
+    debtor_account: str = Field(max_length=128)
     route: Route
-    short_user_description: str
-    long_user_description: str
+    short_user_description: str = Field(max_length=128)
+    long_user_description: str = Field(max_length=512)
     hidden: bool
 
 

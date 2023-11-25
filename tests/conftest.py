@@ -118,8 +118,8 @@ async def retrieve_token_from_last_sent_email():
                     url = next(line for line in lines if "reset-password" in line)
                 except StopIteration:
                     raise ValueError("No reset-password found.")
-                path = urllib.parse.urlparse(url).path
-                _, token = path.split("/reset-password/")
+                query = urllib.parse.urlparse(url).query
+                _, token = query.split("token=")
                 return token
             else:
                 raise ValueError("No emails present.")
