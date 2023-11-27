@@ -18,3 +18,21 @@ class AuthEntityClass(str, Enum):
     BANK_ACCOUNT = "BankAccount"
     INITIATIVE = "Initiative"
     ACTIVITY = "Activity"
+
+
+class LinkableInitiative(BaseModel):
+    id: int
+    name: str
+
+
+class LinkableActivity(BaseModel):
+    id: int
+    name: str
+
+
+class LinkableInitiatives(BaseModel):
+    initiatives: list[LinkableInitiative]
+
+
+class LinkableActivities(BaseModel):
+    activities: list[LinkableActivity]

@@ -30,6 +30,7 @@ from typing import Any, Dict, cast
 from pydantic import EmailStr
 from ..logger import audit_logger
 from ..schemas import UserCreateWithPassword
+from .manager_handlers import ProfilePictureHandler
 
 
 WEBSITE_NAME = os.environ["WEBSITE_NAME"]
@@ -44,9 +45,9 @@ class UserManagerExCurrentUser(
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
 
-    def __init__(self, session: AsyncSession, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.session = session
+    def __init__(self, session: AsyncSession, user_db, current_user=None):
+        BaseUserManager.__init__(self, user_db)
+        BaseManagerExCurrentUser.__init__(self, session, current_user)
 
     async def on_after_register(
         self, user: ent.User, request: Optional[Request] = None
@@ -191,45 +192,6 @@ class UserManagerExCurrentUser(
             raise EntityNotFound(message="User not found")
         return query_result
 
-    async def set_profile_picture(
-        self, file: UploadFile, user: ent.User, request: Request | None = None
-    ) -> None:
-        filename = f"{user.id}_user_profile_picture"
-        ppu = await upload_profile_picture(file, filename)
-        if user.profile_picture is None:
-            profile_picture = ent.Attachment(
-                entity_id=user.id,
-                entity_type=ent.AttachmentEntityType.USER,
-                attachment_type=ent.AttachmentAttachmentType.PROFILE_PICTURE,
-            )
-        else:
-            profile_picture = user.profile_picture
-
-        profile_picture.raw_attachment_url = ppu.raw_attachment_url
-        profile_picture.raw_attachment_thumbnail_128_url = (
-            ppu.raw_attachment_thumbnail_128_url
-        )
-        profile_picture.raw_attachment_thumbnail_256_url = (
-            ppu.raw_attachment_thumbnail_256_url
-        )
-        profile_picture.raw_attachment_thumbnail_512_url = (
-            ppu.raw_attachment_thumbnail_512_url
-        )
-
-        self.session.add(profile_picture)
-        await self.session.commit()
-        await self.after_update(user, {"profile_picture": "created"}, request=request)
-
-    async def delete_profile_picture(
-        self, user: ent.User, request: Request | None = None
-    ) -> None:
-        if user.profile_picture is None:
-            return
-
-        await self.session.delete(user.profile_picture)
-        await self.session.commit()
-        await self.after_update(user, {"profile_picture": "deleted"}, request=request)
-
 
 async def _get_user_manager(
     user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
@@ -239,7 +201,7 @@ async def _get_user_manager(
 
 
 def get_jwt_strategy() -> JWTStrategy:
-    return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=3600)
+    return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=60 * 60 * 10)
 
 
 bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
@@ -262,6 +224,9 @@ def with_joins(original_dependency):
             return None
 
         user = await user_manager.requesting_user_load(user.id)
+        # This expunge is important to prevent the data on this user from being
+        # manipulated and or erased after another instance is queried that shares
+        # data with this user instance. SQL-Alchemy optimization it seems.
         user_manager.session.expunge(user)
         return user
 
@@ -280,5 +245,17 @@ class UserManager(UserManagerExCurrentUser):
         session: AsyncSession = Depends(get_async_session),
         current_user: ent.User | None = Depends(optional_login),
     ):
-        super().__init__(session, user_db)
-        self.current_user = current_user
+        super().__init__(session, user_db, current_user)
+        self.profile_picture_handler = ProfilePictureHandler[ent.User](
+            session, ent.AttachmentEntityType.USER
+        )
+
+    async def set_profile_picture(
+        self, file: UploadFile, user: ent.User, request: Request
+    ):
+        await self.profile_picture_handler.set_profile_picture(file, user)
+        await self.after_update(user, {"profile_picture": "created"}, request=request)
+
+    async def delete_profile_picture(self, user: ent.User, request: Request):
+        await self.profile_picture_handler.delete_profile_picture(user)
+        await self.after_update(user, {"profile_picture": "deleted"}, request=request)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, Field
 from .mixins import NotNullValidatorMixin
 from ..models import RegulationRole
 
@@ -20,8 +20,8 @@ class RegulationReadList(BaseModel):
 
 
 class RegulationCreate(BaseModel):
-    name: str
-    description: str
+    name: str = Field(max_length=128)
+    description: str = Field(max_length=512)
 
 
 class RegulationOfficersUpdate(BaseModel):
@@ -36,5 +36,5 @@ class RegulationOfficersUpdate(BaseModel):
 class RegulationUpdate(NotNullValidatorMixin):
     NOT_NULL_FIELDS: list[str] = ["name", "description"]
 
-    name: str | None
-    description: str | None
+    name: str | None = Field(max_length=128)
+    description: str | None = Field(max_length=512)
