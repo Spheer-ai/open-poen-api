@@ -1297,14 +1297,6 @@ async def link_initiative(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    if payment_db.activity_id is not None:
-        raise PaymentCouplingError(
-            message="Payment is still linked to an activity. First decouple it."
-        )
-    if payment_db.type == ent.PaymentType.MANUAL and payment.initiative_id is None:
-        raise PaymentCouplingError(
-            message="It's not possible to uncouple a manual payment from its initiative."
-        )
     auth.authorize(required_user, "link_initiative", payment_db, oso)
 
     if payment.initiative_id is not None:
@@ -1342,16 +1334,11 @@ async def link_activity(
     oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    if payment_db.initiative_id is None:
-        raise PaymentCouplingError(
-            message="Payment is not linked to an initiative. First couple it."
-        )
     auth.authorize(required_user, "link_activity", payment_db, oso)
 
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
         auth.authorize(required_user, "link_payment", activity_db, oso)
-        assert activity_db.initiative_id == payment.initiative_id
 
     payment_db = await payment_manager.assign_payment_to_activity(
         payment_db, payment.activity_id, request=request
