@@ -1,16 +1,34 @@
-from ..database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, Request, HTTPException
-from ..models import Initiative, User, UserInitiativeRole, DebitCard, Grant
+from fastapi import Request, UploadFile, Depends
+from ..models import (
+    Initiative,
+    User,
+    UserInitiativeRole,
+    DebitCard,
+    AttachmentEntityType,
+)
 from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
 from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from .base_manager import BaseManager
+from .manager_handlers import ProfilePictureHandler
+from .user_manager import optional_login
+from ..database import get_async_session
 
 
 class InitiativeManager(BaseManager):
+    def __init__(
+        self,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: User | None = Depends(optional_login),
+    ):
+        super().__init__(session, current_user)
+        self.profile_picture_handler = ProfilePictureHandler[Initiative](
+            self.session, AttachmentEntityType.INITIATIVE
+        )
+
     async def create(
         self,
         initiative_create: InitiativeCreate,
@@ -151,6 +169,7 @@ class InitiativeManager(BaseManager):
             .options(
                 selectinload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
                 selectinload(Initiative.activities),
+                joinedload(Initiative.profile_picture),
             )
             .where(Initiative.id == id)
         )
@@ -161,3 +180,17 @@ class InitiativeManager(BaseManager):
 
     async def min_load(self, id: int) -> Initiative:
         return await self.base_min_load(Initiative, id)
+
+    async def set_profile_picture(
+        self, file: UploadFile, initiative: Initiative, request: Request
+    ):
+        await self.profile_picture_handler.set_profile_picture(file, initiative)
+        await self.after_update(
+            initiative, {"profile_picture": "deleted"}, request=request
+        )
+
+    async def delete_profile_picture(self, initiative: Initiative, request: Request):
+        await self.profile_picture_handler.delete_profile_picture(initiative)
+        await self.after_update(
+            initiative, {"profile_picture": "deleted"}, request=request
+        )

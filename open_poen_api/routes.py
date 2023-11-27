@@ -1429,7 +1429,7 @@ async def get_authorized_fields(
 
 
 @user_router.post("/user/{user_id}/profile-picture")
-async def upload_profile_picture(
+async def upload_user_profile_picture(
     user_id: int,
     request: Request,
     file: UploadFile = File(...),
@@ -1443,7 +1443,7 @@ async def upload_profile_picture(
 
 
 @user_router.delete("/user/{user_id}/profile-picture/{attachment_id}")
-async def delete_profile_picture(
+async def delete_user_profile_picture(
     user_id: int,
     request: Request,
     user_manager: m.UserManager = Depends(m.UserManager),
@@ -1453,6 +1453,34 @@ async def delete_profile_picture(
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_user, "edit", user_db, oso)
     await user_manager.delete_profile_picture(user_db, request=request)
+    return Response(status_code=204)
+
+
+@initiative_router.post("/initiative/{initiative_id}/profile-picture")
+async def upload_initiatie_profile_picture(
+    initiative_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    initiative_db = await initiative_manager.detail_load(initiative_id)
+    auth.authorize(required_user, "edit", initiative_db, oso)
+    await initiative_manager.set_profile_picture(file, initiative_db, request=request)
+
+
+@initiative_router.delete("/initiative/{initiative_id}/profile-picture/{attachment_id}")
+async def delete_initiative_profile_picture(
+    initiative_id: int,
+    request: Request,
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    initiative_db = await initiative_manager.detail_load(initiative_id)
+    auth.authorize(required_user, "edit", initiative_db, oso)
+    await initiative_manager.delete_profile_picture(initiative_db, request=request)
     return Response(status_code=204)
 
 

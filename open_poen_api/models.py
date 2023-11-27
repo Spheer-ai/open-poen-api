@@ -16,7 +16,7 @@ from sqlalchemy import (
 from datetime import datetime
 from enum import Enum
 from sqlalchemy_utils import ChoiceType
-from typing import Optional
+from typing import Optional, Literal
 from sqlalchemy import select, and_, func, case
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -113,12 +113,13 @@ class ProfilePictureMixin:
     id: int
     id_column: str
     entity_type: str
+    lazy: str = "joined"
 
     @declared_attr
     def profile_picture(cls) -> Mapped[Attachment | None]:
         return relationship(
             "Attachment",
-            lazy="joined",
+            lazy=cls.lazy,
             primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
             f"Attachment.entity_type=='{cls.entity_type}', Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
             cascade="all, delete-orphan",
@@ -393,6 +394,7 @@ class LegalEntity(str, Enum):
 class Initiative(ProfilePictureMixin, Base):
     id_column = "Initiative.id"
     entity_type = AttachmentEntityType.INITIATIVE.value
+    lazy = "noload"
 
     __tablename__ = "initiative"
     __table_args__ = (UniqueConstraint("name", name="unique initiative name"),)
@@ -473,6 +475,7 @@ class Initiative(ProfilePictureMixin, Base):
 class Activity(ProfilePictureMixin, Base):
     id_column = "Activity.id"
     entity_type = AttachmentEntityType.ACTIVITY.value
+    lazy = "noload"
 
     __tablename__ = "activity"
     __table_args__ = (
