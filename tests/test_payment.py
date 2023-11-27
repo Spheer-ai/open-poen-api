@@ -54,7 +54,7 @@ async def test_get_linkable_activities(
 @pytest.mark.parametrize(
     "get_mock_user, status_code, payment_id, initiative_id",
     [
-        (superuser, 409, 1, 1),
+        (superuser, 403, 1, 1),
         (superuser, 200, 5, 1),
         (superuser, 200, 6, 2),
         (superuser, 200, 6, None),
@@ -96,7 +96,7 @@ async def test_switch_initiative(
 @pytest.mark.parametrize(
     "get_mock_user, status_code, payment_id, activity_id, initiative_id",
     [
-        (superuser, 409, 2, 1, 2),
+        (superuser, 403, 2, 1, 2),
         (superuser, 200, 6, 1, 1),
         (superuser, 200, 1, 1, 1),
         (superuser, 200, 1, None, 1),
