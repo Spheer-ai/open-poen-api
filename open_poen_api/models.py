@@ -123,6 +123,7 @@ class ProfilePictureMixin:
             f"Attachment.entity_type=='{cls.entity_type}', Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
             cascade="all, delete-orphan",
             uselist=False,
+            overlaps="profile_picture",
         )
 
 
