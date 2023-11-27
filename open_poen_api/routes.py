@@ -1442,7 +1442,7 @@ async def upload_user_profile_picture(
     await user_manager.set_profile_picture(file, user_db, request=request)
 
 
-@user_router.delete("/user/{user_id}/profile-picture/{attachment_id}")
+@user_router.delete("/user/{user_id}/profile-picture")
 async def delete_user_profile_picture(
     user_id: int,
     request: Request,
@@ -1457,7 +1457,7 @@ async def delete_user_profile_picture(
 
 
 @initiative_router.post("/initiative/{initiative_id}/profile-picture")
-async def upload_initiatie_profile_picture(
+async def upload_initiative_profile_picture(
     initiative_id: int,
     request: Request,
     file: UploadFile = File(...),
@@ -1470,7 +1470,7 @@ async def upload_initiatie_profile_picture(
     await initiative_manager.set_profile_picture(file, initiative_db, request=request)
 
 
-@initiative_router.delete("/initiative/{initiative_id}/profile-picture/{attachment_id}")
+@initiative_router.delete("/initiative/{initiative_id}/profile-picture")
 async def delete_initiative_profile_picture(
     initiative_id: int,
     request: Request,
@@ -1481,6 +1481,40 @@ async def delete_initiative_profile_picture(
     initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
     await initiative_manager.delete_profile_picture(initiative_db, request=request)
+    return Response(status_code=204)
+
+
+@initiative_router.post(
+    "/initiative/{initiative_id}/activity/{activity_id}/profile-picture"
+)
+async def upload_activity_profile_picture(
+    initiative_id: int,
+    activity_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    activity_db = await activity_manager.detail_load(activity_id)
+    auth.authorize(required_user, "edit", activity_db, oso)
+    await activity_manager.set_profile_picture(file, activity_db, request=request)
+
+
+@initiative_router.delete(
+    "/initiative/{initiative_id}/activity/{activity_id}/profile-picture"
+)
+async def delete_activity_profile_picture(
+    initiative_id: int,
+    activity_id: int,
+    request: Request,
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    activity_db = await activity_manager.detail_load(activity_id)
+    auth.authorize(required_user, "edit", activity_db, oso)
+    await activity_manager.delete_profile_picture(activity_db, request=request)
     return Response(status_code=204)
 
 
