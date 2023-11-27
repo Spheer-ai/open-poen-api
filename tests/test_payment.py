@@ -13,6 +13,45 @@ from tests.conftest import (
 
 
 @pytest.mark.parametrize(
+    "get_mock_user, status_code, length",
+    [(initiative_owner, 200, 1), (activity_owner, 200, 1), (user, 200, 0)],
+    ids=[
+        "Initiative owner gets his initiatives",
+        "Activity owner gets initiatives of activities",
+        "User without initiatives gets empty list",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_linkable_initiatives(
+    async_client, dummy_session, status_code, length
+):
+    response = await async_client.get("/auth/entity-access/linkable-initiatives")
+    assert response.status_code == status_code
+    assert len(response.json()["initiatives"]) == length
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, status_code, length",
+    [(initiative_owner, 200, 2), (activity_owner, 200, 1), (user, 200, 0)],
+    ids=[
+        "Initiative owner gets his activities",
+        "Activity owner gets his activities",
+        "User without initiatives gets empty list",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_linkable_activities(
+    async_client, dummy_session, status_code, length
+):
+    initiative_id = 1
+    response = await async_client.get(
+        f"/auth/entity-access/initiative/{initiative_id}/linkable-activities"
+    )
+    assert response.status_code == status_code
+    assert len(response.json()["activities"]) == length
+
+
+@pytest.mark.parametrize(
     "get_mock_user, status_code, payment_id, initiative_id",
     [
         (superuser, 409, 1, 1),

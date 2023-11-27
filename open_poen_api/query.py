@@ -180,6 +180,7 @@ def get_user_payments_q(
 ):
     q = (
         select(
+            ent.Payment,
             ent.Payment.id,
             ent.Payment.booking_date,
             ent.Initiative.name.label("initiative_name"),
@@ -214,6 +215,50 @@ def get_user_payments_q(
         .distinct()
         .offset(offset)
         .limit(limit)
+    )
+
+    return q
+
+
+def get_linkable_initiatives_q(required_user: ent.User):
+    requesting_user = RequestingUser(required_user)
+
+    q = (
+        select(ent.Initiative, ent.Initiative.id, ent.Initiative.name)
+        # Necessary for the checking if the user is an activity owner of one
+        # of the activities of this initiatives.
+        .options(selectinload(ent.Initiative.activities))
+        .where(
+            or_(
+                # Initiatives of your activities.
+                ent.Initiative.id.in_(
+                    select(ent.Activity.initiative_id).where(
+                        ent.Activity.id.in_(requesting_user.activity_ids)
+                    )
+                ),
+                # Your own initiatives.
+                ent.Initiative.id.in_(requesting_user.initiative_ids),
+                # Initiatives where you are overseer.
+                ent.Initiative.id.in_(
+                    select(ent.Initiative.id)
+                    .join(ent.Grant)
+                    .where(ent.Grant.id.in_(requesting_user.grant_ids))
+                ),
+            )
+        )
+        .order_by(ent.Initiative.id.desc())
+    )
+
+    return q
+
+
+def get_linkable_activities_q(required_user: ent.User, initiative_id: int):
+    requesting_user = RequestingUser(required_user)
+
+    q = (
+        select(ent.Activity, ent.Activity.id, ent.Activity.name)
+        .where(ent.Activity.initiative_id == initiative_id)
+        .order_by(ent.Activity.id.desc())
     )
 
     return q

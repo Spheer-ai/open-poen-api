@@ -53,6 +53,8 @@ from .query import (
     get_regulations_q,
     get_grants_q,
     get_user_payments_q,
+    get_linkable_initiatives_q,
+    get_linkable_activities_q,
 )
 
 
@@ -1418,7 +1420,23 @@ async def get_user_payments(
 
     payments_result = await session.execute(query)
     payments_scalar = payments_result.all()
-    payments = [s.PaymentReadUser(**dict(i._mapping)) for i in payments_scalar]
+
+    # For every payment, determine if it's linkable to/from initiatives/activities.
+    payments_with_linkability = []
+    for row in payments_scalar:
+        payments_with_linkability.append(
+            {
+                **row._mapping,
+                "linkable_initiative": auth.is_allowed(
+                    required_user, "link_initiative", row.t[0]
+                ),
+                "linkable_activity": auth.is_allowed(
+                    required_user, "link_activity", row.t[0]
+                ),
+            }
+        )
+
+    payments = [s.PaymentReadUser(**i) for i in payments_with_linkability]
 
     return s.PaymentReadList(payments=payments)
 
@@ -1519,6 +1537,52 @@ async def get_authorized_fields(
     return s.AuthFieldsRead(
         fields=auth.get_authorized_fields(optional_user, "edit", resource)
     )
+
+
+@permission_router.get("/linkable-initiatives", response_model=s.LinkableInitiatives)
+async def get_linkable_initiatives(
+    session: AsyncSession = Depends(get_async_session),
+    required_user: ent.User = Depends(m.required_login),
+):
+    query = get_linkable_initiatives_q(required_user)
+
+    initiatives_result = await session.execute(query)
+    initiatives_scalar = initiatives_result.all()
+
+    # For every initiative, determine if it's possible to link a payment to it.
+    linkable_initiatives = []
+    for row in initiatives_scalar:
+        if auth.is_allowed(required_user, "link_payment", row.t[0]):
+            linkable_initiatives.append(row._mapping)
+
+    initiatives = [s.LinkableInitiative(**i) for i in linkable_initiatives]
+
+    return s.LinkableInitiatives(initiatives=initiatives)
+
+
+@permission_router.get(
+    "/initiative/{initiative_id}/linkable-activities",
+    response_model=s.LinkableActivities,
+)
+async def get_linkable_activities(
+    initiative_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    required_user: ent.User = Depends(m.required_login),
+):
+    query = get_linkable_activities_q(required_user, initiative_id)
+
+    activities_result = await session.execute(query)
+    activities_scalar = activities_result.all()
+
+    # For every activity, determine if it's possible to link a payment to it.
+    linkable_activities = []
+    for row in activities_scalar:
+        if auth.is_allowed(required_user, "link_payment", row.t[0]):
+            linkable_activities.append(row._mapping)
+
+    activities = [s.LinkableActivity(**i) for i in linkable_activities]
+
+    return s.LinkableActivities(activities=activities)
 
 
 @utils_router.get(
