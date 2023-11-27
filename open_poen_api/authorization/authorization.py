@@ -9,6 +9,7 @@ from .data_adapter import SqlAlchemyAdapter
 from sqlalchemy.orm import Session
 from typing import Type
 from sqlalchemy.ext.associationproxy import _AssociationList
+from ..exc import NotAuthorized
 
 SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
@@ -75,7 +76,7 @@ def authorize(
     try:
         OSO.authorize(oso_actor, action, resource)
     except (ForbiddenError, NotFoundError):
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise NotAuthorized("Not authorized")
 
 
 def get_authorized_fields(actor: ent.User | None, action: str, resource: ent.Base):
@@ -88,7 +89,7 @@ def authorize_input_fields(
 ):
     fields = get_authorized_fields(actor, action, resource)
     if not all([k in fields for k in input_schema.dict(exclude_unset=True).keys()]):
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise NotAuthorized("Not authorized")
 
 
 def get_authorized_output_fields(
