@@ -43,7 +43,7 @@ async def test_upload_profile_picture_user(
         assert r.attachment_thumbnail_url_256 is not None
         assert r.attachment_thumbnail_url_512 is not None
 
-    response = await async_client.delete(f"/user/1/profile-picture/{r.id}")
+    response = await async_client.delete(f"/user/1/profile-picture")
 
     assert response.status_code == 204
     if response.status_code == 204:
@@ -94,7 +94,7 @@ async def test_upload_profile_picture_initiative(
         assert r.attachment_thumbnail_url_256 is not None
         assert r.attachment_thumbnail_url_512 is not None
 
-    response = await async_client.delete(f"/initiative/1/profile-picture/{r.id}")
+    response = await async_client.delete(f"/initiative/1/profile-picture")
 
     assert response.status_code == 204
     if response.status_code == 204:

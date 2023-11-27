@@ -166,6 +166,34 @@ async def get_users(
     return s.UserReadList(users=filtered_users)
 
 
+@user_router.post("/user/{user_id}/profile-picture")
+async def upload_user_profile_picture(
+    user_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    user_manager: m.UserManager = Depends(m.UserManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    user_db = await user_manager.detail_load(user_id)
+    auth.authorize(required_user, "edit", user_db, oso)
+    await user_manager.set_profile_picture(file, user_db, request=request)
+
+
+@user_router.delete("/user/{user_id}/profile-picture")
+async def delete_user_profile_picture(
+    user_id: int,
+    request: Request,
+    user_manager: m.UserManager = Depends(m.UserManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    user_db = await user_manager.detail_load(user_id)
+    auth.authorize(required_user, "edit", user_db, oso)
+    await user_manager.delete_profile_picture(user_db, request=request)
+    return Response(status_code=204)
+
+
 # BNG
 @user_router.get(
     "/users/{user_id}/bng-initiate",
@@ -571,6 +599,34 @@ async def delete_initiative(
     return Response(status_code=204)
 
 
+@initiative_router.post("/initiative/{initiative_id}/profile-picture")
+async def upload_initiative_profile_picture(
+    initiative_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    initiative_db = await initiative_manager.detail_load(initiative_id)
+    auth.authorize(required_user, "edit", initiative_db, oso)
+    await initiative_manager.set_profile_picture(file, initiative_db, request=request)
+
+
+@initiative_router.delete("/initiative/{initiative_id}/profile-picture")
+async def delete_initiative_profile_picture(
+    initiative_id: int,
+    request: Request,
+    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    initiative_db = await initiative_manager.detail_load(initiative_id)
+    auth.authorize(required_user, "edit", initiative_db, oso)
+    await initiative_manager.delete_profile_picture(initiative_db, request=request)
+    return Response(status_code=204)
+
+
 @initiative_router.get(
     "/initiatives",
     response_model=s.InitiativeReadList,
@@ -701,6 +757,40 @@ async def delete_activity(
     activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "delete", activity_db, oso)
     await activity_manager.delete(activity_db, request=request)
+    return Response(status_code=204)
+
+
+@initiative_router.post(
+    "/initiative/{initiative_id}/activity/{activity_id}/profile-picture"
+)
+async def upload_activity_profile_picture(
+    initiative_id: int,
+    activity_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    activity_db = await activity_manager.detail_load(activity_id)
+    auth.authorize(required_user, "edit", activity_db, oso)
+    await activity_manager.set_profile_picture(file, activity_db, request=request)
+
+
+@initiative_router.delete(
+    "/initiative/{initiative_id}/activity/{activity_id}/profile-picture"
+)
+async def delete_activity_profile_picture(
+    initiative_id: int,
+    activity_id: int,
+    request: Request,
+    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    activity_db = await activity_manager.detail_load(activity_id)
+    auth.authorize(required_user, "edit", activity_db, oso)
+    await activity_manager.delete_profile_picture(activity_db, request=request)
     return Response(status_code=204)
 
 
@@ -1137,6 +1227,9 @@ async def create_initiative(
     initiative_db = await initiative_manager.create(
         initiative, grant_id, request=request
     )
+    # TODO: If we don't do this, profile_picture will have a Greenlet exception for retrieving data
+    # outside of asynchronous context.
+    await initiative_manager.session.refresh(initiative_db)
     return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
 
 
@@ -1426,96 +1519,6 @@ async def get_authorized_fields(
     return s.AuthFieldsRead(
         fields=auth.get_authorized_fields(optional_user, "edit", resource)
     )
-
-
-@user_router.post("/user/{user_id}/profile-picture")
-async def upload_user_profile_picture(
-    user_id: int,
-    request: Request,
-    file: UploadFile = File(...),
-    user_manager: m.UserManager = Depends(m.UserManager),
-    required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    user_db = await user_manager.detail_load(user_id)
-    auth.authorize(required_user, "edit", user_db, oso)
-    await user_manager.set_profile_picture(file, user_db, request=request)
-
-
-@user_router.delete("/user/{user_id}/profile-picture")
-async def delete_user_profile_picture(
-    user_id: int,
-    request: Request,
-    user_manager: m.UserManager = Depends(m.UserManager),
-    required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    user_db = await user_manager.detail_load(user_id)
-    auth.authorize(required_user, "edit", user_db, oso)
-    await user_manager.delete_profile_picture(user_db, request=request)
-    return Response(status_code=204)
-
-
-@initiative_router.post("/initiative/{initiative_id}/profile-picture")
-async def upload_initiative_profile_picture(
-    initiative_id: int,
-    request: Request,
-    file: UploadFile = File(...),
-    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
-    await initiative_manager.set_profile_picture(file, initiative_db, request=request)
-
-
-@initiative_router.delete("/initiative/{initiative_id}/profile-picture")
-async def delete_initiative_profile_picture(
-    initiative_id: int,
-    request: Request,
-    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
-    await initiative_manager.delete_profile_picture(initiative_db, request=request)
-    return Response(status_code=204)
-
-
-@initiative_router.post(
-    "/initiative/{initiative_id}/activity/{activity_id}/profile-picture"
-)
-async def upload_activity_profile_picture(
-    initiative_id: int,
-    activity_id: int,
-    request: Request,
-    file: UploadFile = File(...),
-    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(required_user, "edit", activity_db, oso)
-    await activity_manager.set_profile_picture(file, activity_db, request=request)
-
-
-@initiative_router.delete(
-    "/initiative/{initiative_id}/activity/{activity_id}/profile-picture"
-)
-async def delete_activity_profile_picture(
-    initiative_id: int,
-    activity_id: int,
-    request: Request,
-    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
-):
-    activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(required_user, "edit", activity_db, oso)
-    await activity_manager.delete_profile_picture(activity_db, request=request)
-    return Response(status_code=204)
 
 
 @utils_router.get(
