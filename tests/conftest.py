@@ -5,6 +5,10 @@ from open_poen_api.database import (
 from open_poen_api.app import app
 from open_poen_api.models import (
     Base,
+    User,
+    Initiative,
+    UserRole,
+    Activity,
     RegulationRole,
     Payment,
     DebitCard,
@@ -37,7 +41,6 @@ from dateutil.parser import isoparse
 from io import BytesIO
 from fastapi import UploadFile
 import asyncio
-import re
 
 
 bankaccount_owner = 1
@@ -115,12 +118,9 @@ async def retrieve_token_from_last_sent_email():
                     url = next(line for line in lines if "reset-password" in line)
                 except StopIteration:
                     raise ValueError("No reset-password found.")
-                pattern = r"\?token=(.*)"
-                token_match = re.search(pattern, url)
-                if token_match:
-                    return token_match.group(1)
-                else:
-                    raise ValueError("Token not found in the URL.")
+                path = urllib.parse.urlparse(url).path
+                _, token = path.split("/reset-password/")
+                return token
             else:
                 raise ValueError("No emails present.")
         else:

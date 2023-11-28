@@ -1,33 +1,16 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, Request, UploadFile
+from fastapi import Depends, Request
 from ..database import get_async_session
 from ..schemas import ActivityCreate, ActivityUpdate
-from ..models import (
-    Activity,
-    UserActivityRole,
-    User,
-    AttachmentEntityType,
-)
+from ..models import Activity, UserActivityRole, User, Initiative, Grant, Regulation
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from ..exc import EntityNotFound, raise_err_if_unique_constraint
+from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload, joinedload
+from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from .base_manager import BaseManager
-from .manager_handlers import ProfilePictureHandler
-from .user_manager import optional_login
 
 
 class ActivityManager(BaseManager):
-    def __init__(
-        self,
-        session: AsyncSession = Depends(get_async_session),
-        current_user: User | None = Depends(optional_login),
-    ):
-        super().__init__(session, current_user)
-        self.profile_picture_handler = ProfilePictureHandler[Activity](
-            self.session, AttachmentEntityType.ACTIVITY
-        )
-
     async def create(
         self,
         activity_create: ActivityCreate,
@@ -107,17 +90,3 @@ class ActivityManager(BaseManager):
 
     async def min_load(self, activity_id: int) -> Activity:
         return await self.base_min_load(Activity, activity_id)
-
-    async def set_profile_picture(
-        self, file: UploadFile, activity: Activity, request: Request
-    ):
-        await self.profile_picture_handler.set_profile_picture(file, activity)
-        await self.after_update(
-            activity, {"profile_picture": "deleted"}, request=request
-        )
-
-    async def delete_profile_picture(self, activity: Activity, request: Request):
-        await self.profile_picture_handler.delete_profile_picture(activity)
-        await self.after_update(
-            activity, {"profile_picture": "deleted"}, request=request
-        )

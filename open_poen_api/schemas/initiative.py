@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field, validator, ValidationError
 from ..models import LegalEntity
 from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
-from .profile_picture import ProfilePicture
 
 
 class InitiativeRead(BaseModel):
@@ -21,7 +20,6 @@ class InitiativeRead(BaseModel):
     budget: Budget
     income: TransactionAmount
     expenses: TransactionAmount
-    profile_picture: ProfilePicture | None
 
     class Config:
         orm_mode = True
@@ -35,16 +33,16 @@ class InitiativeReadList(BaseModel):
 
 
 class InitiativeCreate(BaseModel):
-    name: str = Field(max_length=64)
-    description: str = Field(max_length=512)
-    purpose: str = Field(max_length=64)
-    target_audience: str = Field(max_length=64)
-    owner: str = Field(max_length=64)
-    owner_email: str = Field(max_length=320)
+    name: str
+    description: str
+    purpose: str
+    target_audience: str
+    owner: str
+    owner_email: str
     legal_entity: LegalEntity
-    address_applicant: str = Field(max_length=256)
-    kvk_registration: str = Field(max_length=16)
-    location: str = Field(max_length=64)
+    address_applicant: str
+    kvk_registration: str
+    location: str
     hidden_sponsors: bool = Field(default=False)
     hidden: bool = Field(default=False)
     budget: Budget
@@ -67,16 +65,16 @@ class InitiativeUpdate(NotNullValidatorMixin):
         "budget",
     ]
 
-    name: str | None = Field(max_length=64)
-    description: str | None = Field(max_length=512)
-    purpose: str | None = Field(max_length=64)
-    target_audience: str | None = Field(max_length=64)
-    owner: str | None = Field(max_length=64)
-    owner_email: str | None = Field(max_length=320)
+    name: str | None
+    description: str | None
+    purpose: str | None
+    target_audience: str | None
+    owner: str | None
+    owner_email: str | None
     legal_entity: LegalEntity | None
-    address_applicant: str | None = Field(max_length=256)
-    kvk_registration: str | None = Field(max_length=16)
-    location: str | None = Field(max_length=64)
+    address_applicant: str | None
+    kvk_registration: str | None
+    location: str | None
     hidden_sponsors: bool | None
     hidden: bool | None
     budget: Budget | None

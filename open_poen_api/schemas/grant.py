@@ -22,8 +22,8 @@ class GrantReadList(BaseModel):
 
 
 class GrantCreate(BaseModel):
-    name: str = Field(max_length=128)
-    reference: str = Field(max_length=128)
+    name: str
+    reference: str
     budget: Budget = Field(examples=[1000.01, 555, 9455.11])
 
 
@@ -34,6 +34,6 @@ class GrantOverseerUpdate(BaseModel):
 class GrantUpdate(NotNullValidatorMixin):
     NOT_NULL_FIELDS: list[str] = ["name", "reference", "budget"]
 
-    name: str | None = Field(max_length=128)
-    reference: str | None = Field(max_length=128)
+    name: str | None
+    reference: str | None
     budget: Budget | None

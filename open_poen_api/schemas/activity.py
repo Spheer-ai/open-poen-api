@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, validator
 from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
-from .profile_picture import ProfilePicture
 
 
 class ActivityRead(BaseModel):
@@ -15,7 +14,6 @@ class ActivityRead(BaseModel):
     finished_description: str | None
     income: TransactionAmount
     expenses: TransactionAmount
-    profile_picture: ProfilePicture | None
 
     class Config:
         orm_mode = True
@@ -29,10 +27,10 @@ class ActivityReadList(BaseModel):
 
 
 class ActivityCreate(BaseModel):
-    name: str = Field(max_length=64)
-    description: str = Field(max_length=512)
-    purpose: str = Field(max_length=64)
-    target_audience: str = Field(max_length=64)
+    name: str
+    description: str
+    purpose: str
+    target_audience: str
     hidden: bool = Field(default=False)
     budget: Budget
 
@@ -49,13 +47,13 @@ class ActivityUpdate(NotNullValidatorMixin):
         "budget",
     ]
 
-    name: str | None = Field(max_length=64)
-    description: str | None = Field(max_length=512)
-    purpose: str | None = Field(max_length=64)
-    target_audience: str | None = Field(max_length=64)
+    name: str | None
+    description: str | None
+    purpose: str | None
+    target_audience: str | None
     hidden: bool | None
     finished: bool | None
-    finished_description: str | None = Field(max_length=512)
+    finished_description: bool | None
     budget: Budget | None
 
 
