@@ -1,7 +1,4 @@
-from open_poen_api.database import (
-    async_session_maker,
-    asyng_engine,
-)
+from open_poen_api import database as db
 from open_poen_api.app import app
 from open_poen_api.models import (
     Base,
@@ -38,6 +35,8 @@ from io import BytesIO
 from fastapi import UploadFile
 import asyncio
 import re
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.event import listens_for
 
 
 bankaccount_owner = 1
@@ -96,6 +95,12 @@ async def hide_instance(dummy_session, cls, id):
     await dummy_session.commit()
 
 
+def load_json(json_file_path):
+    with open(json_file_path, "r") as file:
+        data = json.load(file)
+    return data
+
+
 async def retrieve_token_from_last_sent_email():
     """Gets the last send email from Mailhog, assumes it's an email reply to a password
     reset request and parses the token inside it to return it."""
@@ -127,18 +132,8 @@ async def retrieve_token_from_last_sent_email():
             raise ValueError("Request to Mailhog failed.")
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture
-async def async_client(event_loop, overridden_app):
+async def async_client(overridden_app):
     async with AsyncClient(
         app=overridden_app, base_url="http://localhost:8000"
     ) as client:
@@ -146,43 +141,62 @@ async def async_client(event_loop, overridden_app):
 
 
 @pytest_asyncio.fixture
-async def clean_async_client(event_loop):
+async def clean_async_client():
     async with AsyncClient(app=app, base_url="http://localhost:8000") as client:
         yield client
 
 
-@pytest_asyncio.fixture(scope="function")
-async def async_session(event_loop) -> AsyncSession:
-    async with async_session_maker() as s:
-        async with asyng_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
+@pytest_asyncio.fixture(scope="session")
+def event_loop():
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
 
-        yield s
 
-    async with asyng_engine.begin() as conn:
+@pytest_asyncio.fixture(scope="session")
+async def async_session():
+    # Clear and reset the db.
+    async with db.async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Add dummy data.
+    async with db.async_session_maker() as s:
+        s = await add_dummy_data(s)
+
+    yield
+
+    # Clear the entire db.
+    async with db.async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-    await asyng_engine.dispose()
-
-
-def load_json(json_file_path):
-    with open(json_file_path, "r") as file:
-        data = json.load(file)
-    return data
-
-
-@pytest_asyncio.fixture
-async def overridden_app(get_mock_user):
-    app.dependency_overrides[superuser] = get_mock_user
-    app.dependency_overrides[required_login] = get_mock_user
-    app.dependency_overrides[optional_login] = get_mock_user
-    yield app
-    app.dependency_overrides = {}
+    # Dispose of the engine.
+    await db.async_engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def dummy_session(async_session):
+    # https://www.core27.co/post/transactional-unit-tests-with-pytest-and-async-sqlalchemy
+
+    connection = await db.async_engine.connect()
+    trans = await connection.begin()
+    async with db.async_session_maker(bind=connection) as s:
+        nested = await connection.begin_nested()
+
+        @listens_for(s.sync_session, "after_transaction_end")
+        def end_savepoint(session, transaction):
+            nonlocal nested
+
+            if not nested.is_active:
+                nested = connection.sync_connection.begin_nested()
+
+        yield s
+
+    await trans.rollback()
+    await connection.close()
+
+
+async def add_dummy_data(async_session):
     db = await get_user_db(async_session).__anext__()
     user_manager = m.UserManager(db, async_session, None)
     initiative_manager = m.InitiativeManager(async_session, None)
@@ -284,7 +298,7 @@ async def dummy_session(async_session):
     return async_session
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def get_mock_user(request, dummy_session):
     if request.param is None:
         return lambda: None
@@ -292,8 +306,23 @@ async def get_mock_user(request, dummy_session):
     db = await get_user_db(dummy_session).__anext__()
     user_manager = m.UserManager(db, dummy_session, None)
     user_instance = await user_manager.requesting_user_load(request.param)
+    # This expunge is important to prevent the data on this user from being
+    # manipulated and or erased after another instance is queried that shares
+    # data with this user instance. SQL-Alchemy optimization it seems.
+    # (This session is shared with the app itself.)
+    dummy_session.expunge(user_instance)
 
     async def func():
         return user_instance
 
     return func
+
+
+@pytest_asyncio.fixture(scope="function")
+async def overridden_app(get_mock_user, dummy_session):
+    app.dependency_overrides[superuser] = get_mock_user
+    app.dependency_overrides[required_login] = get_mock_user
+    app.dependency_overrides[optional_login] = get_mock_user
+    app.dependency_overrides[db.get_async_session] = lambda: dummy_session
+    yield app
+    app.dependency_overrides = {}

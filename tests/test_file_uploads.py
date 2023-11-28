@@ -36,7 +36,7 @@ async def test_upload_profile_picture_user(
 
     assert response.status_code == status_code
     if status_code == 200:
-        q = await dummy_session.get(User, 1)
+        q = await dummy_session.get(User, 1, populate_existing=True)
         r = q.profile_picture
         assert r.attachment_url is not None
         assert r.attachment_thumbnail_url_128 is not None
@@ -47,8 +47,7 @@ async def test_upload_profile_picture_user(
 
     assert response.status_code == 204
     if response.status_code == 204:
-        q = await dummy_session.get(User, 1)
-        await dummy_session.refresh(q)
+        q = await dummy_session.get(User, 1, populate_existing=True)
         r = q.profile_picture
         assert r is None
 
@@ -81,13 +80,7 @@ async def test_upload_profile_picture_initiative(
 
     assert response.status_code == status_code
     if status_code == 200:
-        q = (
-            select(Initiative)
-            .options(joinedload(Initiative.profile_picture))
-            .where(Initiative.id == 1)
-        )
-        q = await dummy_session.execute(q)
-        q = q.scalars().first()
+        q = await dummy_session.get(Initiative, 1, populate_existing=True)
         r = q.profile_picture
         assert r.attachment_url is not None
         assert r.attachment_thumbnail_url_128 is not None
@@ -98,14 +91,5 @@ async def test_upload_profile_picture_initiative(
 
     assert response.status_code == 204
     if response.status_code == 204:
-        q = (
-            select(Initiative)
-            .options(joinedload(Initiative.profile_picture))
-            .where(Initiative.id == 1)
-        )
-        q = await dummy_session.execute(q)
-        q = q.scalars().first()
-        r = q.profile_picture
-        await dummy_session.refresh(q)
-        r = q.profile_picture
-        assert r is None
+        q = await dummy_session.get(Initiative, 1, populate_existing=True)
+        assert q.profile_picture is None

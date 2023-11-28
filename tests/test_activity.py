@@ -156,9 +156,9 @@ async def test_patch_activity(async_client, dummy_session, body, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        activity = await dummy_session.get(Activity, activity_id)
-        # Fix this. Apparently the session is not clean on every test invocation.
-        await dummy_session.refresh(activity)
+        activity = await dummy_session.get(
+            Activity, activity_id, populate_existing=True
+        )
         for key in body:
             assert getattr(activity, key) == body[key]
 

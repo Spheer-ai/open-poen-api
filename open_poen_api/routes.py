@@ -88,6 +88,7 @@ async def create_user(
         **user.dict(), password=temp_password_generator(size=16)
     )
     user_db = await user_manager.create(user_with_password, request=request)
+    # TODO: Also see initiative. How to deal with this?
     await user_db.awaitable_attrs.profile_picture
     return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
 
