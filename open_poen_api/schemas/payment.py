@@ -14,6 +14,8 @@ class PaymentReadUser(BaseModel):
     short_user_description: str | None
     iban: str | None
     transaction_amount: TransactionAmount
+    linkable_initiative: bool
+    linkable_activity: bool
 
 
 class BasePaymentCreate(BaseModel):

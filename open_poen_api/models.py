@@ -703,6 +703,8 @@ class Requisition(Base, TimeStampMixin):
         back_populates="requisitions",
         lazy="noload",
         secondary=requisition_bank_account,
+        primaryjoin="Requisition.id == requisition_bank_account.c.requisition_id",
+        secondaryjoin="BankAccount.id == requisition_bank_account.c.bank_account_id",
     )
 
     def __repr__(self):
@@ -766,6 +768,8 @@ class BankAccount(Base):
         back_populates="bank_accounts",
         lazy="noload",
         secondary=requisition_bank_account,
+        primaryjoin="BankAccount.id == requisition_bank_account.c.bank_account_id",
+        secondaryjoin="Requisition.id == requisition_bank_account.c.requisition_id",
     )
 
     user_roles: Mapped[list[UserBankAccountRole]] = relationship(
