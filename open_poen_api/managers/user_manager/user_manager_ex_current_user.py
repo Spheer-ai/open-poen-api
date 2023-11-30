@@ -1,11 +1,11 @@
 from fastapi import Depends, Request, Response
 
 from open_poen_api.models import User
-from ..database import get_user_db, get_async_session
-from .. import models as ent
+from ...database import get_user_db, get_async_session
+from ... import models as ent
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from ..utils.email import MessageSchema, conf, env
+from ...utils.email import MessageSchema, conf, env
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -20,14 +20,13 @@ from fastapi_users.exceptions import UserAlreadyExists
 import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
-from ..authorization.authorization import SECRET_KEY
-from ..exc import EntityAlreadyExists
+from ...authorization.authorization import SECRET_KEY
+from ...exc import EntityAlreadyExists
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_
-from .base_manager_ex_current_user import BaseLogger
+from ..bases import BaseLogger
 from typing import Any, Dict, cast
 from pydantic import EmailStr
-from ..logger import audit_logger
+from ...logger import audit_logger
 
 
 WEBSITE_NAME = os.environ["WEBSITE_NAME"]
@@ -37,7 +36,6 @@ SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 class UserManagerExCurrentUser(
     IntegerIDMixin,
     BaseUserManager[ent.User, int],
-    BaseLogger,
 ):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
@@ -45,7 +43,7 @@ class UserManagerExCurrentUser(
 
     def __init__(self, session: AsyncSession, user_db, current_user=None):
         BaseUserManager.__init__(self, user_db)
-        BaseLogger.__init__(self, session, current_user)
+        self.logger = BaseLogger(current_user)
 
     async def on_after_register(
         self, user: ent.User, request: Optional[Request] = None
@@ -61,8 +59,8 @@ class UserManagerExCurrentUser(
         )
         fm = FastMail(conf)
         await fm.send_message(message)
-        await self.after_create(user, request)
-        audit_logger.info(f"{user} has been registered.")
+        await self.logger.after_create(user, request)
+        audit_logger.info(f"{user} has been registered and received the welcome email.")
 
     async def on_after_forgot_password(
         self, user: ent.User, token: str, request: Optional[Request] = None
@@ -123,14 +121,14 @@ class UserManagerExCurrentUser(
         update_dict: Dict[str, Any],
         request: Request | None = None,
     ):
-        await self.after_update(user, update_dict, request)
+        await self.logger.after_update(user, update_dict, request)
 
     async def on_after_delete(
         self,
         user: ent.User,
         request: Request | None = None,
     ):
-        await self.after_delete(user, request)
+        await self.logger.after_delete(user, request)
 
     async def requesting_user_load(self, id: int):
         query_result_q = await self.user_db.session.execute(
@@ -185,7 +183,7 @@ def with_joins(original_dependency):
         # This expunge is important to prevent the data on this user from being
         # manipulated and or erased after another instance is queried that shares
         # data with this user instance. SQL-Alchemy optimization it seems.
-        user_manager.session.expunge(user)
+        user_manager.user_db.session.expunge(user)
         return user
 
     return _user_with_extra_joins

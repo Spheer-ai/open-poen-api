@@ -1,6 +1,6 @@
 from .base_manager import BaseManager
 from ..schemas import RegulationCreate, RegulationUpdate
-from ..models import Regulation, UserRegulationRole, User, RegulationRole
+from .. import models as ent
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
@@ -14,10 +14,10 @@ class RegulationManager(BaseManager):
         regulation_create: RegulationCreate,
         funder_id: int,
         request: Request | None,
-    ) -> Regulation:
+    ) -> ent.Regulation:
         try:
-            regulation = await self.base_create(
-                regulation_create, Regulation, request, funder_id=funder_id
+            regulation = await self.crud.create(
+                regulation_create, ent.Regulation, request, funder_id=funder_id
             )
         except IntegrityError as e:
             raise_err_if_unique_constraint("unique regulation names per funder", e)
@@ -27,11 +27,11 @@ class RegulationManager(BaseManager):
     async def update(
         self,
         regulation_update: RegulationUpdate,
-        regulation_db: Regulation,
+        regulation_db: ent.Regulation,
         request: Request | None = None,
-    ) -> Regulation:
+    ) -> ent.Regulation:
         try:
-            regulation = await self.base_update(
+            regulation = await self.crud.update(
                 regulation_update, regulation_db, request
             )
         except IntegrityError as e:
@@ -39,29 +39,29 @@ class RegulationManager(BaseManager):
             raise
         return regulation
 
-    async def delete(self, regulation: Regulation, request: Request | None = None):
-        await self.base_delete(regulation, request)
+    async def delete(self, regulation: ent.Regulation, request: Request | None = None):
+        await self.crud.delete(regulation, request)
 
     async def make_users_officer(
         self,
-        regulation: Regulation,
+        regulation: ent.Regulation,
         user_ids: list[int],
-        regulation_role: RegulationRole,
+        regulation_role: ent.RegulationRole,
         request: Request | None = None,
     ):
-        if regulation_role == RegulationRole.GRANT_OFFICER:
+        if regulation_role == ent.RegulationRole.GRANT_OFFICER:
             officer_roles = regulation.grant_officer_roles
-            role_field = RegulationRole.GRANT_OFFICER
-        elif regulation_role == RegulationRole.POLICY_OFFICER:
+            role_field = ent.RegulationRole.GRANT_OFFICER
+        elif regulation_role == ent.RegulationRole.POLICY_OFFICER:
             officer_roles = regulation.policy_officer_roles
-            role_field = RegulationRole.POLICY_OFFICER
+            role_field = ent.RegulationRole.POLICY_OFFICER
         else:
             raise ValueError(f"Unknown RegulationRole: {regulation_role}")
 
         linked_user_ids = {role.user_id for role in officer_roles}
 
         matched_users_q = await self.session.execute(
-            select(User).where(User.id.in_(user_ids))
+            select(ent.User).where(ent.User.id.in_(user_ids))
         )
         matched_users = matched_users_q.scalars().all()
         matched_user_ids = {user.id for user in matched_users}
@@ -80,7 +80,7 @@ class RegulationManager(BaseManager):
             await self.session.delete(role)
 
         for user_id in link_user_ids:
-            new_role = UserRegulationRole(
+            new_role = ent.UserRegulationRole(
                 user_id=user_id,
                 regulation_id=regulation.id,
                 role=role_field,
@@ -92,23 +92,23 @@ class RegulationManager(BaseManager):
 
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
-            select(Regulation)
+            select(ent.Regulation)
             .options(
-                selectinload(Regulation.grant_officer_roles).joinedload(
-                    UserRegulationRole.user
+                selectinload(ent.Regulation.grant_officer_roles).joinedload(
+                    ent.UserRegulationRole.user
                 ),
-                selectinload(Regulation.policy_officer_roles).joinedload(
-                    UserRegulationRole.user
+                selectinload(ent.Regulation.policy_officer_roles).joinedload(
+                    ent.UserRegulationRole.user
                 ),
-                selectinload(Regulation.grants),
-                joinedload(Regulation.funder),
+                selectinload(ent.Regulation.grants),
+                joinedload(ent.Regulation.funder),
             )
-            .where(Regulation.id == id)
+            .where(ent.Regulation.id == id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
             raise EntityNotFound(message="Regulation not found")
         return query_result
 
-    async def min_load(self, id: int) -> Regulation:
-        return await self.base_min_load(Regulation, id)
+    async def min_load(self, id: int) -> ent.Regulation:
+        return await self.load.min_load(ent.Regulation, id)

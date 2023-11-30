@@ -293,7 +293,9 @@ async def add_dummy_data(async_session):
         headers={"content-type": "image/png"},
     )
     user_db = await user_manager.detail_load(1)
-    await user_manager.set_profile_picture(mock_upload_file, user_db, request=None)
+    await user_manager.profile_picture_handler.set(
+        mock_upload_file, user_db, request=None
+    )
 
     return async_session
 

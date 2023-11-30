@@ -1,8 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from .managers.user_manager import fastapi_users, auth_backend
+from .managers import fastapi_users, auth_backend
 from .exc import CustomException
-from .database import create_db_and_tables
 from .routes import (
     user_router,
     initiative_router,
@@ -80,9 +79,3 @@ if os.environ["ENVIRONMENT"] == "debug":
         allow_methods=["*"],  # Allows all methods
         allow_headers=["*"],  # Allows all headers
     )
-
-    # @app.on_event("startup")
-    # async def on_startup():
-    #     # TODO: Don't recreate db every time.
-    #     await create_db_and_tables()
-    #     pass

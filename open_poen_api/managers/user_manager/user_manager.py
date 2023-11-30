@@ -1,17 +1,14 @@
-from fastapi import Depends, Request, Response, UploadFile
-
-from ..database import get_user_db, get_async_session
-from .. import models as ent
+from fastapi import Depends
+from ...database import get_user_db, get_async_session
+from ... import models as ent
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from fastapi_users.db import SQLAlchemyUserDatabase
-import os
-from ..exc import EntityNotFound
+from ...exc import EntityNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from .manager_handlers import ProfilePictureHandler
-from .base_manager import BaseManager
-from .user_manager import UserManagerExCurrentUser, optional_login
-from .base_manager_ex_current_user import BaseLoad
+from ..handlers import ProfilePictureHandler
+from ..base_manager import BaseManager
+from .user_manager_ex_current_user import UserManagerExCurrentUser, optional_login
 
 
 class UserManager(BaseManager, UserManagerExCurrentUser):
@@ -61,5 +58,5 @@ class UserManager(BaseManager, UserManagerExCurrentUser):
             raise EntityNotFound(message="User not found")
         return query_result
 
-    async def min_load(self, id: int):
-        return await self.load.base_min_load(ent.User, id)
+    async def min_load(self, user_id: int) -> ent.User:
+        return await self.load.min_load(ent.User, user_id)

@@ -54,7 +54,7 @@ class ProfilePictureHandler(BaseManager, Generic[T]):
 
         self.crud.session.add(profile_picture)
         await self.crud.session.commit()
-        await self.crud.after_update(
+        await self.logger.after_update(
             db_entity, {"profile_picture": "created"}, request=request
         )
 
@@ -64,6 +64,6 @@ class ProfilePictureHandler(BaseManager, Generic[T]):
 
         await self.crud.session.delete(db_entity.profile_picture)
         await self.crud.session.commit()
-        await self.crud.after_update(
+        await self.logger.after_update(
             db_entity, {"profile_picture": "created"}, request=request
         )

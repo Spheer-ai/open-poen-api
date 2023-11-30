@@ -181,7 +181,6 @@ async def upload_user_profile_picture(
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_user, "edit", user_db, oso)
     await user_manager.profile_picture_handler.set(file, user_db, request)
-    # await user_manager.set_profile_picture(file, user_db, request=request)
 
 
 @user_router.delete("/user/{user_id}/profile-picture")
@@ -195,7 +194,6 @@ async def delete_user_profile_picture(
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_user, "edit", user_db, oso)
     await user_manager.profile_picture_handler.delete(user_db, request)
-    # await user_manager.delete_profile_picture(user_db, request=request)
     return Response(status_code=204)
 
 
@@ -615,7 +613,9 @@ async def upload_initiative_profile_picture(
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
-    await initiative_manager.set_profile_picture(file, initiative_db, request=request)
+    await initiative_manager.profile_picture_handler.set(
+        file, initiative_db, request=request
+    )
 
 
 @initiative_router.delete("/initiative/{initiative_id}/profile-picture")
@@ -628,7 +628,9 @@ async def delete_initiative_profile_picture(
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
-    await initiative_manager.delete_profile_picture(initiative_db, request=request)
+    await initiative_manager.profile_picture_handler.delete(
+        initiative_db, request=request
+    )
     return Response(status_code=204)
 
 
@@ -779,7 +781,9 @@ async def upload_activity_profile_picture(
 ):
     activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
-    await activity_manager.set_profile_picture(file, activity_db, request=request)
+    await activity_manager.profile_picture_handler.set(
+        file, activity_db, request=request
+    )
 
 
 @initiative_router.delete(
@@ -795,7 +799,7 @@ async def delete_activity_profile_picture(
 ):
     activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
-    await activity_manager.delete_profile_picture(activity_db, request=request)
+    await activity_manager.profile_picture_handler.delete(activity_db, request=request)
     return Response(status_code=204)
 
 
