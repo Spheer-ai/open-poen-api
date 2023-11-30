@@ -3,7 +3,7 @@ from ..exc import EntityNotFound
 from ..models import Base, User
 from typing import Type, TypeVar
 from pydantic import BaseModel
-from fastapi import Request
+from fastapi import Request, Depends
 from ..logger import audit_logger
 from typing import Dict, Any
 from abc import ABC, abstractmethod
@@ -11,10 +11,31 @@ from abc import ABC, abstractmethod
 T = TypeVar("T", bound=Base)
 
 
-class BaseManagerExCurrentUser(ABC):
+class BaseLogger:
     def __init__(self, session: AsyncSession, current_user: User | None = None):
         self.session = session
         self.current_user = current_user
+
+    async def after_create(self, entity: T, request: Request | None):
+        audit_logger.info(f"{self.current_user} is creating an entity.")
+        audit_logger.info(f"{entity} is created.")
+
+    async def after_update(
+        self, entity: T, update_dict: Dict[str, Any], request: Request | None
+    ):
+        audit_logger.info(f"{self.current_user} is updating an entity.")
+        audit_logger.info(f"{entity} is updated with {update_dict}.")
+
+    async def after_delete(self, entity: T, request: Request | None):
+        audit_logger.info(f"{self.current_user} is deleting an entity.")
+        audit_logger.info(f"{entity} is deleted.")
+
+
+class BaseCRUD(BaseLogger):
+    def __init__(self, session: AsyncSession, current_user: User | None = None):
+        self.session = session
+        self.current_user = current_user
+        super().__init__(session, current_user)
 
     async def base_create(
         self,
@@ -45,26 +66,13 @@ class BaseManagerExCurrentUser(ABC):
         await self.session.commit()
         await self.after_delete(entity, request)
 
+
+class BaseLoad:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
     async def base_min_load(self, db_model: Type[T], id: int) -> T:
         query_result = await self.session.get(db_model, id)
         if query_result is None:
             raise EntityNotFound(message=f"{db_model.__name__} not found")
         return query_result
-
-    @abstractmethod
-    async def detail_load(self, id: int) -> Base:
-        pass
-
-    async def after_create(self, entity: T, request: Request | None):
-        audit_logger.info(f"{self.current_user} is creating an entity.")
-        audit_logger.info(f"{entity} is created.")
-
-    async def after_update(
-        self, entity: T, update_dict: Dict[str, Any], request: Request | None
-    ):
-        audit_logger.info(f"{self.current_user} is updating an entity.")
-        audit_logger.info(f"{entity} is updated with {update_dict}.")
-
-    async def after_delete(self, entity: T, request: Request | None):
-        audit_logger.info(f"{self.current_user} is deleting an entity.")
-        audit_logger.info(f"{entity} is deleted.")

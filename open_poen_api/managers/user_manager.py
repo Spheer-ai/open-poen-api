@@ -1,12 +1,11 @@
-from fastapi import Depends, Request, Response, UploadFile
+from fastapi import Depends, Request, Response
 
 from open_poen_api.models import User
 from ..database import get_user_db, get_async_session
 from .. import models as ent
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from ..utils.email import MessageSchema, conf, env
-from ..utils.utils import upload_profile_picture
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -22,15 +21,13 @@ import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
 from ..authorization.authorization import SECRET_KEY
-from ..exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityAlreadyExists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_
-from .base_manager_ex_current_user import BaseManagerExCurrentUser
+from .base_manager_ex_current_user import BaseLogger
 from typing import Any, Dict, cast
 from pydantic import EmailStr
 from ..logger import audit_logger
-from ..schemas import UserCreateWithPassword
-from .manager_handlers import ProfilePictureHandler
 
 
 WEBSITE_NAME = os.environ["WEBSITE_NAME"]
@@ -40,14 +37,15 @@ SPA_RESET_PASSWORD_URL = os.environ["SPA_RESET_PASSWORD_URL"]
 class UserManagerExCurrentUser(
     IntegerIDMixin,
     BaseUserManager[ent.User, int],
-    BaseManagerExCurrentUser,
+    BaseLogger,
 ):
     reset_password_token_secret = SECRET_KEY
     verification_token_secret = SECRET_KEY
+    user_db: SQLAlchemyUserDatabase
 
     def __init__(self, session: AsyncSession, user_db, current_user=None):
         BaseUserManager.__init__(self, user_db)
-        BaseManagerExCurrentUser.__init__(self, session, current_user)
+        BaseLogger.__init__(self, session, current_user)
 
     async def on_after_register(
         self, user: ent.User, request: Optional[Request] = None
@@ -135,7 +133,7 @@ class UserManagerExCurrentUser(
         await self.after_delete(user, request)
 
     async def requesting_user_load(self, id: int):
-        query_result_q = await self.session.execute(
+        query_result_q = await self.user_db.session.execute(
             select(ent.User)
             .options(
                 selectinload(ent.User.initiative_roles),
@@ -151,46 +149,6 @@ class UserManagerExCurrentUser(
         )
         user = query_result_q.scalars().one()
         return user
-
-    async def detail_load(self, id: int):
-        query_result_q = await self.session.execute(
-            select(ent.User)
-            .options(
-                selectinload(ent.User.initiative_roles).joinedload(
-                    ent.UserInitiativeRole.initiative
-                ),
-                selectinload(ent.User.activity_roles).joinedload(
-                    ent.UserActivityRole.activity
-                ),
-                selectinload(ent.User.user_bank_account_roles).joinedload(
-                    ent.UserBankAccountRole.bank_account
-                ),
-                selectinload(ent.User.owner_bank_account_roles).joinedload(
-                    ent.UserBankAccountRole.bank_account
-                ),
-                selectinload(ent.User.grant_officer_regulation_roles).joinedload(
-                    ent.UserRegulationRole.regulation
-                ),
-                selectinload(ent.User.policy_officer_regulation_roles).joinedload(
-                    ent.UserRegulationRole.regulation
-                ),
-                selectinload(ent.User.overseer_roles).joinedload(
-                    ent.UserGrantRole.grant
-                ),
-                joinedload(ent.User.profile_picture),
-            )
-            .where(ent.User.id == id)
-        )
-        query_result = query_result_q.scalars().first()
-        if query_result is None:
-            raise EntityNotFound(message="User not found")
-        return query_result
-
-    async def min_load(self, id: int):
-        query_result = await self.session.get(ent.User, id)
-        if query_result is None:
-            raise EntityNotFound(message="User not found")
-        return query_result
 
 
 async def _get_user_manager(
@@ -236,26 +194,3 @@ def with_joins(original_dependency):
 superuser = with_joins(fastapi_users.current_user(superuser=True))
 required_login = with_joins(fastapi_users.current_user(optional=False))
 optional_login = with_joins(fastapi_users.current_user(optional=True))
-
-
-class UserManager(UserManagerExCurrentUser):
-    def __init__(
-        self,
-        user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
-        session: AsyncSession = Depends(get_async_session),
-        current_user: ent.User | None = Depends(optional_login),
-    ):
-        super().__init__(session, user_db, current_user)
-        self.profile_picture_handler = ProfilePictureHandler[ent.User](
-            session, ent.AttachmentEntityType.USER
-        )
-
-    async def set_profile_picture(
-        self, file: UploadFile, user: ent.User, request: Request
-    ):
-        await self.profile_picture_handler.set_profile_picture(file, user)
-        await self.after_update(user, {"profile_picture": "created"}, request=request)
-
-    async def delete_profile_picture(self, user: ent.User, request: Request):
-        await self.profile_picture_handler.delete_profile_picture(user)
-        await self.after_update(user, {"profile_picture": "deleted"}, request=request)

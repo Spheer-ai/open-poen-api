@@ -1,25 +1,36 @@
-from fastapi import UploadFile
+from fastapi import UploadFile, Request
 from ..models import (
     ProfilePictureMixin,
     AttachmentEntityType,
     AttachmentAttachmentType,
     Attachment,
+    User,
 )
 from typing import TypeVar, Generic
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..utils.utils import upload_profile_picture
+from .base_manager import BaseManager
+import datetime
 
 
 T = TypeVar("T", bound=ProfilePictureMixin)
 
 
-class ProfilePictureHandler(Generic[T]):
-    def __init__(self, session: AsyncSession, entity_type: AttachmentEntityType):
-        self.session = session
+class ProfilePictureHandler(BaseManager, Generic[T]):
+    def __init__(
+        self,
+        session: AsyncSession,
+        current_user: User | None,
+        entity_type: AttachmentEntityType,
+    ):
+        super().__init__(session, current_user)
         self.entity_type = entity_type
 
-    async def set_profile_picture(self, file: UploadFile, db_entity: T) -> None:
-        filename = f"{db_entity.id}_{self.entity_type.value}_profile_picture"
+    async def set(self, file: UploadFile, db_entity: T, request: Request) -> None:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+        filename = (
+            f"{db_entity.id}_{self.entity_type.value}_profile_picture_{timestamp}"
+        )
         ppu = await upload_profile_picture(file, filename)
         if db_entity.profile_picture is None:
             profile_picture = Attachment(
@@ -41,12 +52,18 @@ class ProfilePictureHandler(Generic[T]):
             ppu.raw_attachment_thumbnail_512_url
         )
 
-        self.session.add(profile_picture)
-        await self.session.commit()
+        self.crud.session.add(profile_picture)
+        await self.crud.session.commit()
+        await self.crud.after_update(
+            db_entity, {"profile_picture": "created"}, request=request
+        )
 
-    async def delete_profile_picture(self, db_entity: T) -> None:
+    async def delete(self, db_entity: T, request: Request) -> None:
         if db_entity.profile_picture is None:
             return
 
-        await self.session.delete(db_entity.profile_picture)
-        await self.session.commit()
+        await self.crud.session.delete(db_entity.profile_picture)
+        await self.crud.session.commit()
+        await self.crud.after_update(
+            db_entity, {"profile_picture": "created"}, request=request
+        )

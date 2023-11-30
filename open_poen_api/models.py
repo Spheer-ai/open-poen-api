@@ -109,7 +109,9 @@ class Attachment(Base):
         return generate_sas_token(self.raw_attachment_thumbnail_512_url)
 
 
-class ProfilePictureMixin:
+class ProfilePictureMixin(Base):
+    __abstract__ = True
+
     id: int
     id_column: str
     entity_type: str
