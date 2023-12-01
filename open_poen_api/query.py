@@ -1,7 +1,9 @@
 from . import models as ent
 from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy import select, and_, or_, literal
-from .exc import UnprocessableContent, NotAuthorized
+from sqlalchemy import select, or_, literal
+from .exc import UnprocessableContent
+from datetime import datetime, date, timedelta
+from .schemas import TransactionAmount
 
 
 class RequestingUser:
@@ -262,5 +264,146 @@ def get_linkable_activities_q(required_user: ent.User, initiative_id: int):
         .where(ent.Activity.initiative_id == initiative_id)
         .order_by(ent.Activity.id.desc())
     )
+
+    return q
+
+
+def apply_date_range_filter(query, start_date: date | None, end_date: date | None):
+    if start_date:
+        query = query.where(ent.Payment.booking_date >= start_date)
+    if end_date:
+        end_date += timedelta(days=1)
+        query = query.where(ent.Payment.booking_date <= end_date)
+    return query
+
+
+def apply_amount_range_filter(
+    query, min_amount: TransactionAmount | None, max_amount: TransactionAmount | None
+):
+    if min_amount is not None:
+        query = query.where(ent.Payment.transaction_amount >= min_amount)
+    if max_amount is not None:
+        query = query.where(ent.Payment.transaction_amount <= max_amount)
+    return query
+
+
+def apply_route_filter(query, route: ent.Route | None):
+    if route:
+        query = query.where(ent.Payment.route == route.value)
+    return query
+
+
+def get_initiative_payments_q(
+    optional_user: ent.User | None,
+    initiative_id: int,
+    offset: int,
+    limit: int,
+    start_date: date | None,
+    end_date: date | None,
+    min_amount: TransactionAmount | None,
+    max_amount: TransactionAmount | None,
+    route: ent.Route | None,
+):
+    q = (
+        select(
+            ent.Payment.id,
+            ent.Payment.booking_date,
+            ent.Activity.name.label("activity_name"),
+            ent.Payment.creditor_name,
+            ent.Payment.debtor_name,
+            ent.Payment.short_user_description,
+            ent.Payment.transaction_amount,
+        )
+        .outerjoin(ent.Activity, ent.Payment.activity_id == ent.Activity.id)
+        .where(ent.Payment.initiative_id == initiative_id)
+    )
+
+    if optional_user is not None:
+        requesting_user = RequestingUser(optional_user)
+
+    if optional_user is None:
+        q = q.where(ent.Payment.hidden == False)
+    else:
+        q = q.where(
+            or_(
+                ent.Payment.hidden == False,
+                # You can see hidden payments if you are initiative owner.
+                ent.Payment.initiative_id.in_(requesting_user.initiative_ids),
+                # You can see hidden payments if you are activity owner.
+                ent.Payment.activity_id.in_(requesting_user.activity_ids),
+                # You can see hidden payments if you are overseer.
+                ent.Payment.initiative_id.in_(
+                    select(ent.Initiative.id)
+                    .join(ent.Grant)
+                    .where(ent.Grant.id.in_(requesting_user.grant_ids))
+                ),
+                # Being a policy or grant officer on one regulation is enough to
+                # see any payment.
+                literal(requesting_user.is_officer),
+                # Administrators or super users can see everything.
+                literal(requesting_user.is_administrator),
+                literal(requesting_user.is_superuser),
+            )
+        )
+
+    q = apply_date_range_filter(q, start_date, end_date)
+    q = apply_amount_range_filter(q, min_amount, max_amount)
+    q = apply_route_filter(q, route)
+    q = q.order_by(ent.Payment.id.desc()).offset(offset).limit(limit)
+
+    return q
+
+
+def get_activity_payments_q(
+    optional_user: ent.User | None,
+    activity_id: int,
+    offset: int,
+    limit: int,
+    start_date: date | None,
+    end_date: date | None,
+    min_amount: TransactionAmount | None,
+    max_amount: TransactionAmount | None,
+    route: ent.Route | None,
+):
+    q = select(
+        ent.Payment.id,
+        ent.Payment.booking_date,
+        ent.Payment.creditor_name,
+        ent.Payment.debtor_name,
+        ent.Payment.short_user_description,
+        ent.Payment.transaction_amount,
+    ).where(ent.Payment.activity_id == activity_id)
+
+    if optional_user is not None:
+        requesting_user = RequestingUser(optional_user)
+
+    if optional_user is None:
+        q = q.where(ent.Payment.hidden == False)
+    else:
+        q = q.where(
+            or_(
+                ent.Payment.hidden == False,
+                # You can see hidden payments if you are initiative owner.
+                ent.Payment.initiative_id.in_(requesting_user.initiative_ids),
+                # You can see hidden payments if you are activity owner.
+                ent.Payment.activity_id.in_(requesting_user.activity_ids),
+                # You can see hidden payments if you are overseer.
+                ent.Payment.initiative_id.in_(
+                    select(ent.Initiative.id)
+                    .join(ent.Grant)
+                    .where(ent.Grant.id.in_(requesting_user.grant_ids))
+                ),
+                # Being a policy or grant officer on one regulation is enough to
+                # see any payment.
+                literal(requesting_user.is_officer),
+                # Administrators or super users can see everything.
+                literal(requesting_user.is_superuser),
+            )
+        )
+
+    q = apply_date_range_filter(q, start_date, end_date)
+    q = apply_amount_range_filter(q, min_amount, max_amount)
+    q = apply_route_filter(q, route)
+    q = q.order_by(ent.Payment.id.desc()).offset(offset).limit(limit)
 
     return q

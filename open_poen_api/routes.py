@@ -20,7 +20,6 @@ from . import managers as m
 from .utils.utils import (
     temp_password_generator,
     get_requester_ip,
-    format_user_timestamp,
 )
 import os
 from .bng.api import create_consent
@@ -28,8 +27,7 @@ from .bng import import_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy import select, and_, or_, literal
+from sqlalchemy import select, and_
 from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
@@ -44,7 +42,7 @@ from .gocardless import (
 from .gocardless import get_institutions as get_institutions_from_gocardless
 from nordigen import NordigenClient
 import uuid
-from .exc import PaymentCouplingError, NotAuthorized
+from .exc import NotAuthorized
 from .logger import audit_logger
 from .query import (
     get_initiatives_q,
@@ -55,8 +53,9 @@ from .query import (
     get_user_payments_q,
     get_linkable_initiatives_q,
     get_linkable_activities_q,
+    get_initiative_payments_q,
+    get_activity_payments_q,
 )
-
 
 user_router = APIRouter(tags=["user"])
 funder_router = APIRouter(tags=["funder"])
@@ -1377,7 +1376,7 @@ async def delete_payment(
 
 @payment_router.get(
     "/payments/bng",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadUserList,
     response_model_exclude_unset=True,
     summary="Get BNG Payments",
 )
@@ -1391,7 +1390,7 @@ async def get_bng_payments(
 
 @payment_router.get(
     "/payments/user/{user_id}",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadUserList,
     response_model_exclude_unset=True,
 )
 async def get_user_payments(
@@ -1432,36 +1431,86 @@ async def get_user_payments(
 
     payments = [s.PaymentReadUser(**i) for i in payments_with_linkability]
 
-    return s.PaymentReadList(payments=payments)
+    return s.PaymentReadUserList(payments=payments)
 
 
 @payment_router.get(
     "/payments/initiative/{initiative_id}",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadInitiativeList,
     response_model_exclude_unset=True,
 )
 async def get_initiative_payments(
     initiative_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    min_amount: s.TransactionAmount | None = None,
+    max_amount: s.TransactionAmount | None = None,
+    route: ent.Route | None = None,
 ):
-    pass
+    # TODO: Add filters.
+    query = get_initiative_payments_q(
+        optional_user,
+        initiative_id,
+        offset,
+        limit,
+        start_date,
+        end_date,
+        min_amount,
+        max_amount,
+        route,
+    )
+
+    payments_result = await session.execute(query)
+    payments_scalar = payments_result.all()
+
+    payments = [s.PaymentReadInitiative(**i._mapping) for i in payments_scalar]
+
+    return s.PaymentReadInitiativeList(payments=payments)
 
 
 @payment_router.get(
     "/payments/initiative/{initiative_id}/activity/{activity_id}",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadActivityList,
     response_model_exclude_unset=True,
 )
 async def get_activity_payments(
     initiative_id: int,
     activity_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    min_amount: s.TransactionAmount | None = None,
+    max_amount: s.TransactionAmount | None = None,
+    route: ent.Route | None = None,
 ):
-    pass
+    # TODO: Add filters.
+    query = get_activity_payments_q(
+        optional_user,
+        activity_id,
+        offset,
+        limit,
+        start_date,
+        end_date,
+        min_amount,
+        max_amount,
+        route,
+    )
+
+    payments_result = await session.execute(query)
+    payments_scalar = payments_result.all()
+
+    payments = [s.PaymentReadActivity(**i._mapping) for i in payments_scalar]
+
+    return s.PaymentReadActivityList(payments=payments)
 
 
 @permission_router.get("/actions", response_model=s.AuthActionsRead)

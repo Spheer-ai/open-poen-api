@@ -255,3 +255,140 @@ async def test_get_linked_initiative_detail(
     response = await async_client.get(f"/initiative/{initiative_id}")
     assert response.status_code == status_code
     assert (field in response.json().keys()) == present
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, length",
+    [(superuser, 11), (initiative_owner, 11), (activity_owner, 10), (user, 9)],
+    ids=[
+        "Super user sees also hidden payments",
+        "Initiative owner sees also hidden payment",
+        "Activity owner sees own hidden payment in activity",
+        "User cannot see any hidden payments",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_initiative_payments(async_client, dummy_session, length):
+    initiative_id = 1
+    response = await async_client.get(f"payments/initiative/{initiative_id}")
+    assert response.status_code == 200
+    assert len(response.json()["payments"]) == length
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, start_date, end_date, min_amount, max_amount, route, expected_length, status_code",
+    [
+        (
+            superuser,
+            None,
+            None,
+            None,
+            None,
+            None,
+            11,
+            200,
+        ),
+        (
+            superuser,
+            "2023-08-15",
+            "2023-10-03",
+            None,
+            None,
+            None,
+            10,
+            200,
+        ),
+        (
+            superuser,
+            "2023-01-011",
+            "2023-06-300",
+            None,
+            None,
+            None,
+            None,
+            422,
+        ),
+        (
+            superuser,
+            None,
+            None,
+            0,
+            700,
+            None,
+            8,
+            200,
+        ),
+        (
+            superuser,
+            None,
+            None,
+            20.001,
+            120.00,
+            None,
+            None,
+            422,
+        ),
+        (
+            superuser,
+            None,
+            None,
+            None,
+            None,
+            "inkomen",
+            6,
+            200,
+        ),
+        (
+            superuser,
+            None,
+            None,
+            None,
+            None,
+            "onbekend",
+            None,
+            422,
+        ),
+        (superuser, "2000-08-15", "2023-10-03", 500.00, 100000, "uitgaven", 3, 200),
+    ],
+    ids=[
+        "No filters returns all payments",
+        "Date filter",
+        "Invalid date returns error",
+        "Transaction amount filter",
+        "Invalid transaction amount returns error",
+        "Route filter",
+        "Invalid route returns error",
+        "Filters can be combined",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_initiative_payments_filters(
+    async_client,
+    dummy_session,
+    get_mock_user,
+    start_date,
+    end_date,
+    min_amount,
+    max_amount,
+    route,
+    expected_length,
+    status_code,
+):
+    initiative_id = 1
+    params = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "min_amount": min_amount,
+        "max_amount": max_amount,
+        "route": route,
+    }
+
+    params = {k: v for k, v in params.items() if v is not None}
+
+    response = await async_client.get(
+        f"/payments/initiative/{initiative_id}", params=params
+    )
+    assert response.status_code == status_code
+    if status_code == 200:
+        payments = response.json()["payments"]
+        assert len(payments) == expected_length

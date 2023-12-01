@@ -573,7 +573,9 @@ class Payment(Base):
     transaction_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
     entry_reference: Mapped[str] = mapped_column(String, nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String, nullable=True)
-    booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    booking_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
     transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
     creditor_name: Mapped[str] = mapped_column(String, nullable=True)
     creditor_account: Mapped[str] = mapped_column(String, nullable=True)

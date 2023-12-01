@@ -20,6 +20,25 @@ class PaymentReadUser(BaseModel):
     linkable_activity: bool
 
 
+class PaymentReadInitiative(BaseModel):
+    id: int
+    booking_date: datetime | None
+    activity_name: str | None
+    creditor_name: str | None
+    debtor_name: str | None
+    short_user_description: str | None
+    transaction_amount: TransactionAmount
+
+
+class PaymentReadActivity(BaseModel):
+    id: int
+    booking_date: datetime | None
+    creditor_name: str | None
+    debtor_name: str | None
+    short_user_description: str | None
+    transaction_amount: TransactionAmount
+
+
 class BasePaymentCreate(BaseModel):
     booking_date: datetime
     transaction_amount: TransactionAmount
@@ -89,8 +108,22 @@ class PaymentActivityUpdate(BaseModel):
     activity_id: int | None
 
 
-class PaymentReadList(BaseModel):
+class PaymentReadUserList(BaseModel):
     payments: list[PaymentReadUser]
+
+    class Config:
+        orm_mode = True
+
+
+class PaymentReadInitiativeList(BaseModel):
+    payments: list[PaymentReadInitiative]
+
+    class Config:
+        orm_mode = True
+
+
+class PaymentReadActivityList(BaseModel):
+    payments: list[PaymentReadActivity]
 
     class Config:
         orm_mode = True
