@@ -68,7 +68,7 @@ class AttachmentEntityType(str, Enum):
 class AttachmentAttachmentType(str, Enum):
     PROFILE_PICTURE = "profile_picture"
     PICTURE = "picture"
-    DOCUMENT = "document"
+    PDF = "pdf"
 
 
 class Attachment(Base):
@@ -82,14 +82,14 @@ class Attachment(Base):
         ChoiceType(AttachmentAttachmentType, impl=VARCHAR(length=32))
     )
     raw_attachment_url: Mapped[str] = mapped_column(String, nullable=False)
-    raw_attachment_thumbnail_128_url: Mapped[str] = mapped_column(
-        String, nullable=False
+    raw_attachment_thumbnail_128_url: Mapped[str | None] = mapped_column(
+        String, nullable=True
     )
-    raw_attachment_thumbnail_256_url: Mapped[str] = mapped_column(
-        String, nullable=False
+    raw_attachment_thumbnail_256_url: Mapped[str | None] = mapped_column(
+        String, nullable=True
     )
-    raw_attachment_thumbnail_512_url: Mapped[str] = mapped_column(
-        String, nullable=False
+    raw_attachment_thumbnail_512_url: Mapped[str | None] = mapped_column(
+        String, nullable=True
     )
 
     @hybrid_property
@@ -122,10 +122,29 @@ class ProfilePictureMixin(Base):
             "Attachment",
             lazy="joined",
             primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
-            f"Attachment.entity_type=='{cls.entity_type}', Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
+            f"Attachment.entity_type=='{cls.entity_type}', "
+            f"Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
             cascade="all, delete-orphan",
-            uselist=False,
             overlaps="profile_picture",
+        )
+
+
+class AttachmentMixin(Base):
+    __abstract__ = True
+
+    id: int
+    id_column: str
+    entity_type: str
+
+    @declared_attr
+    def attachments(cls) -> Mapped[list[Attachment]]:
+        return relationship(
+            "Attachment",
+            lazy="noload",
+            primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
+            f"Attachment.entity_type=='{cls.entity_type}', or_("
+            f"Attachment.attachment_type=='{AttachmentAttachmentType.PICTURE.value}', "
+            f"Attachment.attachment_type=='{AttachmentAttachmentType.PDF.value}'))",
         )
 
 

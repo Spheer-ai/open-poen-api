@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, validator
 from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
-from .profile_picture import ProfilePicture
+from .attachment import ProfilePicture
 
 
 class ActivityRead(BaseModel):
