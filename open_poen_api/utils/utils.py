@@ -45,12 +45,17 @@ container_client = blob_service_client.get_container_client("media")
 
 class AttachmentUpdate(BaseModel):
     raw_attachment_url: str
-    raw_attachment_thumbnail_128_url: str | None
-    raw_attachment_thumbnail_256_url: str | None
-    raw_attachment_thumbnail_512_url: str | None
+    raw_attachment_thumbnail_128_url: str | None = None
+    raw_attachment_thumbnail_256_url: str | None = None
+    raw_attachment_thumbnail_512_url: str | None = None
 
 
-async def upload_attachment(file: UploadFile, filename: str, make_thumbnail = True) -> AttachmentUpdate:
+async def upload_attachment(
+    file: UploadFile, filename: str, make_thumbnail=True
+) -> AttachmentUpdate:
+    if file.content_type not in ("image/png", "image/jpeg") and make_thumbnail:
+        raise ValueError("Can only make thumbnails for png and jpeg")
+
     # TODO: Verify that the mime type is correct by checking the first n bytes.
     file_content = await file.read()
     if len(file_content) > 10 * 1024 * 1024:
@@ -63,8 +68,6 @@ async def upload_attachment(file: UploadFile, filename: str, make_thumbnail = Tr
 
     if not make_thumbnail:
         return AttachmentUpdate(raw_attachment_url=blob_client.url)
-    
-    assert file.content_type in ("image/png", "image/jpeg")
 
     image = Image.open(io.BytesIO(file_content))
     image_format = "PNG" if file.content_type == "image/png" else "JPEG"
@@ -115,7 +118,3 @@ def generate_sas_token(blob_url: T) -> T:
         expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=1),
     )
     return f"{blob_url}?{sas_token}"
-
-
-async def upload_attachment(file: UploadFile, filename: str) -> AttachmentUpdate:
-    

@@ -63,6 +63,7 @@ class AttachmentEntityType(str, Enum):
     USER = "user"
     INITIATIVE = "initiative"
     ACTIVITY = "activity"
+    PAYMENT = "payment"
 
 
 class AttachmentAttachmentType(str, Enum):
@@ -126,6 +127,7 @@ class ProfilePictureMixin(Base):
             f"Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
             cascade="all, delete-orphan",
             overlaps="profile_picture",
+            uselist=False,
         )
 
 
@@ -145,6 +147,8 @@ class AttachmentMixin(Base):
             f"Attachment.entity_type=='{cls.entity_type}', or_("
             f"Attachment.attachment_type=='{AttachmentAttachmentType.PICTURE.value}', "
             f"Attachment.attachment_type=='{AttachmentAttachmentType.PDF.value}'))",
+            cascade="all, delete-orphan",
+            overlaps="attachments",
         )
 
 
@@ -584,9 +588,12 @@ def get_finance_aggregate(route: Route):
     )
 
 
-class Payment(Base):
+class Payment(AttachmentMixin, Base):
     __tablename__ = "payment"
     __table_args__ = (UniqueConstraint("transaction_id", name="unique transaction id"),)
+
+    id_column = "Payment.id"
+    entity_type = AttachmentEntityType.PAYMENT.value
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     transaction_id: Mapped[str] = mapped_column(String, nullable=True, index=True)

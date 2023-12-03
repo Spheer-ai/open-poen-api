@@ -1,14 +1,28 @@
-from fastapi import Request
+from fastapi import Request, Depends
 from ..schemas import PaymentCreateManual, PaymentUpdate, BasePaymentCreate
 from .. import models as ent
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from ..exc import EntityNotFound
 from ..exc import EntityNotFound
 from .base_manager import BaseManager
+from .handlers import AttachmentHandler
+from sqlalchemy.ext.asyncio import AsyncSession
+from ..database import get_async_session
+from .user_manager import optional_login
+from sqlalchemy.orm import selectinload
 
 
 class PaymentManager(BaseManager):
+    def __init__(
+        self,
+        session: AsyncSession = Depends(get_async_session),
+        current_user: ent.User | None = Depends(optional_login),
+    ):
+        super().__init__(session, current_user)
+        self.attachment_handler = AttachmentHandler[ent.Payment](
+            self.session, current_user, ent.AttachmentEntityType.PAYMENT
+        )
+
     async def create(
         self,
         payment_create: PaymentCreateManual,
@@ -16,18 +30,13 @@ class PaymentManager(BaseManager):
         activity_id: int | None,
         request: Request | None,
     ) -> ent.Payment:
-        try:
-            payment = await self.crud.create(
-                BasePaymentCreate.parse_obj(payment_create),
-                ent.Payment,
-                request,
-                initiative_id=initiative_id,
-                activity_id=activity_id,
-            )
-        except IntegrityError:
-            # TODO: Make sure we catch the right error.
-            # TODO: Raise an error?
-            await self.session.rollback()
+        payment = await self.crud.create(
+            BasePaymentCreate.parse_obj(payment_create),
+            ent.Payment,
+            request,
+            initiative_id=initiative_id,
+            activity_id=activity_id,
+        )
         return payment
 
     async def update(
@@ -36,11 +45,7 @@ class PaymentManager(BaseManager):
         payment_db: ent.Payment,
         request: Request | None,
     ) -> ent.Payment:
-        try:
-            payment = await self.crud.update(payment_update, payment_db, request)
-        except IntegrityError:
-            # Make sure we catch the right error and raise something.
-            await self.session.rollback()
+        payment = await self.crud.update(payment_update, payment_db, request)
         return payment
 
     async def delete(
@@ -78,7 +83,9 @@ class PaymentManager(BaseManager):
 
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
-            select(ent.Payment).where(ent.Payment.id == id)
+            select(ent.Payment)
+            .options(selectinload(ent.Payment.attachments))
+            .where(ent.Payment.id == id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:

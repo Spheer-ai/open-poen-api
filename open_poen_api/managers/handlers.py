@@ -88,34 +88,51 @@ class AttachmentHandler(BaseManager, Generic[V]):
         super().__init__(session, current_user)
         self.entity_type = entity_type
 
-    async def set(self, file: UploadFile, db_entity: V, request: Request) -> None:
+    async def set(
+        self, files: list[UploadFile], db_entity: V, request: Request
+    ) -> None:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-        # Plus one to be consistent with the file names for profile pictures. There we
-        # use the index of the db, which starts at one.
-        n = len(db_entity.attachments) + 1
-        filename = f"{db_entity.id}_{self.entity_type.value}_attachment_{n}_{timestamp}"
 
-        if file.content_type == "application/pdf":
-            attachment_type = AttachmentAttachmentType.PDF
-        elif file.content_type in ("image/jpeg", "image/png"):
-            attachment_type = AttachmentAttachmentType.PICTURE
-        else:
-            raise UnsupportedFileType("Attachment should be png, jpeg or pdf")
+        for file in files:
+            if file.content_type == "application/pdf":
+                attachment_type = AttachmentAttachmentType.PDF
+            elif file.content_type in ("image/jpeg", "image/png"):
+                attachment_type = AttachmentAttachmentType.PICTURE
+            else:
+                raise UnsupportedFileType("Attachment should be png, jpeg or pdf")
 
-        au = await upload_attachment(file, filename)
+            attachment = Attachment(
+                raw_attachment_url="",
+                entity_id=db_entity.id,
+                entity_type=self.entity_type,
+                attachment_type=attachment_type,
+            )
+            self.crud.session.add(attachment)
+            await self.crud.session.flush()
 
-        attachment = Attachment(
-            raw_attachment_url=au.raw_attachment_url,
-            entity_id=db_entity.id,
-            entity_type=self.entity_type,
-            attachment_type=attachment_type,
-        )
+            filename = f"{db_entity.id}_{self.entity_type.value}_{attachment.id}_attachment_{timestamp}"
 
-        self.crud.session.add(attachment)
-        await self.crud.session.commit()
-        await self.logger.after_update(
-            db_entity, {"attachment": "created"}, request=request
-        )
+            au = await upload_attachment(
+                file,
+                filename,
+                make_thumbnail=(attachment_type == AttachmentAttachmentType.PICTURE),
+            )
+
+            attachment.raw_attachment_url = au.raw_attachment_url
+            attachment.raw_attachment_thumbnail_128_url = (
+                au.raw_attachment_thumbnail_128_url
+            )
+            attachment.raw_attachment_thumbnail_256_url = (
+                au.raw_attachment_thumbnail_256_url
+            )
+            attachment.raw_attachment_thumbnail_512_url = (
+                au.raw_attachment_thumbnail_512_url
+            )
+
+            await self.crud.session.commit()
+            await self.logger.after_update(
+                db_entity, {"attachment": "created"}, request=request
+            )
 
     async def delete(self, db_entity: V, attachment_id: int, request: Request) -> None:
         was_deleted = False

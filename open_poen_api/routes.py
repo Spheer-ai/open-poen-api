@@ -1374,6 +1374,34 @@ async def delete_payment(
     return Response(status_code=204)
 
 
+@payment_router.post("/payment/{payment_id}/attachment")
+async def upload_payment_attachment(
+    payment_id: int,
+    request: Request,
+    files: list[UploadFile] = File(...),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    auth.authorize(required_user, "edit", payment_db, oso)
+    await payment_manager.attachment_handler.set(files, payment_db, request)
+
+
+@payment_router.delete("/payment/{payment_id}/attachment/{attachment_id}")
+async def delete_payment_attachment(
+    payment_id: int,
+    attachment_id: int,
+    request: Request,
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    auth.authorize(required_user, "edit", payment_db, oso)
+    await payment_manager.attachment_handler.delete(payment_db, attachment_id, request)
+
+
 @payment_router.get(
     "/payments/bng",
     response_model=s.PaymentReadUserList,
@@ -1452,7 +1480,6 @@ async def get_initiative_payments(
     max_amount: s.TransactionAmount | None = None,
     route: ent.Route | None = None,
 ):
-    # TODO: Add filters.
     query = get_initiative_payments_q(
         optional_user,
         initiative_id,
@@ -1492,7 +1519,6 @@ async def get_activity_payments(
     max_amount: s.TransactionAmount | None = None,
     route: ent.Route | None = None,
 ):
-    # TODO: Add filters.
     query = get_activity_payments_q(
         optional_user,
         activity_id,
