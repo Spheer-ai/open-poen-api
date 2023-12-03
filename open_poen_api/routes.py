@@ -1374,8 +1374,8 @@ async def delete_payment(
     return Response(status_code=204)
 
 
-@payment_router.post("/payment/{payment_id}/attachment")
-async def upload_payment_attachment(
+@payment_router.post("/payment/{payment_id}/attachments")
+async def upload_payment_attachments(
     payment_id: int,
     request: Request,
     files: list[UploadFile] = File(...),

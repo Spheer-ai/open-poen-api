@@ -1,5 +1,5 @@
 import pytest
-from open_poen_api.models import User, Initiative
+from open_poen_api.models import User, Initiative, Payment
 from tests.conftest import userowner, initiative_owner, user, superuser
 import asyncio
 from fastapi import UploadFile
@@ -77,24 +77,32 @@ async def test_upload_profile_picture(
 
 
 @pytest.mark.parametrize(
-    "get_mock_user, status_code",
-    [
-        (superuser, 200),
-    ],
+    "get_mock_user, status_code, n_added",
+    [(superuser, 200, 0), (superuser, 200, 1)],
     ids=[
         "Super user can upload single attachment",
+        "Super user can upload multiple attachments",
     ],
     indirect=["get_mock_user"],
 )
 async def test_upload_attachment(
-    async_client,
-    dummy_session,
-    get_mock_user,
-    status_code,
+    async_client, dummy_session, get_mock_user, status_code, n_added
 ):
     files = [("files", ("name.png", file_content(), "image/png"))]
-    files += [("files", ("name.png", file_content(), "image/png"))]
+    for i in range(0, n_added):
+        files += [("files", ("name.png", file_content(), "image/png"))]
     payment_id = 1
-    response = await async_client.post(f"/payment/{payment_id}/attachment", files=files)
+    response = await async_client.post(
+        f"/payment/{payment_id}/attachments", files=files
+    )
 
     assert response.status_code == status_code
+
+    if status_code == 200:
+        q = await dummy_session.execute(
+            select(Payment)
+            .options(selectinload(Payment.attachments))
+            .where(Payment.id == payment_id)
+        )
+        r = q.scalars().first()
+        assert len(r.attachments) == n_added + 1

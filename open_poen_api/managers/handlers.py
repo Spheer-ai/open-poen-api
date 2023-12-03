@@ -9,10 +9,18 @@ from ..models import (
 )
 from typing import TypeVar, Generic
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..utils.utils import upload_attachment
+from ..utils.utils import upload_attachment, AttachmentUpdate
 from .base_manager import BaseManager
 import datetime
 from ..exc import EntityNotFound, UnsupportedFileType, FileTooLarge
+
+
+def assign_attachment_urls(entity: Attachment, au: AttachmentUpdate):
+    entity.raw_attachment_url = au.raw_attachment_url
+    entity.raw_attachment_thumbnail_128_url = au.raw_attachment_thumbnail_128_url
+    entity.raw_attachment_thumbnail_256_url = au.raw_attachment_thumbnail_256_url
+    entity.raw_attachment_thumbnail_512_url = au.raw_attachment_thumbnail_512_url
+    return entity
 
 
 T = TypeVar("T", bound=ProfilePictureMixin)
@@ -30,35 +38,29 @@ class ProfilePictureHandler(BaseManager, Generic[T]):
 
     async def set(self, file: UploadFile, db_entity: T, request: Request) -> None:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-        filename = (
-            f"{db_entity.id}_{self.entity_type.value}_profile_picture_{timestamp}"
-        )
 
         if file.content_type not in ["image/png", "image/jpeg"]:
             raise UnsupportedFileType("Profile picture should be png or jpeg")
 
-        au = await upload_attachment(file, filename)
         if db_entity.profile_picture is None:
             profile_picture = Attachment(
+                raw_attachment_url="",
                 entity_id=db_entity.id,
                 entity_type=self.entity_type,
                 attachment_type=AttachmentAttachmentType.PROFILE_PICTURE,
             )
+            self.crud.session.add(profile_picture)
         else:
             profile_picture = db_entity.profile_picture
 
-        profile_picture.raw_attachment_url = au.raw_attachment_url
-        profile_picture.raw_attachment_thumbnail_128_url = (
-            au.raw_attachment_thumbnail_128_url
-        )
-        profile_picture.raw_attachment_thumbnail_256_url = (
-            au.raw_attachment_thumbnail_256_url
-        )
-        profile_picture.raw_attachment_thumbnail_512_url = (
-            au.raw_attachment_thumbnail_512_url
-        )
+        await self.crud.session.flush()
 
-        self.crud.session.add(profile_picture)
+        filename = f"{db_entity.id}_{self.entity_type.value}_{profile_picture.id}_profile_picture_{timestamp}"
+
+        au = await upload_attachment(file, filename, make_thumbnail=True)
+
+        profile_picture = assign_attachment_urls(profile_picture, au)
+
         await self.crud.session.commit()
         await self.logger.after_update(
             db_entity, {"profile_picture": "created"}, request=request
@@ -118,16 +120,7 @@ class AttachmentHandler(BaseManager, Generic[V]):
                 make_thumbnail=(attachment_type == AttachmentAttachmentType.PICTURE),
             )
 
-            attachment.raw_attachment_url = au.raw_attachment_url
-            attachment.raw_attachment_thumbnail_128_url = (
-                au.raw_attachment_thumbnail_128_url
-            )
-            attachment.raw_attachment_thumbnail_256_url = (
-                au.raw_attachment_thumbnail_256_url
-            )
-            attachment.raw_attachment_thumbnail_512_url = (
-                au.raw_attachment_thumbnail_512_url
-            )
+            attachment = assign_attachment_urls(attachment, au)
 
             await self.crud.session.commit()
             await self.logger.after_update(
