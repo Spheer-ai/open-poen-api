@@ -8,7 +8,9 @@ from typing import Literal
 class PaymentReadUser(BaseModel):
     id: int
     booking_date: datetime
+    initiative_id: int | None
     initiative_name: str | None
+    activity_id: int | None
     activity_name: str | None
     creditor_name: str | None
     short_user_description: str | None
