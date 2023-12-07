@@ -45,6 +45,7 @@ userowner = 1
 user = 7
 admin = 5
 grant_officer = 11
+policy_officer = 8
 initiative_owner = 12
 activity_owner = 13
 anon = None
@@ -85,6 +86,21 @@ grant_info = {
     "name": "Beschikking BBQ",
     "reference": "AB1234",
     "budget": 1000.01,
+}
+
+payment_info = {
+    "booking_date": "2023-12-07T11:50:06.944Z",
+    "transaction_amount": 800,
+    "creditor_name": "MMT de Wijk",
+    "creditor_account": "IBAN1234",
+    "debtor_name": "J Vleij",
+    "debtor_account": "IBAN4321",
+    "route": "uitgaven",
+    "short_user_description": "Kort",
+    "long_user_description": "Lang",
+    "hidden": False,
+    "initiative_id": 1,
+    "activity_id": 1,
 }
 
 
@@ -269,6 +285,9 @@ async def add_dummy_data(async_session):
     regulation = await regulation_manager.min_load(6)
     await regulation_manager.make_users_officer(
         regulation, user_ids=[11], regulation_role=RegulationRole.GRANT_OFFICER
+    )
+    await regulation_manager.make_users_officer(
+        regulation, user_ids=[8], regulation_role=RegulationRole.POLICY_OFFICER
     )
 
     initiative = await initiative_manager.min_load(1)
