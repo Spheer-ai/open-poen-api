@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
-from .mixins import TransactionAmount
+from .mixins import TransactionAmount, NotNullValidatorMixin
 from ..models import Route, PaymentType
 from typing import Literal
 
@@ -105,17 +105,30 @@ class PaymentCreateAll(BasePaymentCreate):
         return debit_card_id
 
 
-class PaymentUpdate(BaseModel):
-    booking_date: datetime
-    transaction_amount: TransactionAmount
-    creditor_name: str = Field(max_length=128)
-    creditor_account: str = Field(max_length=128)
-    debtor_name: str = Field(max_length=128)
-    debtor_account: str = Field(max_length=128)
-    route: Route
-    short_user_description: str = Field(max_length=128)
-    long_user_description: str = Field(max_length=512)
-    hidden: bool
+class PaymentUpdate(NotNullValidatorMixin):
+    NOT_NULL_FIELDS: list[str] = [
+        "booking_date",
+        "transaction_amount",
+        "creditor_name",
+        "creditor_account",
+        "debtor_name",
+        "debtor_account",
+        "route",
+        "short_user_description",
+        "long_user_description",
+        "hidden",
+    ]
+
+    booking_date: datetime | None
+    transaction_amount: TransactionAmount | None
+    creditor_name: str | None = Field(max_length=128)
+    creditor_account: str | None = Field(max_length=128)
+    debtor_name: str | None = Field(max_length=128)
+    debtor_account: str | None = Field(max_length=128)
+    route: Route | None
+    short_user_description: str | None = Field(max_length=128)
+    long_user_description: str | None = Field(max_length=512)
+    hidden: bool | None
 
 
 class PaymentInitiativeUpdate(BaseModel):

@@ -73,7 +73,7 @@ class ProfilePictureHandler(BaseManager, Generic[T]):
         await self.crud.session.delete(db_entity.profile_picture)
         await self.crud.session.commit()
         await self.logger.after_update(
-            db_entity, {"profile_picture": "created"}, request=request
+            db_entity, {"profile_picture": "deleted"}, request=request
         )
 
 
@@ -139,5 +139,5 @@ class AttachmentHandler(BaseManager, Generic[V]):
 
         await self.crud.session.commit()
         await self.logger.after_update(
-            db_entity, {"attachment": "created"}, request=request
+            db_entity, {"attachment": "deleted"}, request=request
         )

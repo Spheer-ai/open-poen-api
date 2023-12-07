@@ -198,3 +198,23 @@ async def test_get_linked_activity_detail(
     )
     assert response.status_code == status_code
     assert (field in response.json().keys()) == present
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, length",
+    [(superuser, 9), (initiative_owner, 9), (activity_owner, 9), (user, 8)],
+    ids=[
+        "Super user sees also hidden payments",
+        "Initiative owner sees also hidden payment",
+        "Activity owner sees own hidden payment in activity",
+        "User cannot see any hidden payments",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_activity_payments(async_client, dummy_session, length):
+    initiative_id, activity_id = 1, 1
+    response = await async_client.get(
+        f"payments/initiative/{initiative_id}/activity/{activity_id}"
+    )
+    assert response.status_code == 200
+    assert len(response.json()["payments"]) == length

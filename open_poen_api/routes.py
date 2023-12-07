@@ -1266,6 +1266,8 @@ async def create_payment(
     payment_db = await payment_manager.create(
         payment, payment.initiative_id, payment.activity_id, request=request
     )
+    # TODO: Also see user. How to deal with this?
+    await payment_db.awaitable_attrs.attachments
     return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
 
 
@@ -1357,6 +1359,8 @@ async def link_activity(
 
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
+        if activity_db.initiative_id != payment.initiative_id:
+            raise EntityNotFound("There exists no activity with this initiative id")
         auth.authorize(required_user, "link_payment", activity_db, oso)
 
     payment_db = await payment_manager.assign_payment_to_activity(

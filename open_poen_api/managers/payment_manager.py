@@ -30,12 +30,14 @@ class PaymentManager(BaseManager):
         activity_id: int | None,
         request: Request | None,
     ) -> ent.Payment:
+        # NOTE: how only manual payments are created through user input.
         payment = await self.crud.create(
             BasePaymentCreate.parse_obj(payment_create),
             ent.Payment,
             request,
             initiative_id=initiative_id,
             activity_id=activity_id,
+            type="handmatig",
         )
         return payment
 
