@@ -142,7 +142,7 @@ class AttachmentMixin(Base):
     def attachments(cls) -> Mapped[list[Attachment]]:
         return relationship(
             "Attachment",
-            lazy="noload",
+            lazy="selectin",
             primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
             f"Attachment.entity_type=='{cls.entity_type}', or_("
             f"Attachment.attachment_type=='{AttachmentAttachmentType.PICTURE.value}', "

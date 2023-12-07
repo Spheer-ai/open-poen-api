@@ -42,7 +42,7 @@ from .gocardless import (
 from .gocardless import get_institutions as get_institutions_from_gocardless
 from nordigen import NordigenClient
 import uuid
-from .exc import NotAuthorized
+from .exc import NotAuthorized, EntityNotFound
 from .logger import audit_logger
 from .query import (
     get_initiatives_q,
@@ -102,7 +102,6 @@ async def get_user(
     optional_login: ent.User | None = Depends(m.optional_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
-    session=Depends(get_async_session),
 ):
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(optional_login, "read", user_db, oso)
@@ -1243,7 +1242,7 @@ async def create_initiative(
 
 @payment_router.post(
     "/payment",
-    response_model=s.PaymentReadUser,
+    response_model=s.PaymentRead,
 )
 async def create_payment(
     payment: s.PaymentCreateManual,
@@ -1257,6 +1256,8 @@ async def create_payment(
     # TODO: Make sure initiative_id in the schema is congruent with activity_id.
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
+        if activity_db.initiative_id != payment.initiative_id:
+            raise EntityNotFound("There exists no activity with this initiative id")
         auth.authorize(required_user, "create_payment", activity_db, oso)
     else:
         initiative_db = await initiative_manager.detail_load(payment.initiative_id)
@@ -1268,9 +1269,21 @@ async def create_payment(
     return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
 
 
+@payment_router.get("/payment/{payment_id}", response_model=s.PaymentReadLinked)
+async def get_payment(
+    payment_id: int,
+    optional_login: ent.User | None = Depends(m.optional_login),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    auth.authorize(optional_login, "read", payment_db, oso)
+    return auth.get_authorized_output_fields(optional_login, "read", payment_db, oso)
+
+
 @payment_router.patch(
     "/payment/{payment_id}",
-    response_model=s.PaymentReadUser,
+    response_model=s.PaymentRead,
     response_model_exclude_unset=True,
 )
 async def update_payment(

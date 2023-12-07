@@ -1,9 +1,10 @@
 from . import models as ent
 from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy import select, or_, literal
+from sqlalchemy import select, or_, literal, and_
 from .exc import UnprocessableContent
 from datetime import datetime, date, timedelta
 from .schemas import TransactionAmount
+from sqlalchemy import func, case
 
 
 class RequestingUser:
@@ -313,9 +314,26 @@ def get_initiative_payments_q(
             ent.Payment.debtor_name,
             ent.Payment.short_user_description,
             ent.Payment.transaction_amount,
+            func.count(ent.Attachment.id).label("n_attachments"),
         )
         .outerjoin(ent.Activity, ent.Payment.activity_id == ent.Activity.id)
+        .outerjoin(
+            ent.Attachment,
+            and_(
+                ent.Payment.id == ent.Attachment.entity_id,
+                ent.Attachment.entity_type == ent.AttachmentEntityType.PAYMENT.value,
+            ),
+        )
         .where(ent.Payment.initiative_id == initiative_id)
+        .group_by(
+            ent.Payment.id,
+            ent.Payment.booking_date,
+            ent.Activity.name,
+            ent.Payment.creditor_name,
+            ent.Payment.debtor_name,
+            ent.Payment.short_user_description,
+            ent.Payment.transaction_amount,
+        )
     )
 
     if optional_user is not None:
@@ -365,14 +383,33 @@ def get_activity_payments_q(
     max_amount: TransactionAmount | None,
     route: ent.Route | None,
 ):
-    q = select(
-        ent.Payment.id,
-        ent.Payment.booking_date,
-        ent.Payment.creditor_name,
-        ent.Payment.debtor_name,
-        ent.Payment.short_user_description,
-        ent.Payment.transaction_amount,
-    ).where(ent.Payment.activity_id == activity_id)
+    q = (
+        select(
+            ent.Payment.id,
+            ent.Payment.booking_date,
+            ent.Payment.creditor_name,
+            ent.Payment.debtor_name,
+            ent.Payment.short_user_description,
+            ent.Payment.transaction_amount,
+            func.count(ent.Attachment.id).label("n_attachments"),
+        )
+        .outerjoin(
+            ent.Attachment,
+            and_(
+                ent.Payment.id == ent.Attachment.entity_id,
+                ent.Attachment.entity_type == ent.AttachmentEntityType.PAYMENT.value,
+            ),
+        )
+        .where(ent.Payment.activity_id == activity_id)
+        .group_by(
+            ent.Payment.id,
+            ent.Payment.booking_date,
+            ent.Payment.creditor_name,
+            ent.Payment.debtor_name,
+            ent.Payment.short_user_description,
+            ent.Payment.transaction_amount,
+        )
+    )
 
     if optional_user is not None:
         requesting_user = RequestingUser(optional_user)

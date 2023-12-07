@@ -83,9 +83,7 @@ class PaymentManager(BaseManager):
 
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
-            select(ent.Payment)
-            .options(selectinload(ent.Payment.attachments))
-            .where(ent.Payment.id == id)
+            select(ent.Payment).where(ent.Payment.id == id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:

@@ -6,6 +6,8 @@ from .regulation import RegulationRead
 from .debit_card import DebitCardRead
 from .grant import GrantRead
 from .bank_account import BankAccountRead
+from .payment import PaymentRead
+from .attachment import Attachment
 from pydantic import validator
 
 
@@ -73,3 +75,7 @@ class UserReadLinked(UserRead):
 class BankAccountReadLinked(BankAccountRead):
     users: list[UserRead]
     owner: UserRead
+
+
+class PaymentReadLinked(PaymentRead):
+    attachments: list[Attachment]

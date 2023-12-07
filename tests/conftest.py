@@ -205,6 +205,7 @@ async def add_dummy_data(async_session):
     regulation_manager = m.RegulationManager(async_session, None)
     grant_manager = m.GrantManager(async_session, None)
     bank_account_manager = m.BankAccountManager(async_session, None)
+    payment_manager = m.PaymentManager(async_session, None)
 
     users = load_json("./tests/dummy_data/users.json")
     for user in users:
@@ -286,15 +287,23 @@ async def add_dummy_data(async_session):
     with open("tests/dummy_data/test.png", "rb") as f:
         image_content = f.read()
 
-    image_stream = BytesIO(image_content)
     mock_upload_file = UploadFile(
         filename="test.png",
-        file=image_stream,
+        file=BytesIO(image_content),
         headers={"content-type": "image/png"},
     )
     user_db = await user_manager.detail_load(1)
     await user_manager.profile_picture_handler.set(
         mock_upload_file, user_db, request=None
+    )
+    mock_upload_file = UploadFile(
+        filename="test.png",
+        file=BytesIO(image_content),
+        headers={"content-type": "image/png"},
+    )
+    payment_db = await payment_manager.detail_load(15)
+    await payment_manager.attachment_handler.set(
+        [mock_upload_file], payment_db, request=None
     )
 
     return async_session

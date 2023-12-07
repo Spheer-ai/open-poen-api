@@ -5,6 +5,23 @@ from ..models import Route, PaymentType
 from typing import Literal
 
 
+class PaymentRead(BaseModel):
+    id: int
+    booking_date: datetime | None
+    transaction_amount: TransactionAmount
+    creditor_name: str | None
+    creditor_account: str | None
+    debtor_name: str | None
+    debtor_account: str | None
+    route: Route
+    type: PaymentType
+    remittance_information_unstructured: str | None
+    remittance_information_structured: str | None
+    short_user_description: str | None
+    long_user_description: str | None
+    hidden: bool | None
+
+
 class PaymentReadUser(BaseModel):
     id: int
     booking_date: datetime
@@ -28,6 +45,7 @@ class PaymentReadInitiative(BaseModel):
     debtor_name: str | None
     short_user_description: str | None
     transaction_amount: TransactionAmount
+    n_attachments: int
 
 
 class PaymentReadActivity(BaseModel):
@@ -37,6 +55,7 @@ class PaymentReadActivity(BaseModel):
     debtor_name: str | None
     short_user_description: str | None
     transaction_amount: TransactionAmount
+    n_attachments: int
 
 
 class BasePaymentCreate(BaseModel):
