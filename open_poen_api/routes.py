@@ -55,6 +55,7 @@ from .query import (
     get_linkable_activities_q,
     get_initiative_payments_q,
     get_activity_payments_q,
+    get_initiative_media_q,
 )
 
 user_router = APIRouter(tags=["user"])
@@ -532,6 +533,36 @@ async def get_initiative(
     initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(optional_user, "read", initiative_db, oso)
     return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
+
+
+@initiative_router.get(
+    "/initiative/{initiative_id}/media", response_model=s.AttachmentList
+)
+async def get_initiative_media(
+    initiative_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(m.optional_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+):
+    # TODO: Is initiative hidden? Also for other routes.
+    query = await get_initiative_media_q(
+        optional_user,
+        initiative_id,
+        offset,
+        limit,
+    )
+
+    media_result = await session.execute(query)
+    media_scalar = media_result.scalars().all()
+
+    filtered_media = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in media_scalar
+    ]
+
+    return s.AttachmentList(attachments=filtered_media)
 
 
 @initiative_router.patch(
@@ -1497,6 +1528,7 @@ async def get_initiative_payments(
     max_amount: s.TransactionAmount | None = None,
     route: ent.Route | None = None,
 ):
+    # TODO: What is initiatie is hidden?
     query = get_initiative_payments_q(
         optional_user,
         initiative_id,
@@ -1536,6 +1568,7 @@ async def get_activity_payments(
     max_amount: s.TransactionAmount | None = None,
     route: ent.Route | None = None,
 ):
+    # What if activity is hidden?
     query = get_activity_payments_q(
         optional_user,
         activity_id,
@@ -1569,8 +1602,9 @@ async def get_authorized_actions(
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
 ):
-    class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
+    class_map: dict[s.AuthEntityClass, m.BaseManager] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
@@ -1578,6 +1612,7 @@ async def get_authorized_actions(
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
         s.AuthEntityClass.INITIATIVE: initiative_manager,
         s.AuthEntityClass.ACTIVITY: activity_manager,
+        s.AuthEntityClass.PAYMENT: payment_manager,
     }
 
     resource: ent.Base | s.AuthEntityClass
@@ -1607,8 +1642,9 @@ async def get_authorized_fields(
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
 ):
-    class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
+    class_map: dict[s.AuthEntityClass, m.BaseManager] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
@@ -1616,6 +1652,7 @@ async def get_authorized_fields(
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
         s.AuthEntityClass.INITIATIVE: initiative_manager,
         s.AuthEntityClass.ACTIVITY: activity_manager,
+        s.AuthEntityClass.PAYMENT: payment_manager,
     }
 
     resource = await class_map[entity_class].detail_load(entity_id)

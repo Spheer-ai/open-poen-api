@@ -18,6 +18,7 @@ class AuthEntityClass(str, Enum):
     BANK_ACCOUNT = "BankAccount"
     INITIATIVE = "Initiative"
     ACTIVITY = "Activity"
+    PAYMENT = "Payment"
 
 
 class LinkableInitiative(BaseModel):

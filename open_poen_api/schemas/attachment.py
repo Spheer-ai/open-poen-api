@@ -21,3 +21,10 @@ class Attachment(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class AttachmentList(BaseModel):
+    attachments: list[Attachment]
+
+    class Config:
+        orm_mode = True

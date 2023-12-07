@@ -444,3 +444,50 @@ def get_activity_payments_q(
     q = q.order_by(ent.Payment.id.desc()).offset(offset).limit(limit)
 
     return q
+
+
+async def get_initiative_media_q(
+    optional_user: ent.User | None, initiative_id: int, offset: int, limit: int
+):
+    q = (
+        select(ent.Attachment)
+        .join(ent.Payment, ent.Payment.id == ent.Attachment.entity_id)
+        .where(
+            and_(
+                ent.Payment.initiative_id == initiative_id,
+                ent.Attachment.entity_type == ent.AttachmentEntityType.PAYMENT.value,
+            )
+        )
+    )
+
+    if optional_user is not None:
+        requesting_user = RequestingUser(optional_user)
+
+    if optional_user is None:
+        q = q.where(ent.Payment.hidden == False)
+    else:
+        q = q.where(
+            or_(
+                ent.Payment.hidden == False,
+                # You can see hidden payments if you are initiative owner.
+                ent.Payment.initiative_id.in_(requesting_user.initiative_ids),
+                # You can see hidden payments if you are activity owner.
+                ent.Payment.activity_id.in_(requesting_user.activity_ids),
+                # You can see hidden payments if you are overseer.
+                ent.Payment.initiative_id.in_(
+                    select(ent.Initiative.id)
+                    .join(ent.Grant)
+                    .where(ent.Grant.id.in_(requesting_user.grant_ids))
+                ),
+                # Being a policy or grant officer on one regulation is enough to
+                # see any payment.
+                literal(requesting_user.is_officer),
+                # Administrators or super users can see everything.
+                literal(requesting_user.is_administrator),
+                literal(requesting_user.is_superuser),
+            )
+        )
+
+    q = q.order_by(ent.Attachment.id.desc()).offset(offset).limit(limit)
+
+    return q
