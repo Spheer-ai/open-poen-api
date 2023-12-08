@@ -204,7 +204,7 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     [
         (superuser, 24, 200),
         (admin, 24, 200),
-        (grant_officer, 24, 200),
+        (grant_officer, 23, 200),
         (initiative_owner, 22, 200),
         (activity_owner, 22, 200),
         (user, 21, 200),
@@ -213,9 +213,9 @@ async def test_patch_initiative(async_client, dummy_session, body, status_code):
     ids=[
         "Superuser sees everything",
         "Administrator sees everything",
-        "Grant officer sees everything",
-        "initiative_owner sees own hidden initiative",
-        "activity_owner sees own hidden initiative",
+        "Grant officer sees initiatives hidden in own regulation (id 6), but not in other (id 2)",
+        "initiative_owner sees own hidden initiative (id 1)",
+        "activity_owner sees own hidden initiative (id 1)",
         "User sees non hidden",
         "Anon sees non hidden",
     ],

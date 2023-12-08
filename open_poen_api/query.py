@@ -24,6 +24,14 @@ class RequestingUser:
         return [i.grant_id for i in self.user.overseer_roles]
 
     @property
+    def go_regulation_ids(self):
+        return [i.regulation_id for i in self.user.grant_officer_regulation_roles]
+
+    @property
+    def po_regulation_ids(self):
+        return [i.regulation_id for i in self.user.policy_officer_regulation_roles]
+
+    @property
     def is_officer(self):
         return (
             len(self.user.grant_officer_regulation_roles) > 0
@@ -41,6 +49,14 @@ class RequestingUser:
     @property
     def id(self):
         return self.user.id
+
+    @property
+    def used_and_owned_bank_accounts(self):
+        return [
+            i.bank_account_id
+            for i in self.user.user_bank_account_roles
+            + self.user.owner_bank_account_roles
+        ]
 
 
 def get_users_q(
@@ -78,7 +94,7 @@ def get_initiatives_q(
     offset: int,
     limit: int,
 ):
-    q = select(ent.Initiative)
+    q = select(ent.Initiative).join(ent.Grant).join(ent.Regulation)
 
     if optional_user is not None:
         requesting_user = RequestingUser(optional_user)
@@ -103,9 +119,9 @@ def get_initiatives_q(
                     .join(ent.Grant)
                     .where(ent.Grant.id.in_(requesting_user.grant_ids))
                 ),
-                # Being a policy or grant officer on one regulation is enough to
-                # see any initiative.
-                literal(requesting_user.is_officer),
+                # You can see initiatives in your regulation as an officer.
+                ent.Regulation.id.in_(requesting_user.go_regulation_ids),
+                ent.Regulation.id.in_(requesting_user.po_regulation_ids),
                 # Administrators or super users can see everything.
                 literal(requesting_user.is_administrator),
                 literal(requesting_user.is_superuser),
@@ -316,6 +332,9 @@ def get_initiative_payments_q(
             ent.Payment.transaction_amount,
             func.count(ent.Attachment.id).label("n_attachments"),
         )
+        .join(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
+        .join(ent.Grant, ent.Initiative.grant_id == ent.Grant.id)
+        .join(ent.Regulation, ent.Grant.regulation_id == ent.Regulation.id)
         .outerjoin(ent.Activity, ent.Payment.activity_id == ent.Activity.id)
         .outerjoin(
             ent.Attachment,
@@ -355,12 +374,16 @@ def get_initiative_payments_q(
                     .join(ent.Grant)
                     .where(ent.Grant.id.in_(requesting_user.grant_ids))
                 ),
-                # Being a policy or grant officer on one regulation is enough to
-                # see any payment.
-                literal(requesting_user.is_officer),
+                # You can see hidden payments in your regulation as an officer.
+                ent.Regulation.id.in_(requesting_user.go_regulation_ids),
+                ent.Regulation.id.in_(requesting_user.po_regulation_ids),
                 # Administrators or super users can see everything.
                 literal(requesting_user.is_administrator),
                 literal(requesting_user.is_superuser),
+                # Users can always see payments from their bank accounts.
+                ent.Payment.bank_account_id.in_(
+                    requesting_user.used_and_owned_bank_accounts
+                ),
             )
         )
 
@@ -393,6 +416,9 @@ def get_activity_payments_q(
             ent.Payment.transaction_amount,
             func.count(ent.Attachment.id).label("n_attachments"),
         )
+        .join(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
+        .join(ent.Grant, ent.Initiative.grant_id == ent.Grant.id)
+        .join(ent.Regulation, ent.Grant.regulation_id == ent.Regulation.id)
         .outerjoin(
             ent.Attachment,
             and_(
@@ -430,11 +456,16 @@ def get_activity_payments_q(
                     .join(ent.Grant)
                     .where(ent.Grant.id.in_(requesting_user.grant_ids))
                 ),
-                # Being a policy or grant officer on one regulation is enough to
-                # see any payment.
-                literal(requesting_user.is_officer),
+                # You can see hidden payments in your regulation as an officer.
+                ent.Regulation.id.in_(requesting_user.go_regulation_ids),
+                ent.Regulation.id.in_(requesting_user.po_regulation_ids),
                 # Administrators or super users can see everything.
+                literal(requesting_user.is_administrator),
                 literal(requesting_user.is_superuser),
+                # Users can always see payments from their bank accounts.
+                ent.Payment.bank_account_id.in_(
+                    requesting_user.used_and_owned_bank_accounts
+                ),
             )
         )
 
@@ -452,6 +483,9 @@ async def get_initiative_media_q(
     q = (
         select(ent.Attachment)
         .join(ent.Payment, ent.Payment.id == ent.Attachment.entity_id)
+        .join(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
+        .join(ent.Grant, ent.Initiative.grant_id == ent.Grant.id)
+        .join(ent.Regulation, ent.Grant.regulation_id == ent.Regulation.id)
         .where(
             and_(
                 ent.Payment.initiative_id == initiative_id,
@@ -479,12 +513,16 @@ async def get_initiative_media_q(
                     .join(ent.Grant)
                     .where(ent.Grant.id.in_(requesting_user.grant_ids))
                 ),
-                # Being a policy or grant officer on one regulation is enough to
-                # see any payment.
-                literal(requesting_user.is_officer),
+                # You can see hidden payments in your regulation as an officer.
+                ent.Regulation.id.in_(requesting_user.go_regulation_ids),
+                ent.Regulation.id.in_(requesting_user.po_regulation_ids),
                 # Administrators or super users can see everything.
                 literal(requesting_user.is_administrator),
                 literal(requesting_user.is_superuser),
+                # Users can always see payments from their bank accounts.
+                ent.Payment.bank_account_id.in_(
+                    requesting_user.used_and_owned_bank_accounts
+                ),
             )
         )
 
