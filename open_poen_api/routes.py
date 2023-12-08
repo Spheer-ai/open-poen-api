@@ -56,6 +56,7 @@ from .query import (
     get_initiative_payments_q,
     get_activity_payments_q,
     get_initiative_media_q,
+    get_activity_media_q,
 )
 
 user_router = APIRouter(tags=["user"])
@@ -725,6 +726,38 @@ async def get_activity(
     activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(optional_user, "read", activity_db, oso)
     return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
+
+
+@initiative_router.get(
+    "/initiative/{initiative_id}/activity/{activity_id}/media",
+    response_model=s.AttachmentList,
+)
+async def get_activity_media(
+    initiative_id: int,
+    activity_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(m.optional_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+):
+    # TODO: Is initiative or activity hidden? Also for other routes.
+    query = await get_activity_media_q(
+        optional_user,
+        activity_id,
+        offset,
+        limit,
+    )
+
+    media_result = await session.execute(query)
+    media_scalar = media_result.scalars().all()
+
+    filtered_media = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in media_scalar
+    ]
+
+    return s.AttachmentList(attachments=filtered_media)
 
 
 @initiative_router.patch(

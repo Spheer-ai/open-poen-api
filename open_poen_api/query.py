@@ -529,3 +529,58 @@ async def get_initiative_media_q(
     q = q.order_by(ent.Attachment.id.desc()).offset(offset).limit(limit)
 
     return q
+
+
+async def get_activity_media_q(
+    optional_user: ent.User | None, activity_id: int, offset: int, limit: int
+):
+    q = (
+        select(ent.Attachment)
+        .join(ent.Payment, ent.Payment.id == ent.Attachment.entity_id)
+        .join(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
+        .join(ent.Grant, ent.Initiative.grant_id == ent.Grant.id)
+        .join(ent.Regulation, ent.Grant.regulation_id == ent.Regulation.id)
+        .join(ent.Activity, ent.Payment.activity_id == ent.Activity.id)
+        .where(
+            and_(
+                ent.Payment.activity_id == activity_id,
+                ent.Attachment.entity_type == ent.AttachmentEntityType.PAYMENT.value,
+            )
+        )
+    )
+
+    if optional_user is not None:
+        requesting_user = RequestingUser(optional_user)
+
+    if optional_user is None:
+        q = q.where(ent.Payment.hidden == False)
+    else:
+        q = q.where(
+            or_(
+                ent.Payment.hidden == False,
+                # You can see hidden payments if you are initiative owner.
+                ent.Payment.initiative_id.in_(requesting_user.initiative_ids),
+                # You can see hidden payments if you are activity owner.
+                ent.Payment.activity_id.in_(requesting_user.activity_ids),
+                # You can see hidden payments if you are overseer.
+                ent.Payment.initiative_id.in_(
+                    select(ent.Initiative.id)
+                    .join(ent.Grant)
+                    .where(ent.Grant.id.in_(requesting_user.grant_ids))
+                ),
+                # You can see hidden payments in your regulation as an officer.
+                ent.Regulation.id.in_(requesting_user.go_regulation_ids),
+                ent.Regulation.id.in_(requesting_user.po_regulation_ids),
+                # Administrators or super users can see everything.
+                literal(requesting_user.is_administrator),
+                literal(requesting_user.is_superuser),
+                # Users can always see payments from their bank accounts.
+                ent.Payment.bank_account_id.in_(
+                    requesting_user.used_and_owned_bank_accounts
+                ),
+            )
+        )
+
+    q = q.order_by(ent.Attachment.id.desc()).offset(offset).limit(limit)
+
+    return q
