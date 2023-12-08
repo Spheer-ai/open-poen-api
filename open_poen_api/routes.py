@@ -67,7 +67,7 @@ permission_router = APIRouter(tags=["auth"])
 utils_router = APIRouter(tags=["utils"])
 
 
-@user_router.post("/user", response_model=s.UserRead)
+@user_router.post("/user", response_model=s.UserRead, response_model_exclude_unset=True)
 async def create_user(
     user: Annotated[
         s.UserCreate,
@@ -202,6 +202,7 @@ async def delete_user_profile_picture(
     "/users/{user_id}/bng-initiate",
     response_model=s.BNGInitiate,
     summary="BNG Initiate",
+    include_in_schema=False,
 )
 async def bng_initiate(
     user_id: int,
@@ -457,6 +458,7 @@ async def get_bank_account(
 @user_router.patch(
     "/user/{user_id}/bank-account/{bank_account_id}",
     response_model=s.BankAccountRead,
+    response_model_exclude_unset=True,
 )
 async def revoke_bank_account(
     user_id: int,
@@ -494,6 +496,7 @@ async def delete_bank_account(
 @user_router.patch(
     "/user/{user_id}/bank-account/{bank_account_id}/users",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_bank_account_users(
     user_id: int,
@@ -537,7 +540,9 @@ async def get_initiative(
 
 
 @initiative_router.get(
-    "/initiative/{initiative_id}/media", response_model=s.AttachmentList
+    "/initiative/{initiative_id}/media",
+    response_model=s.AttachmentList,
+    response_model_exclude_unset=True,
 )
 async def get_initiative_media(
     initiative_id: int,
@@ -593,6 +598,7 @@ async def update_initiative(
 @initiative_router.patch(
     "/initiative/{initiative_id}/owners",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_initiative_owners(
     initiative_id: int,
@@ -691,7 +697,9 @@ async def get_initiatives(
 
 
 @initiative_router.post(
-    "/initiative/{initiative_id}/activity", response_model=s.ActivityRead
+    "/initiative/{initiative_id}/activity",
+    response_model=s.ActivityRead,
+    response_model_exclude_unset=True,
 )
 async def create_activity(
     initiative_id: int,
@@ -731,6 +739,7 @@ async def get_activity(
 @initiative_router.get(
     "/initiative/{initiative_id}/activity/{activity_id}/media",
     response_model=s.AttachmentList,
+    response_model_exclude_unset=True,
 )
 async def get_activity_media(
     initiative_id: int,
@@ -788,6 +797,7 @@ async def update_activity(
 @initiative_router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}/owners",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_activity_owners(
     initiative_id: int,
@@ -868,6 +878,8 @@ async def delete_activity_profile_picture(
 @initiative_router.patch(
     "/initiative/{initiative_id}/debit-cards",
     response_model=s.DebitCardReadList,
+    response_model_exclude_unset=True,
+    include_in_schema=False,
 )
 async def link_initiative_debit_cards(
     initiative_id: int,
@@ -894,7 +906,9 @@ async def link_initiative_debit_cards(
     return s.DebitCardReadList(debit_cards=filtered_debit_cards)
 
 
-@funder_router.post("/funder", response_model=s.FunderRead)
+@funder_router.post(
+    "/funder", response_model=s.FunderRead, response_model_exclude_unset=True
+)
 async def create_funder(
     funder: Annotated[
         s.FunderCreate,
@@ -986,7 +1000,11 @@ async def get_funders(
     return s.FunderReadList(funders=filtered_funders)
 
 
-@funder_router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
+@funder_router.post(
+    "/funder/{funder_id}/regulation",
+    response_model=s.RegulationRead,
+    response_model_exclude_unset=True,
+)
 async def create_regulation(
     funder_id: int,
     regulation: Annotated[
@@ -1057,6 +1075,7 @@ async def update_regulation(
 @funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/officers",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_officers(
     funder_id: int,
@@ -1135,7 +1154,9 @@ async def get_regulations(
 
 
 @funder_router.post(
-    "/funder/{funder_id}/regulation/{regulation_id}/grant", response_model=s.GrantRead
+    "/funder/{funder_id}/regulation/{regulation_id}/grant",
+    response_model=s.GrantRead,
+    response_model_exclude_unset=True,
 )
 async def create_grant(
     funder_id: int,
@@ -1206,7 +1227,7 @@ async def update_grant(
 @funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseers",
     response_model=s.UserReadList,
-    responses={204: {"description": "Grant overseer is removed"}},
+    response_model_exclude_unset=True,
 )
 async def link_overseers(
     funder_id: int,
@@ -1280,6 +1301,7 @@ async def get_grants(
 @funder_router.post(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/initiative",
     response_model=s.InitiativeRead,
+    response_model_exclude_unset=True,
 )
 async def create_initiative(
     funder_id: int,
@@ -1305,8 +1327,7 @@ async def create_initiative(
 
 
 @payment_router.post(
-    "/payment",
-    response_model=s.PaymentRead,
+    "/payment", response_model=s.PaymentRead, response_model_exclude_unset=True
 )
 async def create_payment(
     payment: s.PaymentCreateManual,
@@ -1335,7 +1356,11 @@ async def create_payment(
     return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
 
 
-@payment_router.get("/payment/{payment_id}", response_model=s.PaymentReadLinked)
+@payment_router.get(
+    "/payment/{payment_id}",
+    response_model=s.PaymentReadLinked,
+    response_model_exclude_unset=True,
+)
 async def get_payment(
     payment_id: int,
     optional_login: ent.User | None = Depends(m.optional_login),
@@ -1488,6 +1513,7 @@ async def delete_payment_attachment(
     response_model=s.PaymentReadUserList,
     response_model_exclude_unset=True,
     summary="Get BNG Payments",
+    include_in_schema=False,
 )
 async def get_bng_payments(
     async_session: AsyncSession = Depends(get_async_session),
