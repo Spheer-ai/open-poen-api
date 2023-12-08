@@ -1,6 +1,6 @@
 from .base_manager import BaseManager
 from ..schemas import GrantCreate, GrantUpdate
-from ..models import Grant, UserGrantRole, User, Initiative
+from .. import models as ent
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
@@ -14,11 +14,11 @@ class GrantManager(BaseManager):
         grant_create: GrantCreate,
         regulation_id: int,
         request: Request | None,
-    ) -> Grant:
+    ) -> ent.Grant:
         try:
-            grant = await self.base_create(
+            grant = await self.crud.create(
                 grant_create,
-                Grant,
+                ent.Grant,
                 request,
                 regulation_id=regulation_id,
             )
@@ -30,26 +30,26 @@ class GrantManager(BaseManager):
     async def update(
         self,
         grant_update: GrantUpdate,
-        grant_db: Grant,
+        grant_db: ent.Grant,
         request: Request | None = None,
-    ) -> Grant:
+    ) -> ent.Grant:
         try:
-            grant = await self.base_update(grant_update, grant_db, request)
+            grant = await self.crud.update(grant_update, grant_db, request)
         except IntegrityError as e:
             raise_err_if_unique_constraint("unique grant names per regulation", e)
             raise
         return grant
 
-    async def delete(self, grant: Grant, request: Request | None = None):
-        await self.base_delete(grant, request)
+    async def delete(self, grant: ent.Grant, request: Request | None = None):
+        await self.crud.delete(grant, request)
 
     async def make_users_overseer(
-        self, grant: Grant, user_ids: list[int], request: Request | None = None
+        self, grant: ent.Grant, user_ids: list[int], request: Request | None = None
     ):
         linked_user_ids = {role.user_id for role in grant.overseer_roles}
 
         matched_users_q = await self.session.execute(
-            select(User).where(User.id.in_(user_ids))
+            select(ent.User).where(ent.User.id.in_(user_ids))
         )
         matched_users = matched_users_q.scalars().all()
         matched_user_ids = {user.id for user in matched_users}
@@ -70,7 +70,7 @@ class GrantManager(BaseManager):
             await self.session.delete(role)
 
         for user_id in link_user_ids:
-            new_role = UserGrantRole(user_id=user_id, grant_id=grant.id)
+            new_role = ent.UserGrantRole(user_id=user_id, grant_id=grant.id)
             self.session.add(new_role)
 
         await self.session.commit()
@@ -78,18 +78,20 @@ class GrantManager(BaseManager):
 
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
-            select(Grant)
+            select(ent.Grant)
             .options(
-                joinedload(Grant.regulation),
-                selectinload(Grant.initiatives),
-                selectinload(Grant.overseer_roles).joinedload(UserGrantRole.user),
+                joinedload(ent.Grant.regulation),
+                selectinload(ent.Grant.initiatives),
+                selectinload(ent.Grant.overseer_roles).joinedload(
+                    ent.UserGrantRole.user
+                ),
             )
-            .where(Grant.id == id)
+            .where(ent.Grant.id == id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
             raise EntityNotFound(message="Grant not found")
         return query_result
 
-    async def min_load(self, id: int) -> Grant:
-        return await self.base_min_load(Grant, id)
+    async def min_load(self, id: int) -> ent.Grant:
+        return await self.load.min_load(ent.Grant, id)

@@ -7,7 +7,7 @@ from .database import (
 from .schemas import UserCreateWithPassword
 from .gocardless import get_nordigen_client
 from .utils.utils import temp_password_generator
-from .managers.user_manager import UserManager
+from .managers import UserManager
 from .gocardless.payments import get_gocardless_payments
 
 # from fastapi_users.exceptions import UserAlreadyExists

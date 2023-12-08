@@ -4,7 +4,7 @@ from .mixins import NotNullValidatorMixin
 
 from fastapi_users import schemas
 from ..models import UserRole
-from .profile_picture import ProfilePicture
+from .attachment import ProfilePicture
 
 
 class UserRead(schemas.BaseUser[int]):

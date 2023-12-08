@@ -63,12 +63,13 @@ class AttachmentEntityType(str, Enum):
     USER = "user"
     INITIATIVE = "initiative"
     ACTIVITY = "activity"
+    PAYMENT = "payment"
 
 
 class AttachmentAttachmentType(str, Enum):
     PROFILE_PICTURE = "profile_picture"
     PICTURE = "picture"
-    DOCUMENT = "document"
+    PDF = "pdf"
 
 
 class Attachment(Base):
@@ -82,14 +83,14 @@ class Attachment(Base):
         ChoiceType(AttachmentAttachmentType, impl=VARCHAR(length=32))
     )
     raw_attachment_url: Mapped[str] = mapped_column(String, nullable=False)
-    raw_attachment_thumbnail_128_url: Mapped[str] = mapped_column(
-        String, nullable=False
+    raw_attachment_thumbnail_128_url: Mapped[str | None] = mapped_column(
+        String, nullable=True
     )
-    raw_attachment_thumbnail_256_url: Mapped[str] = mapped_column(
-        String, nullable=False
+    raw_attachment_thumbnail_256_url: Mapped[str | None] = mapped_column(
+        String, nullable=True
     )
-    raw_attachment_thumbnail_512_url: Mapped[str] = mapped_column(
-        String, nullable=False
+    raw_attachment_thumbnail_512_url: Mapped[str | None] = mapped_column(
+        String, nullable=True
     )
 
     @hybrid_property
@@ -109,7 +110,9 @@ class Attachment(Base):
         return generate_sas_token(self.raw_attachment_thumbnail_512_url)
 
 
-class ProfilePictureMixin:
+class ProfilePictureMixin(Base):
+    __abstract__ = True
+
     id: int
     id_column: str
     entity_type: str
@@ -120,10 +123,32 @@ class ProfilePictureMixin:
             "Attachment",
             lazy="joined",
             primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
-            f"Attachment.entity_type=='{cls.entity_type}', Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
+            f"Attachment.entity_type=='{cls.entity_type}', "
+            f"Attachment.attachment_type=='{AttachmentAttachmentType.PROFILE_PICTURE.value}')",
             cascade="all, delete-orphan",
-            uselist=False,
             overlaps="profile_picture",
+            uselist=False,
+        )
+
+
+class AttachmentMixin(Base):
+    __abstract__ = True
+
+    id: int
+    id_column: str
+    entity_type: str
+
+    @declared_attr
+    def attachments(cls) -> Mapped[list[Attachment]]:
+        return relationship(
+            "Attachment",
+            lazy="selectin",
+            primaryjoin=f"and_({cls.id_column}==foreign(Attachment.entity_id), "
+            f"Attachment.entity_type=='{cls.entity_type}', or_("
+            f"Attachment.attachment_type=='{AttachmentAttachmentType.PICTURE.value}', "
+            f"Attachment.attachment_type=='{AttachmentAttachmentType.PDF.value}'))",
+            cascade="all, delete-orphan",
+            overlaps="attachments",
         )
 
 
@@ -563,15 +588,20 @@ def get_finance_aggregate(route: Route):
     )
 
 
-class Payment(Base):
+class Payment(AttachmentMixin, Base):
     __tablename__ = "payment"
     __table_args__ = (UniqueConstraint("transaction_id", name="unique transaction id"),)
+
+    id_column = "Payment.id"
+    entity_type = AttachmentEntityType.PAYMENT.value
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     transaction_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
     entry_reference: Mapped[str] = mapped_column(String, nullable=True)
     end_to_end_id: Mapped[str] = mapped_column(String, nullable=True)
-    booking_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    booking_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
     transaction_amount: Mapped[Decimal] = mapped_column(DECIMAL(precision=10, scale=2))
     creditor_name: Mapped[str] = mapped_column(String, nullable=True)
     creditor_account: Mapped[str] = mapped_column(String, nullable=True)

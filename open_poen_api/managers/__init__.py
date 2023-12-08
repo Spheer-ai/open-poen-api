@@ -3,6 +3,8 @@ from .user_manager import (
     superuser,
     required_login,
     optional_login,
+    fastapi_users,
+    auth_backend,
 )
 from .initiative_manager import InitiativeManager
 from .activity_manager import ActivityManager
@@ -11,5 +13,4 @@ from .regulation_manager import RegulationManager
 from .grant_manager import GrantManager
 from .bank_account_manager import BankAccountManager
 from .payment_manager import PaymentManager
-from .base_manager_ex_current_user import BaseManagerExCurrentUser
 from .base_manager import BaseManager

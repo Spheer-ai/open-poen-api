@@ -1,29 +1,16 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Request
 from ..database import get_async_session
-from ..schemas import ActivityCreate, ActivityUpdate
-from ..models import (
-    BankAccount,
-    Payment,
-    UserBankAccountRole,
-    User,
-    BankAccountRole,
-    ReqStatus,
-    Activity,
-    Initiative,
-)
-from sqlalchemy.exc import IntegrityError
+from .. import models as ent
 from sqlalchemy import select, and_, delete, or_
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from ..exc import EntityNotFound
-from ..exc import EntityAlreadyExists, EntityNotFound
+from ..exc import EntityNotFound
 from .base_manager import BaseManager
-import asyncio
 from ..gocardless import get_nordigen_client
 from nordigen import NordigenClient
-from nordigen.types import Requisition
 from ..database import get_async_session
-from .user_manager import optional_login
+from .user_manager.user_manager_ex_current_user import optional_login
 from aiohttp import ClientResponseError
 from ..logger import audit_logger
 
@@ -32,16 +19,16 @@ class BankAccountManager(BaseManager):
     def __init__(
         self,
         session: AsyncSession = Depends(get_async_session),
-        current_user: User | None = Depends(optional_login),
+        current_user: ent.User | None = Depends(optional_login),
         client: NordigenClient = Depends(get_nordigen_client),
     ):
         self.client = client
         super().__init__(session, current_user)
 
-    async def revoke(self, bank_account: BankAccount, request: Request | None):
+    async def revoke(self, bank_account: ent.BankAccount, request: Request | None):
         for req in bank_account.requisitions:
             try:
-                if req.status not in (ReqStatus.REVOKED, ReqStatus.DELETED):
+                if req.status not in (ent.ReqStatus.REVOKED, ent.ReqStatus.DELETED):
                     await self.client.requisition.delete_requisition(
                         req.api_requisition_id
                     )
@@ -53,14 +40,14 @@ class BankAccountManager(BaseManager):
                     "deleted because it was not found. This can happen if the user "
                     "coupled two bank accounts with one requisition."
                 )
-            req.status = ReqStatus.REVOKED
+            req.status = ent.ReqStatus.REVOKED
             self.session.add(req)
 
         await self.session.execute(
-            delete(Payment).where(
+            delete(ent.Payment).where(
                 and_(
-                    Payment.bank_account_id == bank_account.id,
-                    Payment.initiative_id == None,
+                    ent.Payment.bank_account_id == bank_account.id,
+                    ent.Payment.initiative_id == None,
                 )
             )
         )
@@ -69,10 +56,10 @@ class BankAccountManager(BaseManager):
         await self.session.refresh(bank_account)
         return bank_account
 
-    async def delete(self, bank_account: BankAccount, request: Request | None):
+    async def delete(self, bank_account: ent.BankAccount, request: Request | None):
         for req in bank_account.requisitions:
             try:
-                if req.status not in (ReqStatus.REVOKED, ReqStatus.DELETED):
+                if req.status not in (ent.ReqStatus.REVOKED, ent.ReqStatus.DELETED):
                     await self.client.requisition.delete_requisition(
                         req.api_requisition_id
                     )
@@ -84,26 +71,26 @@ class BankAccountManager(BaseManager):
                     "deleted because it was not found. This can happen if the user "
                     "coupled two bank accounts with one requisition."
                 )
-            req.status = ReqStatus.DELETED
+            req.status = ent.ReqStatus.DELETED
             self.session.add(req)
 
         # TODO: Make sure an error is returned if there are payments for this bank
         # account that are coupled to a finished or justified activity or initiative.
         await self.session.execute(
-            delete(Payment).where(
-                Payment.bank_account_id == bank_account.id,
+            delete(ent.Payment).where(
+                ent.Payment.bank_account_id == bank_account.id,
                 or_(
-                    Payment.initiative_id == None,
+                    ent.Payment.initiative_id == None,
                     and_(
-                        Payment.initiative_id != None,
-                        Payment.initiative.has(Initiative.justified == False),
+                        ent.Payment.initiative_id != None,
+                        ent.Payment.initiative.has(ent.Initiative.justified == False),
                     ),
                 ),
                 or_(
-                    Payment.activity_id == None,
+                    ent.Payment.activity_id == None,
                     and_(
-                        Payment.activity_id != None,
-                        Payment.activity.has(Activity.finished == False),
+                        ent.Payment.activity_id != None,
+                        ent.Payment.activity.has(ent.Activity.finished == False),
                     ),
                 ),
             )
@@ -114,14 +101,14 @@ class BankAccountManager(BaseManager):
 
     async def make_users_user(
         self,
-        bank_account: BankAccount,
+        bank_account: ent.BankAccount,
         user_ids: list[int],
         request: Request | None = None,
     ):
         linked_user_ids = {role.user_id for role in bank_account.user_roles}
 
         matched_users_q = await self.session.execute(
-            select(User).where(User.id.in_(user_ids))
+            select(ent.User).where(ent.User.id.in_(user_ids))
         )
         matched_users = matched_users_q.scalars().all()
         matched_user_ids = {user.id for user in matched_users}
@@ -142,10 +129,10 @@ class BankAccountManager(BaseManager):
             await self.session.delete(role)
 
         for user_id in link_user_ids:
-            new_role = UserBankAccountRole(
+            new_role = ent.UserBankAccountRole(
                 user_id=user_id,
                 bank_account_id=bank_account.id,
-                role=BankAccountRole.USER,
+                role=ent.BankAccountRole.USER,
             )
             self.session.add(new_role)
 
@@ -154,17 +141,17 @@ class BankAccountManager(BaseManager):
 
     async def detail_load(self, bank_account_id: int):
         query_result_q = await self.session.execute(
-            select(BankAccount)
+            select(ent.BankAccount)
             .options(
-                selectinload(BankAccount.requisitions),
-                selectinload(BankAccount.user_roles)
-                .joinedload(UserBankAccountRole.user)
-                .joinedload(User.profile_picture),
-                selectinload(BankAccount.owner_role)
-                .selectinload(UserBankAccountRole.user)
-                .joinedload(User.profile_picture),
+                selectinload(ent.BankAccount.requisitions),
+                selectinload(ent.BankAccount.user_roles)
+                .joinedload(ent.UserBankAccountRole.user)
+                .joinedload(ent.User.profile_picture),
+                selectinload(ent.BankAccount.owner_role)
+                .selectinload(ent.UserBankAccountRole.user)
+                .joinedload(ent.User.profile_picture),
             )
-            .where(BankAccount.id == bank_account_id)
+            .where(ent.BankAccount.id == bank_account_id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
@@ -172,4 +159,4 @@ class BankAccountManager(BaseManager):
         return query_result
 
     async def min_load(self, bank_account_id: int):
-        return await self.base_min_load(BankAccount, bank_account_id)
+        return await self.load.min_load(ent.BankAccount, bank_account_id)

@@ -9,6 +9,7 @@ from azure.storage.blob.aio import BlobServiceClient
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from pydantic import BaseModel
 from ..exc import UnsupportedFileType, FileTooLarge
+from typing import TypeVar
 
 DEBUG = os.environ.get("ENVIRONMENT") == "debug"
 
@@ -42,27 +43,31 @@ AZURE_STORAGE_ACCOUNT_KEY = os.environ["AZURE_STORAGE_ACCOUNT_KEY"]
 container_client = blob_service_client.get_container_client("media")
 
 
-class ProfilePictureUpdate(BaseModel):
+class AttachmentUpdate(BaseModel):
     raw_attachment_url: str
-    raw_attachment_thumbnail_128_url: str
-    raw_attachment_thumbnail_256_url: str
-    raw_attachment_thumbnail_512_url: str
+    raw_attachment_thumbnail_128_url: str | None = None
+    raw_attachment_thumbnail_256_url: str | None = None
+    raw_attachment_thumbnail_512_url: str | None = None
 
 
-async def upload_profile_picture(
-    file: UploadFile, filename: str
-) -> ProfilePictureUpdate:
-    if file.content_type not in ["image/png", "image/jpeg"]:
-        raise UnsupportedFileType("Profile picture should be png or jpeg")
+async def upload_attachment(
+    file: UploadFile, filename: str, make_thumbnail=True
+) -> AttachmentUpdate:
+    if file.content_type not in ("image/png", "image/jpeg") and make_thumbnail:
+        raise ValueError("Can only make thumbnails for png and jpeg")
 
+    # TODO: Verify that the mime type is correct by checking the first n bytes.
     file_content = await file.read()
     if len(file_content) > 10 * 1024 * 1024:
-        raise FileTooLarge("Profile picture has a max size of 10 MB")
+        raise FileTooLarge("Maximum file size of any upload 10 MB")
 
     ext = os.path.splitext(str(file.filename))[1][1:]
     original_blob_path = f"images/{filename}.{ext}"
     blob_client = container_client.get_blob_client(original_blob_path)
     await blob_client.upload_blob(file_content, overwrite=True)
+
+    if not make_thumbnail:
+        return AttachmentUpdate(raw_attachment_url=blob_client.url)
 
     image = Image.open(io.BytesIO(file_content))
     image_format = "PNG" if file.content_type == "image/png" else "JPEG"
@@ -83,7 +88,7 @@ async def upload_profile_picture(
         )
         thumbnail_urls[size] = thumbnail_blob_client.url
 
-    return ProfilePictureUpdate(
+    return AttachmentUpdate(
         raw_attachment_url=blob_client.url,
         raw_attachment_thumbnail_128_url=thumbnail_urls[128],
         raw_attachment_thumbnail_256_url=thumbnail_urls[256],
@@ -91,7 +96,13 @@ async def upload_profile_picture(
     )
 
 
-def generate_sas_token(blob_url: str) -> str:
+T = TypeVar("T", str, None)
+
+
+def generate_sas_token(blob_url: T) -> T:
+    if blob_url is None:
+        return blob_url
+
     url_parts = blob_url.split("/")
     account_name = url_parts[2].split(".")[0]
     container_name = url_parts[3]

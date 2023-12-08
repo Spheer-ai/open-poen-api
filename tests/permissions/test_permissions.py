@@ -14,7 +14,7 @@ from tests.conftest import superuser, user, userowner, admin, grant_officer
 
 
 @pytest_asyncio.fixture(scope="function")
-async def user_data(async_session):
+async def user_data(dummy_session):
     superuser = User(
         hashed_password="123456",
         email="superuser@gmail.com",
@@ -28,10 +28,10 @@ async def user_data(async_session):
         hashed_password="123456", email="administrator@gmail.com", role="administrator"
     )
     user = User(hashed_password="123456", email="user@gmail.com", role="user")
-    async_session.add_all([superuser, financial, administrator, user])
-    await async_session.commit()
+    dummy_session.add_all([superuser, financial, administrator, user])
+    await dummy_session.commit()
     for i in (superuser, financial, administrator, user):
-        await async_session.refresh(i)
+        await dummy_session.refresh(i)
     return {
         "superuser": superuser,
         "financial": financial,

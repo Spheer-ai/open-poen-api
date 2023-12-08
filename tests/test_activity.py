@@ -156,9 +156,9 @@ async def test_patch_activity(async_client, dummy_session, body, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        activity = await dummy_session.get(Activity, activity_id)
-        # Fix this. Apparently the session is not clean on every test invocation.
-        await dummy_session.refresh(activity)
+        activity = await dummy_session.get(
+            Activity, activity_id, populate_existing=True
+        )
         for key in body:
             assert getattr(activity, key) == body[key]
 
@@ -198,3 +198,23 @@ async def test_get_linked_activity_detail(
     )
     assert response.status_code == status_code
     assert (field in response.json().keys()) == present
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, length",
+    [(superuser, 9), (initiative_owner, 9), (activity_owner, 9), (user, 8)],
+    ids=[
+        "Super user sees also hidden payments",
+        "Initiative owner sees also hidden payment",
+        "Activity owner sees own hidden payment in activity",
+        "User cannot see any hidden payments",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_get_activity_payments(async_client, dummy_session, length):
+    initiative_id, activity_id = 1, 1
+    response = await async_client.get(
+        f"payments/initiative/{initiative_id}/activity/{activity_id}"
+    )
+    assert response.status_code == 200
+    assert len(response.json()["payments"]) == length

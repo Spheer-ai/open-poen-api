@@ -6,54 +6,13 @@ from pydantic import BaseModel
 from fastapi import Request
 from ..logger import audit_logger
 from typing import Dict, Any
-from abc import ABC, abstractmethod
 
 T = TypeVar("T", bound=Base)
 
 
-class BaseManagerExCurrentUser(ABC):
-    def __init__(self, session: AsyncSession, current_user: User | None = None):
-        self.session = session
+class BaseLogger:
+    def __init__(self, current_user: User | None = None):
         self.current_user = current_user
-
-    async def base_create(
-        self,
-        entity_create: BaseModel,
-        db_model: Type[T],
-        request: Request | None = None,
-        **kwargs,
-    ) -> T:
-        entity = db_model(**entity_create.dict(), **kwargs)
-        self.session.add(entity)
-        await self.session.commit()
-        await self.after_create(entity, request)
-        return entity
-
-    async def base_update(
-        self, entity_update: BaseModel, db_entity: T, request: Request | None = None
-    ) -> T:
-        update_dict = entity_update.dict(exclude_unset=True)
-        for key, value in update_dict.items():
-            setattr(db_entity, key, value)
-        self.session.add(db_entity)
-        await self.session.commit()
-        await self.after_update(db_entity, update_dict, request)
-        return db_entity
-
-    async def base_delete(self, entity: T, request: Request | None = None) -> None:
-        await self.session.delete(entity)
-        await self.session.commit()
-        await self.after_delete(entity, request)
-
-    async def base_min_load(self, db_model: Type[T], id: int) -> T:
-        query_result = await self.session.get(db_model, id)
-        if query_result is None:
-            raise EntityNotFound(message=f"{db_model.__name__} not found")
-        return query_result
-
-    @abstractmethod
-    async def detail_load(self, id: int) -> Base:
-        pass
 
     async def after_create(self, entity: T, request: Request | None):
         audit_logger.info(f"{self.current_user} is creating an entity.")
@@ -68,3 +27,50 @@ class BaseManagerExCurrentUser(ABC):
     async def after_delete(self, entity: T, request: Request | None):
         audit_logger.info(f"{self.current_user} is deleting an entity.")
         audit_logger.info(f"{entity} is deleted.")
+
+
+class BaseCRUD:
+    def __init__(self, session: AsyncSession, current_user: User | None = None):
+        self.session = session
+        self.current_user = current_user
+        self.logger = BaseLogger(current_user)
+
+    async def create(
+        self,
+        entity_create: BaseModel,
+        db_model: Type[T],
+        request: Request | None = None,
+        **kwargs,
+    ) -> T:
+        entity = db_model(**entity_create.dict(), **kwargs)
+        self.session.add(entity)
+        await self.session.commit()
+        await self.logger.after_create(entity, request)
+        return entity
+
+    async def update(
+        self, entity_update: BaseModel, db_entity: T, request: Request | None = None
+    ) -> T:
+        update_dict = entity_update.dict(exclude_unset=True)
+        for key, value in update_dict.items():
+            setattr(db_entity, key, value)
+        self.session.add(db_entity)
+        await self.session.commit()
+        await self.logger.after_update(db_entity, update_dict, request)
+        return db_entity
+
+    async def delete(self, entity: T, request: Request | None = None) -> None:
+        await self.session.delete(entity)
+        await self.session.commit()
+        await self.logger.after_delete(entity, request)
+
+
+class BaseLoad:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def min_load(self, db_model: Type[T], id: int) -> T:
+        query_result = await self.session.get(db_model, id)
+        if query_result is None:
+            raise EntityNotFound(message=f"{db_model.__name__} not found")
+        return query_result

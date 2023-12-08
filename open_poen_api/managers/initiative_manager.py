@@ -1,20 +1,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Request, UploadFile, Depends
-from ..models import (
-    Initiative,
-    User,
-    UserInitiativeRole,
-    DebitCard,
-    AttachmentEntityType,
-)
+from .. import models as ent
 from ..schemas import InitiativeCreate, InitiativeUpdate
 from sqlalchemy.exc import IntegrityError
 from ..exc import EntityAlreadyExists, EntityNotFound, raise_err_if_unique_constraint
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from .base_manager import BaseManager
-from .manager_handlers import ProfilePictureHandler
-from .user_manager import optional_login
+from .handlers import ProfilePictureHandler
+from .user_manager.user_manager_ex_current_user import optional_login
 from ..database import get_async_session
 
 
@@ -22,11 +16,11 @@ class InitiativeManager(BaseManager):
     def __init__(
         self,
         session: AsyncSession = Depends(get_async_session),
-        current_user: User | None = Depends(optional_login),
+        current_user: ent.User | None = Depends(optional_login),
     ):
         super().__init__(session, current_user)
-        self.profile_picture_handler = ProfilePictureHandler[Initiative](
-            self.session, AttachmentEntityType.INITIATIVE
+        self.profile_picture_handler = ProfilePictureHandler[ent.Initiative](
+            self.session, current_user, ent.AttachmentEntityType.INITIATIVE
         )
 
     async def create(
@@ -34,10 +28,10 @@ class InitiativeManager(BaseManager):
         initiative_create: InitiativeCreate,
         grant_id: int,
         request: Request | None = None,
-    ) -> Initiative:
+    ) -> ent.Initiative:
         try:
-            initiative = await self.base_create(
-                initiative_create, Initiative, request, grant_id=grant_id
+            initiative = await self.crud.create(
+                initiative_create, ent.Initiative, request, grant_id=grant_id
             )
         except IntegrityError as e:
             raise_err_if_unique_constraint("unique initiative name", e)
@@ -47,11 +41,11 @@ class InitiativeManager(BaseManager):
     async def update(
         self,
         initiative_update: InitiativeUpdate,
-        initiative_db: Initiative,
+        initiative_db: ent.Initiative,
         request: Request | None = None,
-    ) -> Initiative:
+    ) -> ent.Initiative:
         try:
-            initiative = await self.base_update(
+            initiative = await self.crud.update(
                 initiative_update, initiative_db, request
             )
         except IntegrityError as e:
@@ -60,20 +54,20 @@ class InitiativeManager(BaseManager):
         return initiative
 
     async def delete(
-        self, initiative: Initiative, request: Request | None = None
+        self, initiative: ent.Initiative, request: Request | None = None
     ) -> None:
-        await self.base_delete(initiative, request)
+        await self.crud.delete(initiative, request)
 
     async def make_users_owner(
         self,
-        initiative: Initiative,
+        initiative: ent.Initiative,
         user_ids: list[int],
         request: Request | None = None,
     ):
         linked_user_ids = {role.user_id for role in initiative.user_roles}
 
         matched_users_q = await self.session.execute(
-            select(User).where(User.id.in_(user_ids))
+            select(ent.User).where(ent.User.id.in_(user_ids))
         )
         matched_users = matched_users_q.scalars().all()
         matched_user_ids = {user.id for user in matched_users}
@@ -94,7 +88,9 @@ class InitiativeManager(BaseManager):
             await self.session.delete(role)
 
         for user_id in link_user_ids:
-            new_role = UserInitiativeRole(user_id=user_id, initiative_id=initiative.id)
+            new_role = ent.UserInitiativeRole(
+                user_id=user_id, initiative_id=initiative.id
+            )
             self.session.add(new_role)
 
         await self.session.commit()
@@ -102,7 +98,7 @@ class InitiativeManager(BaseManager):
 
     async def link_debit_cards(
         self,
-        initiative: Initiative,
+        initiative: ent.Initiative,
         card_numbers: list[str],
         request: Request | None,
         ignore_already_linked: bool = True,
@@ -110,7 +106,7 @@ class InitiativeManager(BaseManager):
         linked_card_numbers = {card.card_number for card in initiative.debit_cards}
 
         matched_cards_q = await self.session.execute(
-            select(DebitCard).where(DebitCard.card_number.in_(card_numbers))
+            select(ent.DebitCard).where(ent.DebitCard.card_number.in_(card_numbers))
         )
         matched_cards = matched_cards_q.scalars().all()
         if not ignore_already_linked:
@@ -147,14 +143,14 @@ class InitiativeManager(BaseManager):
             self.session.add(card)
 
         for card_number in link_non_existing_card_numbers:
-            new_debit_card = DebitCard(
+            new_debit_card = ent.DebitCard(
                 card_number=card_number, initiative_id=initiative.id
             )
             self.session.add(new_debit_card)
 
         for card_number in link_existing_card_numbers:
             card_q = await self.session.execute(
-                select(DebitCard).where(DebitCard.card_number == card_number)
+                select(ent.DebitCard).where(ent.DebitCard.card_number == card_number)
             )
             card = card_q.scalars().one()
             card.initiative_id = initiative.id
@@ -165,32 +161,20 @@ class InitiativeManager(BaseManager):
 
     async def detail_load(self, id: int):
         query_result_q = await self.session.execute(
-            select(Initiative)
+            select(ent.Initiative)
             .options(
-                selectinload(Initiative.user_roles).joinedload(UserInitiativeRole.user),
-                selectinload(Initiative.activities),
-                joinedload(Initiative.profile_picture),
+                selectinload(ent.Initiative.user_roles).joinedload(
+                    ent.UserInitiativeRole.user
+                ),
+                selectinload(ent.Initiative.activities),
+                joinedload(ent.Initiative.profile_picture),
             )
-            .where(Initiative.id == id)
+            .where(ent.Initiative.id == id)
         )
         query_result = query_result_q.scalars().first()
         if query_result is None:
             raise EntityNotFound(message="Initiative not found")
         return query_result
 
-    async def min_load(self, id: int) -> Initiative:
-        return await self.base_min_load(Initiative, id)
-
-    async def set_profile_picture(
-        self, file: UploadFile, initiative: Initiative, request: Request
-    ):
-        await self.profile_picture_handler.set_profile_picture(file, initiative)
-        await self.after_update(
-            initiative, {"profile_picture": "deleted"}, request=request
-        )
-
-    async def delete_profile_picture(self, initiative: Initiative, request: Request):
-        await self.profile_picture_handler.delete_profile_picture(initiative)
-        await self.after_update(
-            initiative, {"profile_picture": "deleted"}, request=request
-        )
+    async def min_load(self, initiative_id: int):
+        return await self.load.min_load(ent.Initiative, initiative_id)

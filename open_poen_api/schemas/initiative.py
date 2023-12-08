@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, validator, ValidationError
 from ..models import LegalEntity
 from .mixins import NotNullValidatorMixin, Budget, TransactionAmount
-from .profile_picture import ProfilePicture
+from .attachment import ProfilePicture
 
 
 class InitiativeRead(BaseModel):

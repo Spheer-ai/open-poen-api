@@ -1,8 +1,25 @@
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
-from .mixins import TransactionAmount
+from .mixins import TransactionAmount, NotNullValidatorMixin
 from ..models import Route, PaymentType
 from typing import Literal
+
+
+class PaymentRead(BaseModel):
+    id: int
+    booking_date: datetime | None
+    transaction_amount: TransactionAmount
+    creditor_name: str | None
+    creditor_account: str | None
+    debtor_name: str | None
+    debtor_account: str | None
+    route: Route
+    type: PaymentType
+    remittance_information_unstructured: str | None
+    remittance_information_structured: str | None
+    short_user_description: str | None
+    long_user_description: str | None
+    hidden: bool | None
 
 
 class PaymentReadUser(BaseModel):
@@ -18,6 +35,27 @@ class PaymentReadUser(BaseModel):
     transaction_amount: TransactionAmount
     linkable_initiative: bool
     linkable_activity: bool
+
+
+class PaymentReadInitiative(BaseModel):
+    id: int
+    booking_date: datetime | None
+    activity_name: str | None
+    creditor_name: str | None
+    debtor_name: str | None
+    short_user_description: str | None
+    transaction_amount: TransactionAmount
+    n_attachments: int
+
+
+class PaymentReadActivity(BaseModel):
+    id: int
+    booking_date: datetime | None
+    creditor_name: str | None
+    debtor_name: str | None
+    short_user_description: str | None
+    transaction_amount: TransactionAmount
+    n_attachments: int
 
 
 class BasePaymentCreate(BaseModel):
@@ -67,17 +105,30 @@ class PaymentCreateAll(BasePaymentCreate):
         return debit_card_id
 
 
-class PaymentUpdate(BaseModel):
-    booking_date: datetime
-    transaction_amount: TransactionAmount
-    creditor_name: str = Field(max_length=128)
-    creditor_account: str = Field(max_length=128)
-    debtor_name: str = Field(max_length=128)
-    debtor_account: str = Field(max_length=128)
-    route: Route
-    short_user_description: str = Field(max_length=128)
-    long_user_description: str = Field(max_length=512)
-    hidden: bool
+class PaymentUpdate(NotNullValidatorMixin):
+    NOT_NULL_FIELDS: list[str] = [
+        "booking_date",
+        "transaction_amount",
+        "creditor_name",
+        "creditor_account",
+        "debtor_name",
+        "debtor_account",
+        "route",
+        "short_user_description",
+        "long_user_description",
+        "hidden",
+    ]
+
+    booking_date: datetime | None
+    transaction_amount: TransactionAmount | None
+    creditor_name: str | None = Field(max_length=128)
+    creditor_account: str | None = Field(max_length=128)
+    debtor_name: str | None = Field(max_length=128)
+    debtor_account: str | None = Field(max_length=128)
+    route: Route | None
+    short_user_description: str | None = Field(max_length=128)
+    long_user_description: str | None = Field(max_length=512)
+    hidden: bool | None
 
 
 class PaymentInitiativeUpdate(BaseModel):
@@ -89,8 +140,22 @@ class PaymentActivityUpdate(BaseModel):
     activity_id: int | None
 
 
-class PaymentReadList(BaseModel):
+class PaymentReadUserList(BaseModel):
     payments: list[PaymentReadUser]
+
+    class Config:
+        orm_mode = True
+
+
+class PaymentReadInitiativeList(BaseModel):
+    payments: list[PaymentReadInitiative]
+
+    class Config:
+        orm_mode = True
+
+
+class PaymentReadActivityList(BaseModel):
+    payments: list[PaymentReadActivity]
 
     class Config:
         orm_mode = True

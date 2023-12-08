@@ -10,21 +10,21 @@ from sqlalchemy import create_engine
 import os
 
 # TODO: Configure this with environment variables.
-asyng_engine = create_async_engine(os.environ["ASYNC_DATABASE_URL"])
-async_session_maker = async_sessionmaker(asyng_engine, expire_on_commit=False)
+async_engine = create_async_engine(os.environ["ASYNC_DATABASE_URL"])
+async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
 
 sync_engine = create_engine(os.environ["SYNC_DATABASE_URL"])
 sync_session_maker = sessionmaker(sync_engine, expire_on_commit=False)
 
 
 async def create_db_and_tables():
-    async with asyng_engine.begin() as conn:
+    async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
 
 async def drop_all():
-    async with asyng_engine.begin() as conn:
+    async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 

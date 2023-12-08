@@ -226,4 +226,4 @@ async def test_get_user_payments(async_client, dummy_session, status_code):
     response = await async_client.get(f"payments/user/{user_id}")
     assert response.status_code == status_code
     if response.status_code == 200:
-        assert len(response.json()["payments"]) == 3
+        assert len(response.json()["payments"]) == 9

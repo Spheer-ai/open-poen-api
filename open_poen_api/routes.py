@@ -20,7 +20,6 @@ from . import managers as m
 from .utils.utils import (
     temp_password_generator,
     get_requester_ip,
-    format_user_timestamp,
 )
 import os
 from .bng.api import create_consent
@@ -28,8 +27,7 @@ from .bng import import_bng_payments, retrieve_access_token, create_consent
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy import select, and_, or_, literal
+from sqlalchemy import select, and_
 from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
@@ -44,7 +42,7 @@ from .gocardless import (
 from .gocardless import get_institutions as get_institutions_from_gocardless
 from nordigen import NordigenClient
 import uuid
-from .exc import PaymentCouplingError, NotAuthorized
+from .exc import NotAuthorized, EntityNotFound
 from .logger import audit_logger
 from .query import (
     get_initiatives_q,
@@ -55,8 +53,11 @@ from .query import (
     get_user_payments_q,
     get_linkable_initiatives_q,
     get_linkable_activities_q,
+    get_initiative_payments_q,
+    get_activity_payments_q,
+    get_initiative_media_q,
+    get_activity_media_q,
 )
-
 
 user_router = APIRouter(tags=["user"])
 funder_router = APIRouter(tags=["funder"])
@@ -66,7 +67,7 @@ permission_router = APIRouter(tags=["auth"])
 utils_router = APIRouter(tags=["utils"])
 
 
-@user_router.post("/user", response_model=s.UserRead)
+@user_router.post("/user", response_model=s.UserRead, response_model_exclude_unset=True)
 async def create_user(
     user: Annotated[
         s.UserCreate,
@@ -88,6 +89,7 @@ async def create_user(
         **user.dict(), password=temp_password_generator(size=16)
     )
     user_db = await user_manager.create(user_with_password, request=request)
+    # TODO: Also see initiative. How to deal with this?
     await user_db.awaitable_attrs.profile_picture
     return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
 
@@ -102,7 +104,6 @@ async def get_user(
     optional_login: ent.User | None = Depends(m.optional_login),
     user_manager: m.UserManager = Depends(m.UserManager),
     oso=Depends(auth.set_sqlalchemy_adapter),
-    session=Depends(get_async_session),
 ):
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(optional_login, "read", user_db, oso)
@@ -179,7 +180,7 @@ async def upload_user_profile_picture(
 ):
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_user, "edit", user_db, oso)
-    await user_manager.set_profile_picture(file, user_db, request=request)
+    await user_manager.profile_picture_handler.set(file, user_db, request)
 
 
 @user_router.delete("/user/{user_id}/profile-picture")
@@ -192,7 +193,7 @@ async def delete_user_profile_picture(
 ):
     user_db = await user_manager.detail_load(user_id)
     auth.authorize(required_user, "edit", user_db, oso)
-    await user_manager.delete_profile_picture(user_db, request=request)
+    await user_manager.profile_picture_handler.delete(user_db, request)
     return Response(status_code=204)
 
 
@@ -201,6 +202,7 @@ async def delete_user_profile_picture(
     "/users/{user_id}/bng-initiate",
     response_model=s.BNGInitiate,
     summary="BNG Initiate",
+    include_in_schema=False,
 )
 async def bng_initiate(
     user_id: int,
@@ -456,6 +458,7 @@ async def get_bank_account(
 @user_router.patch(
     "/user/{user_id}/bank-account/{bank_account_id}",
     response_model=s.BankAccountRead,
+    response_model_exclude_unset=True,
 )
 async def revoke_bank_account(
     user_id: int,
@@ -493,6 +496,7 @@ async def delete_bank_account(
 @user_router.patch(
     "/user/{user_id}/bank-account/{bank_account_id}/users",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_bank_account_users(
     user_id: int,
@@ -535,6 +539,38 @@ async def get_initiative(
     return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
 
 
+@initiative_router.get(
+    "/initiative/{initiative_id}/media",
+    response_model=s.AttachmentList,
+    response_model_exclude_unset=True,
+)
+async def get_initiative_media(
+    initiative_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(m.optional_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+):
+    # TODO: Is initiative hidden? Also for other routes.
+    query = await get_initiative_media_q(
+        optional_user,
+        initiative_id,
+        offset,
+        limit,
+    )
+
+    media_result = await session.execute(query)
+    media_scalar = media_result.scalars().all()
+
+    filtered_media = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in media_scalar
+    ]
+
+    return s.AttachmentList(attachments=filtered_media)
+
+
 @initiative_router.patch(
     "/initiative/{initiative_id}",
     response_model=s.InitiativeRead,
@@ -562,6 +598,7 @@ async def update_initiative(
 @initiative_router.patch(
     "/initiative/{initiative_id}/owners",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_initiative_owners(
     initiative_id: int,
@@ -612,7 +649,9 @@ async def upload_initiative_profile_picture(
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
-    await initiative_manager.set_profile_picture(file, initiative_db, request=request)
+    await initiative_manager.profile_picture_handler.set(
+        file, initiative_db, request=request
+    )
 
 
 @initiative_router.delete("/initiative/{initiative_id}/profile-picture")
@@ -625,7 +664,9 @@ async def delete_initiative_profile_picture(
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
     auth.authorize(required_user, "edit", initiative_db, oso)
-    await initiative_manager.delete_profile_picture(initiative_db, request=request)
+    await initiative_manager.profile_picture_handler.delete(
+        initiative_db, request=request
+    )
     return Response(status_code=204)
 
 
@@ -656,7 +697,9 @@ async def get_initiatives(
 
 
 @initiative_router.post(
-    "/initiative/{initiative_id}/activity", response_model=s.ActivityRead
+    "/initiative/{initiative_id}/activity",
+    response_model=s.ActivityRead,
+    response_model_exclude_unset=True,
 )
 async def create_activity(
     initiative_id: int,
@@ -693,6 +736,39 @@ async def get_activity(
     return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
 
 
+@initiative_router.get(
+    "/initiative/{initiative_id}/activity/{activity_id}/media",
+    response_model=s.AttachmentList,
+    response_model_exclude_unset=True,
+)
+async def get_activity_media(
+    initiative_id: int,
+    activity_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    optional_user=Depends(m.optional_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+):
+    # TODO: Is initiative or activity hidden? Also for other routes.
+    query = await get_activity_media_q(
+        optional_user,
+        activity_id,
+        offset,
+        limit,
+    )
+
+    media_result = await session.execute(query)
+    media_scalar = media_result.scalars().all()
+
+    filtered_media = [
+        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        for i in media_scalar
+    ]
+
+    return s.AttachmentList(attachments=filtered_media)
+
+
 @initiative_router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}",
     response_model=s.ActivityRead,
@@ -721,6 +797,7 @@ async def update_activity(
 @initiative_router.patch(
     "/initiative/{initiative_id}/activity/{activity_id}/owners",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_activity_owners(
     initiative_id: int,
@@ -776,7 +853,9 @@ async def upload_activity_profile_picture(
 ):
     activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
-    await activity_manager.set_profile_picture(file, activity_db, request=request)
+    await activity_manager.profile_picture_handler.set(
+        file, activity_db, request=request
+    )
 
 
 @initiative_router.delete(
@@ -792,13 +871,15 @@ async def delete_activity_profile_picture(
 ):
     activity_db = await activity_manager.detail_load(activity_id)
     auth.authorize(required_user, "edit", activity_db, oso)
-    await activity_manager.delete_profile_picture(activity_db, request=request)
+    await activity_manager.profile_picture_handler.delete(activity_db, request=request)
     return Response(status_code=204)
 
 
 @initiative_router.patch(
     "/initiative/{initiative_id}/debit-cards",
     response_model=s.DebitCardReadList,
+    response_model_exclude_unset=True,
+    include_in_schema=False,
 )
 async def link_initiative_debit_cards(
     initiative_id: int,
@@ -825,7 +906,9 @@ async def link_initiative_debit_cards(
     return s.DebitCardReadList(debit_cards=filtered_debit_cards)
 
 
-@funder_router.post("/funder", response_model=s.FunderRead)
+@funder_router.post(
+    "/funder", response_model=s.FunderRead, response_model_exclude_unset=True
+)
 async def create_funder(
     funder: Annotated[
         s.FunderCreate,
@@ -917,7 +1000,11 @@ async def get_funders(
     return s.FunderReadList(funders=filtered_funders)
 
 
-@funder_router.post("/funder/{funder_id}/regulation", response_model=s.RegulationRead)
+@funder_router.post(
+    "/funder/{funder_id}/regulation",
+    response_model=s.RegulationRead,
+    response_model_exclude_unset=True,
+)
 async def create_regulation(
     funder_id: int,
     regulation: Annotated[
@@ -988,6 +1075,7 @@ async def update_regulation(
 @funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/officers",
     response_model=s.UserReadList,
+    response_model_exclude_unset=True,
 )
 async def link_officers(
     funder_id: int,
@@ -1066,7 +1154,9 @@ async def get_regulations(
 
 
 @funder_router.post(
-    "/funder/{funder_id}/regulation/{regulation_id}/grant", response_model=s.GrantRead
+    "/funder/{funder_id}/regulation/{regulation_id}/grant",
+    response_model=s.GrantRead,
+    response_model_exclude_unset=True,
 )
 async def create_grant(
     funder_id: int,
@@ -1137,7 +1227,7 @@ async def update_grant(
 @funder_router.patch(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/overseers",
     response_model=s.UserReadList,
-    responses={204: {"description": "Grant overseer is removed"}},
+    response_model_exclude_unset=True,
 )
 async def link_overseers(
     funder_id: int,
@@ -1211,6 +1301,7 @@ async def get_grants(
 @funder_router.post(
     "/funder/{funder_id}/regulation/{regulation_id}/grant/{grant_id}/initiative",
     response_model=s.InitiativeRead,
+    response_model_exclude_unset=True,
 )
 async def create_initiative(
     funder_id: int,
@@ -1236,8 +1327,7 @@ async def create_initiative(
 
 
 @payment_router.post(
-    "/payment",
-    response_model=s.PaymentReadUser,
+    "/payment", response_model=s.PaymentRead, response_model_exclude_unset=True
 )
 async def create_payment(
     payment: s.PaymentCreateManual,
@@ -1251,6 +1341,8 @@ async def create_payment(
     # TODO: Make sure initiative_id in the schema is congruent with activity_id.
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
+        if activity_db.initiative_id != payment.initiative_id:
+            raise EntityNotFound("There exists no activity with this initiative id")
         auth.authorize(required_user, "create_payment", activity_db, oso)
     else:
         initiative_db = await initiative_manager.detail_load(payment.initiative_id)
@@ -1259,12 +1351,30 @@ async def create_payment(
     payment_db = await payment_manager.create(
         payment, payment.initiative_id, payment.activity_id, request=request
     )
+    # TODO: Also see user. How to deal with this?
+    await payment_db.awaitable_attrs.attachments
     return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+
+
+@payment_router.get(
+    "/payment/{payment_id}",
+    response_model=s.PaymentReadLinked,
+    response_model_exclude_unset=True,
+)
+async def get_payment(
+    payment_id: int,
+    optional_login: ent.User | None = Depends(m.optional_login),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    auth.authorize(optional_login, "read", payment_db, oso)
+    return auth.get_authorized_output_fields(optional_login, "read", payment_db, oso)
 
 
 @payment_router.patch(
     "/payment/{payment_id}",
-    response_model=s.PaymentReadUser,
+    response_model=s.PaymentRead,
     response_model_exclude_unset=True,
 )
 async def update_payment(
@@ -1338,6 +1448,8 @@ async def link_activity(
 
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
+        if activity_db.initiative_id != payment.initiative_id:
+            raise EntityNotFound("There exists no activity with this initiative id")
         auth.authorize(required_user, "link_payment", activity_db, oso)
 
     payment_db = await payment_manager.assign_payment_to_activity(
@@ -1368,11 +1480,40 @@ async def delete_payment(
     return Response(status_code=204)
 
 
+@payment_router.post("/payment/{payment_id}/attachments")
+async def upload_payment_attachments(
+    payment_id: int,
+    request: Request,
+    files: list[UploadFile] = File(...),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    auth.authorize(required_user, "edit", payment_db, oso)
+    await payment_manager.attachment_handler.set(files, payment_db, request)
+
+
+@payment_router.delete("/payment/{payment_id}/attachment/{attachment_id}")
+async def delete_payment_attachment(
+    payment_id: int,
+    attachment_id: int,
+    request: Request,
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
+    required_user: ent.User = Depends(m.required_login),
+    oso=Depends(auth.set_sqlalchemy_adapter),
+):
+    payment_db = await payment_manager.detail_load(payment_id)
+    auth.authorize(required_user, "edit", payment_db, oso)
+    await payment_manager.attachment_handler.delete(payment_db, attachment_id, request)
+
+
 @payment_router.get(
     "/payments/bng",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadUserList,
     response_model_exclude_unset=True,
     summary="Get BNG Payments",
+    include_in_schema=False,
 )
 async def get_bng_payments(
     async_session: AsyncSession = Depends(get_async_session),
@@ -1384,7 +1525,7 @@ async def get_bng_payments(
 
 @payment_router.get(
     "/payments/user/{user_id}",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadUserList,
     response_model_exclude_unset=True,
 )
 async def get_user_payments(
@@ -1425,36 +1566,86 @@ async def get_user_payments(
 
     payments = [s.PaymentReadUser(**i) for i in payments_with_linkability]
 
-    return s.PaymentReadList(payments=payments)
+    return s.PaymentReadUserList(payments=payments)
 
 
 @payment_router.get(
     "/payments/initiative/{initiative_id}",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadInitiativeList,
     response_model_exclude_unset=True,
 )
 async def get_initiative_payments(
     initiative_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    min_amount: s.TransactionAmount | None = None,
+    max_amount: s.TransactionAmount | None = None,
+    route: ent.Route | None = None,
 ):
-    pass
+    # TODO: What is initiatie is hidden?
+    query = get_initiative_payments_q(
+        optional_user,
+        initiative_id,
+        offset,
+        limit,
+        start_date,
+        end_date,
+        min_amount,
+        max_amount,
+        route,
+    )
+
+    payments_result = await session.execute(query)
+    payments_scalar = payments_result.all()
+
+    payments = [s.PaymentReadInitiative(**i._mapping) for i in payments_scalar]
+
+    return s.PaymentReadInitiativeList(payments=payments)
 
 
 @payment_router.get(
     "/payments/initiative/{initiative_id}/activity/{activity_id}",
-    response_model=s.PaymentReadList,
+    response_model=s.PaymentReadActivityList,
     response_model_exclude_unset=True,
 )
 async def get_activity_payments(
     initiative_id: int,
     activity_id: int,
-    async_session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
     oso=Depends(auth.set_sqlalchemy_adapter),
+    offset: int = 0,
+    limit: int = 20,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    min_amount: s.TransactionAmount | None = None,
+    max_amount: s.TransactionAmount | None = None,
+    route: ent.Route | None = None,
 ):
-    pass
+    # What if activity is hidden?
+    query = get_activity_payments_q(
+        optional_user,
+        activity_id,
+        offset,
+        limit,
+        start_date,
+        end_date,
+        min_amount,
+        max_amount,
+        route,
+    )
+
+    payments_result = await session.execute(query)
+    payments_scalar = payments_result.all()
+
+    payments = [s.PaymentReadActivity(**i._mapping) for i in payments_scalar]
+
+    return s.PaymentReadActivityList(payments=payments)
 
 
 @permission_router.get("/actions", response_model=s.AuthActionsRead)
@@ -1470,8 +1661,9 @@ async def get_authorized_actions(
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
 ):
-    class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
+    class_map: dict[s.AuthEntityClass, m.BaseManager] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
@@ -1479,6 +1671,7 @@ async def get_authorized_actions(
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
         s.AuthEntityClass.INITIATIVE: initiative_manager,
         s.AuthEntityClass.ACTIVITY: activity_manager,
+        s.AuthEntityClass.PAYMENT: payment_manager,
     }
 
     resource: ent.Base | s.AuthEntityClass
@@ -1508,8 +1701,9 @@ async def get_authorized_fields(
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
+    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
 ):
-    class_map: dict[s.AuthEntityClass, m.BaseManagerExCurrentUser] = {
+    class_map: dict[s.AuthEntityClass, m.BaseManager] = {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
@@ -1517,6 +1711,7 @@ async def get_authorized_fields(
         s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
         s.AuthEntityClass.INITIATIVE: initiative_manager,
         s.AuthEntityClass.ACTIVITY: activity_manager,
+        s.AuthEntityClass.PAYMENT: payment_manager,
     }
 
     resource = await class_map[entity_class].detail_load(entity_id)

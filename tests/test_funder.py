@@ -19,7 +19,7 @@ from open_poen_api.models import Funder
         "Superuser can",
         "User cannot",
         "Administrator can",
-        "Policy officer cannot",
+        "Grant officer cannot",
         "Anon cannot",
     ],
     indirect=["get_mock_user"],
@@ -42,7 +42,7 @@ async def test_create_funder(async_client, dummy_session, status_code):
         "Superuser can",
         "User cannot",
         "Administrator can",
-        "Policy officer cannot",
+        "Grant officer cannot",
         "Anon cannot",
     ],
     indirect=["get_mock_user"],
@@ -67,7 +67,7 @@ async def test_delete_funder(async_client, dummy_session, status_code):
     ids=[
         "Superuser can",
         "User cannot",
-        "Policy officer cannot",
+        "Grant officer cannot",
         "Duplicate name fails",
     ],
     indirect=["get_mock_user"],
@@ -97,7 +97,7 @@ async def test_get_funders_list(async_client, dummy_session, status_code):
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [(superuser, 200), (grant_officer, 200), (anon, 200)],
-    ids=["Superuser can", "Policy officer can", "Anon can"],
+    ids=["Superuser can", "Grant officer can", "Anon can"],
     indirect=["get_mock_user"],
 )
 async def test_get_linked_funder_detail(async_client, dummy_session, status_code):
