@@ -5,6 +5,7 @@ from .attachment import ProfilePicture
 
 class ActivityRead(BaseModel):
     id: int
+    initiative_id: int
     name: str
     description: str
     purpose: str
