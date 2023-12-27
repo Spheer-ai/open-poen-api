@@ -1587,7 +1587,6 @@ async def get_initiative_payments(
     max_amount: s.TransactionAmount | None = None,
     route: ent.Route | None = None,
 ):
-    # TODO: What is initiatie is hidden?
     query = get_initiative_payments_q(
         optional_user,
         initiative_id,
@@ -1603,7 +1602,19 @@ async def get_initiative_payments(
     payments_result = await session.execute(query)
     payments_scalar = payments_result.all()
 
-    payments = [s.PaymentReadInitiative(**i._mapping) for i in payments_scalar]
+    filtered_payments = [
+        (
+            auth.get_authorized_output_fields(optional_user, "read", i[0], oso),
+            i[1],
+            i[2],
+        )
+        for i in payments_scalar
+    ]
+
+    payments = [
+        s.PaymentReadInitiative(payment=i[0], activity_name=i[1], n_attachments=i[2])
+        for i in filtered_payments
+    ]
 
     return s.PaymentReadInitiativeList(payments=payments)
 
@@ -1643,7 +1654,18 @@ async def get_activity_payments(
     payments_result = await session.execute(query)
     payments_scalar = payments_result.all()
 
-    payments = [s.PaymentReadActivity(**i._mapping) for i in payments_scalar]
+    filtered_payments = [
+        (
+            auth.get_authorized_output_fields(optional_user, "read", i[0], oso),
+            i[1],
+        )
+        for i in payments_scalar
+    ]
+
+    payments = [
+        s.PaymentReadActivity(payment=i[0], n_attachments=i[1])
+        for i in filtered_payments
+    ]
 
     return s.PaymentReadActivityList(payments=payments)
 

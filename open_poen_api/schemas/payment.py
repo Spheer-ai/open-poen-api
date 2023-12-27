@@ -38,23 +38,13 @@ class PaymentReadUser(BaseModel):
 
 
 class PaymentReadInitiative(BaseModel):
-    id: int
-    booking_date: datetime | None
+    payment: PaymentRead
     activity_name: str | None
-    creditor_name: str | None
-    debtor_name: str | None
-    short_user_description: str | None
-    transaction_amount: TransactionAmount
     n_attachments: int
 
 
 class PaymentReadActivity(BaseModel):
-    id: int
-    booking_date: datetime | None
-    creditor_name: str | None
-    debtor_name: str | None
-    short_user_description: str | None
-    transaction_amount: TransactionAmount
+    payment: PaymentRead
     n_attachments: int
 
 

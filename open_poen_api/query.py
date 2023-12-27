@@ -1,5 +1,5 @@
 from . import models as ent
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload, joinedload, noload
 from sqlalchemy import select, or_, literal, and_
 from .exc import UnprocessableContent
 from datetime import datetime, date, timedelta
@@ -323,14 +323,14 @@ def get_initiative_payments_q(
 ):
     q = (
         select(
-            ent.Payment.id,
-            ent.Payment.booking_date,
+            ent.Payment,
             ent.Activity.name.label("activity_name"),
-            ent.Payment.creditor_name,
-            ent.Payment.debtor_name,
-            ent.Payment.short_user_description,
-            ent.Payment.transaction_amount,
             func.count(ent.Attachment.id).label("n_attachments"),
+        )
+        .options(
+            noload(ent.Payment.activity),
+            noload(ent.Payment.initiative),
+            noload(ent.Payment.bank_account),
         )
         .join(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
         .join(ent.Grant, ent.Initiative.grant_id == ent.Grant.id)
@@ -346,12 +346,26 @@ def get_initiative_payments_q(
         .where(ent.Payment.initiative_id == initiative_id)
         .group_by(
             ent.Payment.id,
+            ent.Payment.transaction_id,
+            ent.Payment.entry_reference,
+            ent.Payment.end_to_end_id,
             ent.Payment.booking_date,
-            ent.Activity.name,
-            ent.Payment.creditor_name,
-            ent.Payment.debtor_name,
-            ent.Payment.short_user_description,
             ent.Payment.transaction_amount,
+            ent.Payment.creditor_name,
+            ent.Payment.creditor_account,
+            ent.Payment.debtor_name,
+            ent.Payment.debtor_account,
+            ent.Payment.route,
+            ent.Payment.remittance_information_unstructured,
+            ent.Payment.remittance_information_structured,
+            ent.Payment.short_user_description,
+            ent.Payment.long_user_description,
+            ent.Payment.hidden,
+            ent.Payment.activity_id,
+            ent.Payment.initiative_id,
+            ent.Payment.debit_card_id,
+            ent.Payment.bank_account_id,
+            ent.Activity.name,
         )
     )
 
@@ -408,13 +422,13 @@ def get_activity_payments_q(
 ):
     q = (
         select(
-            ent.Payment.id,
-            ent.Payment.booking_date,
-            ent.Payment.creditor_name,
-            ent.Payment.debtor_name,
-            ent.Payment.short_user_description,
-            ent.Payment.transaction_amount,
+            ent.Payment,
             func.count(ent.Attachment.id).label("n_attachments"),
+        )
+        .options(
+            noload(ent.Payment.activity),
+            noload(ent.Payment.initiative),
+            noload(ent.Payment.bank_account),
         )
         .join(ent.Initiative, ent.Payment.initiative_id == ent.Initiative.id)
         .join(ent.Grant, ent.Initiative.grant_id == ent.Grant.id)
@@ -429,11 +443,25 @@ def get_activity_payments_q(
         .where(ent.Payment.activity_id == activity_id)
         .group_by(
             ent.Payment.id,
+            ent.Payment.transaction_id,
+            ent.Payment.entry_reference,
+            ent.Payment.end_to_end_id,
             ent.Payment.booking_date,
-            ent.Payment.creditor_name,
-            ent.Payment.debtor_name,
-            ent.Payment.short_user_description,
             ent.Payment.transaction_amount,
+            ent.Payment.creditor_name,
+            ent.Payment.creditor_account,
+            ent.Payment.debtor_name,
+            ent.Payment.debtor_account,
+            ent.Payment.route,
+            ent.Payment.remittance_information_unstructured,
+            ent.Payment.remittance_information_structured,
+            ent.Payment.short_user_description,
+            ent.Payment.long_user_description,
+            ent.Payment.hidden,
+            ent.Payment.activity_id,
+            ent.Payment.initiative_id,
+            ent.Payment.debit_card_id,
+            ent.Payment.bank_account_id,
         )
     )
 
