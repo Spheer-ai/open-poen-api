@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Request, UploadFile
+from fastapi import Request, UploadFile
 from PIL import Image
 import io
 import os
@@ -6,9 +6,9 @@ import string
 import random
 import datetime
 from azure.storage.blob.aio import BlobServiceClient
-from azure.storage.blob import BlobSasPermissions, generate_blob_sas
+from azure.storage.blob import BlobSasPermissions, generate_blob_sas, ContentSettings
 from pydantic import BaseModel
-from ..exc import UnsupportedFileType, FileTooLarge
+from ..exc import FileTooLarge
 from typing import TypeVar
 
 DEBUG = os.environ.get("ENVIRONMENT") == "debug"
@@ -64,7 +64,11 @@ async def upload_attachment(
     ext = os.path.splitext(str(file.filename))[1][1:]
     original_blob_path = f"images/{filename}.{ext}"
     blob_client = container_client.get_blob_client(original_blob_path)
-    await blob_client.upload_blob(file_content, overwrite=True)
+    await blob_client.upload_blob(
+        file_content,
+        overwrite=True,
+        content_settings=ContentSettings(content_type=file.content_type),
+    )
 
     if not make_thumbnail:
         return AttachmentUpdate(raw_attachment_url=blob_client.url)
@@ -84,7 +88,9 @@ async def upload_attachment(
         thumbnail_blob_path = f"image_thumbnails/{filename}_{size}.{ext}"
         thumbnail_blob_client = container_client.get_blob_client(thumbnail_blob_path)
         await thumbnail_blob_client.upload_blob(
-            thumbnail_bytes.getvalue(), overwrite=True
+            thumbnail_bytes.getvalue(),
+            overwrite=True,
+            content_settings=ContentSettings(content_type=file.content_type),
         )
         thumbnail_urls[size] = thumbnail_blob_client.url
 
