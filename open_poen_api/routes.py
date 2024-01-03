@@ -11,7 +11,7 @@ from fastapi import (
     Body,
     Path,
 )
-from typing import Annotated, Union
+from typing import Annotated, Union, Protocol
 from fastapi.responses import RedirectResponse
 from .database import get_async_session
 from . import schemas as s
@@ -1588,11 +1588,12 @@ async def get_activity_payments(
     return s.PaymentReadActivityList(payments=payments)
 
 
-@permission_router.get("/actions", response_model=s.AuthActionsRead)
-async def get_authorized_actions(
-    entity_class: s.AuthEntityClass,
-    entity_id: int | None = None,
-    optional_user: ent.User | None = Depends(m.optional_login),
+class DetailLoaderProtocol(Protocol):
+    async def detail_load(self, id: int) -> ent.Base:
+        ...
+
+
+async def get_auth_class_map(
     user_manager: m.UserManager = Depends(m.UserManager),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
@@ -1601,8 +1602,8 @@ async def get_authorized_actions(
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
-):
-    class_map: dict[s.AuthEntityClass, m.BaseManager] = {
+) -> dict[s.AuthEntityClass, DetailLoaderProtocol]:
+    return {
         s.AuthEntityClass.USER: user_manager,
         s.AuthEntityClass.FUNDER: funder_manager,
         s.AuthEntityClass.REGULATION: regulation_manager,
@@ -1613,6 +1614,16 @@ async def get_authorized_actions(
         s.AuthEntityClass.PAYMENT: payment_manager,
     }
 
+
+@permission_router.get("/actions", response_model=s.AuthActionsRead)
+async def get_authorized_actions(
+    entity_class: s.AuthEntityClass,
+    entity_id: int | None = None,
+    optional_user: ent.User | None = Depends(m.optional_login),
+    class_map: dict[s.AuthEntityClass, DetailLoaderProtocol] = Depends(
+        get_auth_class_map
+    ),
+):
     resource: ent.Base | s.AuthEntityClass
     if entity_id is not None:
         resource = await class_map[entity_class].detail_load(entity_id)
@@ -1630,28 +1641,10 @@ async def get_authorized_fields(
     entity_id: int,
     async_session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
-    user_manager: m.UserManager = Depends(m.UserManager),
-    funder_manager: m.FunderManager = Depends(
-        m.FunderManager,
+    class_map: dict[s.AuthEntityClass, DetailLoaderProtocol] = Depends(
+        get_auth_class_map
     ),
-    regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
-    grant_manager: m.GrantManager = Depends(m.GrantManager),
-    bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
-    initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    payment_manager: m.PaymentManager = Depends(m.PaymentManager),
 ):
-    class_map: dict[s.AuthEntityClass, m.BaseManager] = {
-        s.AuthEntityClass.USER: user_manager,
-        s.AuthEntityClass.FUNDER: funder_manager,
-        s.AuthEntityClass.REGULATION: regulation_manager,
-        s.AuthEntityClass.GRANT: grant_manager,
-        s.AuthEntityClass.BANK_ACCOUNT: bank_account_manager,
-        s.AuthEntityClass.INITIATIVE: initiative_manager,
-        s.AuthEntityClass.ACTIVITY: activity_manager,
-        s.AuthEntityClass.PAYMENT: payment_manager,
-    }
-
     resource = await class_map[entity_class].detail_load(entity_id)
 
     return s.AuthFieldsRead(

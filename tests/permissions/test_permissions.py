@@ -1,10 +1,8 @@
 from open_poen_api.authorization import (
     OSO,
     get_authorized_output_fields,
-    set_sqlalchemy_adapter,
     get_authorized_actions,
 )
-from open_poen_api.database import sync_session_maker
 from open_poen_api.models import User, Regulation
 from open_poen_api.managers import RegulationManager
 import pytest_asyncio
@@ -90,16 +88,14 @@ async def test_field_permissions(
 async def test_get_authorized_output_fields(dummy_session):
     user = await dummy_session.get(User, 1)
     regulation = await dummy_session.get(Regulation, 1)
-    fields = get_authorized_output_fields(user, "read", regulation, OSO)
+    fields = get_authorized_output_fields(user, "read", regulation)
 
 
 async def test_get_authorized_output_fields_2(dummy_session):
     regulation_manager = RegulationManager(dummy_session, None)
-    with sync_session_maker() as s:
-        oso = await set_sqlalchemy_adapter(s).__anext__()
-        user = await dummy_session.get(User, 1)
-        regulation = await regulation_manager.detail_load(1)
-        fields = get_authorized_output_fields(user, "read", regulation, oso)
+    user = await dummy_session.get(User, 1)
+    regulation = await regulation_manager.detail_load(1)
+    fields = get_authorized_output_fields(user, "read", regulation)
 
 
 @pytest.mark.parametrize(
