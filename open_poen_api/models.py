@@ -72,7 +72,7 @@ class AttachmentAttachmentType(str, Enum):
     PDF = "pdf"
 
 
-class Attachment(Base):
+class Attachment(Base, TimeStampMixin):
     __tablename__ = "attachments"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     entity_id: Mapped[int] = mapped_column(Integer)
@@ -152,7 +152,7 @@ class AttachmentMixin(Base):
         )
 
 
-class UserInitiativeRole(Base):
+class UserInitiativeRole(Base, TimeStampMixin):
     __tablename__ = "user_initiative_roles"
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
@@ -168,7 +168,7 @@ class UserInitiativeRole(Base):
     )
 
 
-class UserActivityRole(Base):
+class UserActivityRole(Base, TimeStampMixin):
     __tablename__ = "user_activity_roles"
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
@@ -189,7 +189,7 @@ class BankAccountRole(str, Enum):
     USER = "user"
 
 
-class UserBankAccountRole(Base):
+class UserBankAccountRole(Base, TimeStampMixin):
     __tablename__ = "user_bank_account_roles"
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
@@ -210,7 +210,7 @@ class RegulationRole(str, Enum):
     POLICY_OFFICER = "policy officer"
 
 
-class UserRegulationRole(Base):
+class UserRegulationRole(Base, TimeStampMixin):
     __tablename__ = "user_regulation_roles"
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
@@ -226,7 +226,7 @@ class UserRegulationRole(Base):
     regulation: Mapped["Regulation"] = relationship("Regulation", uselist=False)
 
 
-class UserGrantRole(Base):
+class UserGrantRole(Base, TimeStampMixin):
     __tablename__ = "user_grant_roles"
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
@@ -252,7 +252,7 @@ class UserRole(str, Enum):
     USER = "user"
 
 
-class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base):
+class User(SQLAlchemyBaseUserTable[int], ProfilePictureMixin, Base, TimeStampMixin):
     id_column = "User.id"
     entity_type = AttachmentEntityType.USER.value
 
@@ -416,7 +416,7 @@ class LegalEntity(str, Enum):
     GEEN = "geen (natuurlijk persoon)"
 
 
-class Initiative(ProfilePictureMixin, Base):
+class Initiative(ProfilePictureMixin, Base, TimeStampMixin):
     id_column = "Initiative.id"
     entity_type = AttachmentEntityType.INITIATIVE.value
 
@@ -496,7 +496,7 @@ class Initiative(ProfilePictureMixin, Base):
         return f"Initiative(id={self.id}, name='{self.name}')"
 
 
-class Activity(ProfilePictureMixin, Base):
+class Activity(ProfilePictureMixin, Base, TimeStampMixin):
     id_column = "Activity.id"
     entity_type = AttachmentEntityType.ACTIVITY.value
 
@@ -588,7 +588,7 @@ def get_finance_aggregate(route: Route):
     )
 
 
-class Payment(AttachmentMixin, Base):
+class Payment(AttachmentMixin, Base, TimeStampMixin):
     __tablename__ = "payment"
     __table_args__ = (UniqueConstraint("transaction_id", name="unique transaction id"),)
 
@@ -741,7 +741,7 @@ class Requisition(Base, TimeStampMixin):
         )
 
 
-class BankAccount(Base):
+class BankAccount(Base, TimeStampMixin):
     __tablename__ = "bank_account"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -830,7 +830,7 @@ class BankAccount(Base):
     PROXIES = ["users", "owner"]
 
 
-class Regulation(Base):
+class Regulation(Base, TimeStampMixin):
     __tablename__ = "regulation"
     __table_args__ = (
         UniqueConstraint(
@@ -883,7 +883,7 @@ class Regulation(Base):
         return f"Regulation(id={self.id}, name='{self.name}')"
 
 
-class Grant(Base):
+class Grant(Base, TimeStampMixin):
     __tablename__ = "grant"
     __table_args__ = (
         UniqueConstraint(
@@ -935,7 +935,7 @@ class Grant(Base):
         return f"Grant(id={self.id}, name='{self.name}', reference='{self.reference}', budget='{self.budget}')"
 
 
-class Funder(Base):
+class Funder(Base, TimeStampMixin):
     __tablename__ = "funder"
     __table_args__ = (UniqueConstraint("name", name="unique funder name"),)
 
