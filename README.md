@@ -68,6 +68,24 @@ DOMAIN_NAME=9f2a-2a00-1370-819c-4201-bf7b-fc7-6d47-8401.ngrok-free.app
 ### Gotcha's
 * .env files have to end with an empty line. The script that parses these for Terraform otherwise skips the last key value pair.
 
+* SQL-Alchemy might give a warning about a cartesian product in an update statement. This is erroneous. For example, the following SQL statement is generated for the [many to many example](https://sqlalchemy-utils.readthedocs.io/en/latest/aggregates.html) in SQL-Alchemy-utils:
+
+```sql
+UPDATE "user"
+SET    group_count=
+       (
+              SELECT count(%(count_2)s) AS count_1
+              FROM   "group"
+              JOIN   user_group AS user_group_1
+              ON     "group".id = user_group_1.group_id
+              WHERE  "user".id = user_group_1.user_id)
+FROM   "group"
+WHERE  "group".id IN (%(id_1_1)s,
+                      %(id_1_2)s)
+```
+
+Supposedly SQL-Alchemy is warning about the outer query, because it does not specify how user and group are joined. This is however done by the user in the sub query referring to the user in the outer query.
+
 ##### Using Docker on MacOS's M1 chip set
 Docker will by default look for binaries for the M1 chip set when you install dependencies for the Docker image. There are not always available and therefore you'll probably run into problems. Solve this by:
 

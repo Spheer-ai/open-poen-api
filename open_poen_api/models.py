@@ -54,8 +54,8 @@ class Base(AsyncAttrs, DeclarativeBase):
 requisition_bank_account = Table(
     "requisition_bank_account",
     Base.metadata,
-    Column("requisition_id", Integer, ForeignKey("requisition.id"), primary_key=True),
-    Column("bank_account_id", Integer, ForeignKey("bank_account.id"), primary_key=True),
+    Column("requisition_id", Integer, ForeignKey("requisition.id")),
+    Column("bank_account_id", Integer, ForeignKey("bank_account.id")),
 )
 
 
@@ -148,7 +148,7 @@ class AttachmentMixin(Base):
             f"Attachment.attachment_type=='{AttachmentAttachmentType.PICTURE.value}', "
             f"Attachment.attachment_type=='{AttachmentAttachmentType.PDF.value}'))",
             cascade="all, delete-orphan",
-            overlaps="attachments",
+            overlaps="profile_picture",
         )
 
 
@@ -732,9 +732,7 @@ class Requisition(Base, TimeStampMixin):
         "BankAccount",
         back_populates="requisitions",
         lazy="noload",
-        secondary=requisition_bank_account,
-        primaryjoin="Requisition.id == requisition_bank_account.c.requisition_id",
-        secondaryjoin="BankAccount.id == requisition_bank_account.c.bank_account_id",
+        secondary="requisition_bank_account",
     )
 
     def __repr__(self):
@@ -797,9 +795,7 @@ class BankAccount(Base):
         "Requisition",
         back_populates="bank_accounts",
         lazy="noload",
-        secondary=requisition_bank_account,
-        primaryjoin="BankAccount.id == requisition_bank_account.c.bank_account_id",
-        secondaryjoin="Requisition.id == requisition_bank_account.c.requisition_id",
+        secondary="requisition_bank_account",
     )
 
     user_roles: Mapped[list[UserBankAccountRole]] = relationship(

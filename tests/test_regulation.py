@@ -22,7 +22,7 @@ async def test_create_regulation(async_client, dummy_session, status_code):
     response = await async_client.post(f"/funder/{funder_id}/regulation", json=body)
     assert response.status_code == status_code
     if status_code == 200:
-        db_regulation = dummy_session.get(Regulation, response.json()["id"])
+        db_regulation = await dummy_session.get(Regulation, response.json()["id"])
         assert db_regulation is not None
         regulation_data = response.json()
         assert regulation_data["name"] == body["name"]
