@@ -20,7 +20,7 @@ from fastapi_users.exceptions import UserAlreadyExists
 import contextlib
 from fastapi_mail import MessageType, FastMail
 import os
-from ...authorization.authorization import SECRET_KEY
+from ...authorization import SECRET_KEY
 from ...exc import EntityAlreadyExists
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..bases import BaseLogger

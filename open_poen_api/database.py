@@ -13,9 +13,6 @@ import os
 async_engine = create_async_engine(os.environ["ASYNC_DATABASE_URL"])
 async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
 
-sync_engine = create_engine(os.environ["SYNC_DATABASE_URL"])
-sync_session_maker = sessionmaker(sync_engine, expire_on_commit=False)
-
 
 async def create_db_and_tables():
     async with async_engine.begin() as conn:
@@ -30,11 +27,6 @@ async def drop_all():
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
-        yield session
-
-
-async def get_sync_session():
-    with sync_session_maker() as session:
         yield session
 
 

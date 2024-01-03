@@ -32,8 +32,8 @@ from requests import RequestException
 from datetime import datetime, timedelta, date
 from time import time
 import pytz
-from .authorization.authorization import SECRET_KEY, ALGORITHM
-from .authorization import authorization as auth
+from .authorization import SECRET_KEY, ALGORITHM
+from . import authorization as auth
 from .gocardless import (
     get_nordigen_client,
     get_gocardless_payments,
@@ -82,16 +82,15 @@ async def create_user(
     request: Request,
     required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(required_login, "create", "User", oso)
+    auth.authorize(required_login, "create", "User")
     user_with_password = s.UserCreateWithPassword(
         **user.dict(), password=temp_password_generator(size=16)
     )
     user_db = await user_manager.create(user_with_password, request=request)
     # TODO: Also see initiative. How to deal with this?
     await user_db.awaitable_attrs.profile_picture
-    return auth.get_authorized_output_fields(required_login, "read", user_db, oso)
+    return auth.get_authorized_output_fields(required_login, "read", user_db)
 
 
 @user_router.get(
@@ -103,11 +102,10 @@ async def get_user(
     user_id: int,
     optional_login: ent.User | None = Depends(m.optional_login),
     user_manager: m.UserManager = Depends(m.UserManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.detail_load(user_id)
-    auth.authorize(optional_login, "read", user_db, oso)
-    return auth.get_authorized_output_fields(optional_login, "read", user_db, oso)
+    auth.authorize(optional_login, "read", user_db)
+    return auth.get_authorized_output_fields(optional_login, "read", user_db)
 
 
 @user_router.patch(
@@ -123,13 +121,12 @@ async def update_user(
     request: Request,
     required_user=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
-    auth.authorize(required_user, "edit", user_db, oso)
+    auth.authorize(required_user, "edit", user_db)
     auth.authorize_input_fields(required_user, "edit", user_db, user)
     edited_user = await user_manager.update(user, user_db, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", edited_user, oso)
+    return auth.get_authorized_output_fields(required_user, "read", edited_user)
 
 
 @user_router.delete("/user/{user_id}")
@@ -138,10 +135,9 @@ async def delete_user(
     request: Request,
     required_login=Depends(m.required_login),
     user_manager: m.UserManager = Depends(m.UserManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.min_load(user_id)
-    auth.authorize(required_login, "delete", user_db, oso)
+    auth.authorize(required_login, "delete", user_db)
     await user_manager.delete(user_db, request=request)
     return Response(status_code=204)
 
@@ -152,7 +148,6 @@ async def delete_user(
 async def get_users(
     session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     email: str | None = None,
@@ -163,7 +158,7 @@ async def get_users(
     users_scalar = users_result.scalars().all()
 
     filtered_users = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        auth.get_authorized_output_fields(optional_user, "read", i)
         for i in users_scalar
     ]
     return s.UserReadList(users=filtered_users)
@@ -176,10 +171,9 @@ async def upload_user_profile_picture(
     file: UploadFile = File(...),
     user_manager: m.UserManager = Depends(m.UserManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.detail_load(user_id)
-    auth.authorize(required_user, "edit", user_db, oso)
+    auth.authorize(required_user, "edit", user_db)
     await user_manager.profile_picture_handler.set(file, user_db, request)
 
 
@@ -189,10 +183,9 @@ async def delete_user_profile_picture(
     request: Request,
     user_manager: m.UserManager = Depends(m.UserManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     user_db = await user_manager.detail_load(user_id)
-    auth.authorize(required_user, "edit", user_db, oso)
+    auth.authorize(required_user, "edit", user_db)
     await user_manager.profile_picture_handler.delete(user_db, request)
     return Response(status_code=204)
 
@@ -446,13 +439,10 @@ async def get_bank_account(
     bank_account_id: int,
     required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
-    auth.authorize(required_user, "read", bank_account_db, oso)
-    return auth.get_authorized_output_fields(
-        required_user, "read", bank_account_db, oso
-    )
+    auth.authorize(required_user, "read", bank_account_db)
+    return auth.get_authorized_output_fields(required_user, "read", bank_account_db)
 
 
 @user_router.patch(
@@ -466,16 +456,13 @@ async def revoke_bank_account(
     request: Request,
     required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
-    auth.authorize(required_user, "revoke", bank_account_db, oso)
+    auth.authorize(required_user, "revoke", bank_account_db)
     bank_account_db = await bank_account_manager.revoke(
         bank_account_db, request=request
     )
-    return auth.get_authorized_output_fields(
-        required_user, "read", bank_account_db, oso
-    )
+    return auth.get_authorized_output_fields(required_user, "read", bank_account_db)
 
 
 @user_router.delete("/user/{user_id}/bank-account/{bank_account_id}")
@@ -485,10 +472,9 @@ async def delete_bank_account(
     request: Request,
     required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
-    auth.authorize(required_user, "delete", bank_account_db, oso)
+    auth.authorize(required_user, "delete", bank_account_db)
     await bank_account_manager.delete(bank_account_db, request=request)
     return Response(status_code=204)
 
@@ -505,19 +491,16 @@ async def link_bank_account_users(
     request: Request,
     required_user=Depends(m.required_login),
     bank_account_manager: m.BankAccountManager = Depends(m.BankAccountManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     bank_account_db = await bank_account_manager.detail_load(bank_account_id)
-    auth.authorize(required_user, "link_users", bank_account_db, oso)
+    auth.authorize(required_user, "link_users", bank_account_db)
     bank_account_db = await bank_account_manager.make_users_user(
         bank_account_db, bank_account.user_ids, request=request
     )
     # Important for up to date relations. Has to be in this async context.
     await bank_account_manager.session.refresh(bank_account_db)
     filtered_bank_account_users = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, ent.User.REL_FIELDS)
         for i in bank_account_db.users
     ]
     return s.UserReadList(users=filtered_bank_account_users)
@@ -532,11 +515,10 @@ async def get_initiative(
     initiative_id: int,
     optional_user=Depends(m.optional_login),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(optional_user, "read", initiative_db, oso)
-    return auth.get_authorized_output_fields(optional_user, "read", initiative_db, oso)
+    auth.authorize(optional_user, "read", initiative_db)
+    return auth.get_authorized_output_fields(optional_user, "read", initiative_db)
 
 
 @initiative_router.get(
@@ -548,7 +530,6 @@ async def get_initiative_media(
     initiative_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
 ):
@@ -564,7 +545,7 @@ async def get_initiative_media(
     media_scalar = media_result.scalars().all()
 
     filtered_media = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        auth.get_authorized_output_fields(optional_user, "read", i)
         for i in media_scalar
     ]
 
@@ -582,17 +563,14 @@ async def update_initiative(
     request: Request,
     required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
+    auth.authorize(required_user, "edit", initiative_db)
     auth.authorize_input_fields(required_user, "edit", initiative_db, initiative)
     edited_initiative = await initiative_manager.update(
         initiative, initiative_db, request=request
     )
-    return auth.get_authorized_output_fields(
-        required_user, "read", edited_initiative, oso
-    )
+    return auth.get_authorized_output_fields(required_user, "read", edited_initiative)
 
 
 @initiative_router.patch(
@@ -606,19 +584,16 @@ async def link_initiative_owners(
     request: Request,
     required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
+    auth.authorize(required_user, "edit", initiative_db)
     initiative_db = await initiative_manager.make_users_owner(
         initiative_db, initiative.user_ids, request=request
     )
     # Important for up to date relations. Has to be in this async context.
     await initiative_manager.session.refresh(initiative_db)
     filtered_initiative_owners = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, ent.User.REL_FIELDS)
         for i in initiative_db.initiative_owners
     ]
     return s.UserReadList(users=filtered_initiative_owners)
@@ -630,10 +605,9 @@ async def delete_initiative(
     request: Request,
     required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "delete", initiative_db, oso)
+    auth.authorize(required_user, "delete", initiative_db)
     await initiative_manager.delete(initiative_db, request=request)
     return Response(status_code=204)
 
@@ -645,10 +619,9 @@ async def upload_initiative_profile_picture(
     file: UploadFile = File(...),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
+    auth.authorize(required_user, "edit", initiative_db)
     await initiative_manager.profile_picture_handler.set(
         file, initiative_db, request=request
     )
@@ -660,10 +633,9 @@ async def delete_initiative_profile_picture(
     request: Request,
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "edit", initiative_db, oso)
+    auth.authorize(required_user, "edit", initiative_db)
     await initiative_manager.profile_picture_handler.delete(
         initiative_db, request=request
     )
@@ -678,7 +650,6 @@ async def delete_initiative_profile_picture(
 async def get_initiatives(
     session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     name: str | None = None,
@@ -689,7 +660,7 @@ async def get_initiatives(
     initiatives_scalar = initiatives_result.scalars().all()
 
     filtered_initiatives = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        auth.get_authorized_output_fields(optional_user, "read", i)
         for i in initiatives_scalar
     ]
 
@@ -708,15 +679,14 @@ async def create_activity(
     required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "create_activity", initiative_db, oso)
+    auth.authorize(required_user, "create_activity", initiative_db)
     activity_db = await activity_manager.create(
         activity, initiative_id, request=request
     )
     activity_db = await activity_manager.detail_load(activity_db.id)
-    return auth.get_authorized_output_fields(required_user, "read", activity_db, oso)
+    return auth.get_authorized_output_fields(required_user, "read", activity_db)
 
 
 @initiative_router.get(
@@ -729,11 +699,10 @@ async def get_activity(
     activity_id: int,
     optional_user=Depends(m.optional_login),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(optional_user, "read", activity_db, oso)
-    return auth.get_authorized_output_fields(optional_user, "read", activity_db, oso)
+    auth.authorize(optional_user, "read", activity_db)
+    return auth.get_authorized_output_fields(optional_user, "read", activity_db)
 
 
 @initiative_router.get(
@@ -746,7 +715,6 @@ async def get_activity_media(
     activity_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
 ):
@@ -762,7 +730,7 @@ async def get_activity_media(
     media_scalar = media_result.scalars().all()
 
     filtered_media = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        auth.get_authorized_output_fields(optional_user, "read", i)
         for i in media_scalar
     ]
 
@@ -781,17 +749,14 @@ async def update_activity(
     request: Request,
     required_user=Depends(m.required_login),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(required_user, "edit", activity_db, oso)
+    auth.authorize(required_user, "edit", activity_db)
     auth.authorize_input_fields(required_user, "edit", activity_db, activity)
     edited_activity = await activity_manager.update(
         activity, activity_db, request=request
     )
-    return auth.get_authorized_output_fields(
-        required_user, "read", edited_activity, oso
-    )
+    return auth.get_authorized_output_fields(required_user, "read", edited_activity)
 
 
 @initiative_router.patch(
@@ -806,19 +771,16 @@ async def link_activity_owners(
     request: Request,
     required_user=Depends(m.required_login),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(required_user, "link_owners", activity_db, oso)
+    auth.authorize(required_user, "link_owners", activity_db)
     activity_db = await activity_manager.make_users_owner(
         activity_db, activity.user_ids, request=request
     )
     # Important for up to date relations. Has to be in this async context.
     await activity_manager.session.refresh(activity_db)
     filtered_activity_owners = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, ent.User.REL_FIELDS)
         for i in activity_db.activity_owners
     ]
     return s.UserReadList(users=filtered_activity_owners)
@@ -831,10 +793,9 @@ async def delete_activity(
     request: Request,
     required_user=Depends(m.required_login),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(required_user, "delete", activity_db, oso)
+    auth.authorize(required_user, "delete", activity_db)
     await activity_manager.delete(activity_db, request=request)
     return Response(status_code=204)
 
@@ -849,10 +810,9 @@ async def upload_activity_profile_picture(
     file: UploadFile = File(...),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(required_user, "edit", activity_db, oso)
+    auth.authorize(required_user, "edit", activity_db)
     await activity_manager.profile_picture_handler.set(
         file, activity_db, request=request
     )
@@ -867,10 +827,9 @@ async def delete_activity_profile_picture(
     request: Request,
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     activity_db = await activity_manager.detail_load(activity_id)
-    auth.authorize(required_user, "edit", activity_db, oso)
+    auth.authorize(required_user, "edit", activity_db)
     await activity_manager.profile_picture_handler.delete(activity_db, request=request)
     return Response(status_code=204)
 
@@ -887,10 +846,9 @@ async def link_initiative_debit_cards(
     request: Request,
     required_user=Depends(m.required_login),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     initiative_db = await initiative_manager.detail_load(initiative_id)
-    auth.authorize(required_user, "link_cards", initiative_db, oso)
+    auth.authorize(required_user, "link_cards", initiative_db)
     initiative_db = await initiative_manager.link_debit_cards(
         initiative_db,
         initiative.card_numbers,
@@ -900,7 +858,7 @@ async def link_initiative_debit_cards(
     # Important for up to date relations. Has to be in this async context.
     await initiative_manager.session.refresh(initiative_db)
     filtered_debit_cards = [
-        auth.get_authorized_output_fields(required_user, "read", i, oso)
+        auth.get_authorized_output_fields(required_user, "read", i)
         for i in initiative_db.debit_cards
     ]
     return s.DebitCardReadList(debit_cards=filtered_debit_cards)
@@ -917,11 +875,10 @@ async def create_funder(
     request: Request,
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
-    auth.authorize(required_user, "create", "Funder", oso)
+    auth.authorize(required_user, "create", "Funder")
     funder_db = await funder_manager.create(funder, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", funder_db, oso)
+    return auth.get_authorized_output_fields(required_user, "read", funder_db)
 
 
 @funder_router.get(
@@ -933,11 +890,10 @@ async def get_funder(
     funder_id: int,
     optional_user=Depends(m.optional_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.detail_load(funder_id)
-    auth.authorize(optional_user, "read", funder_db, oso)
-    return auth.get_authorized_output_fields(optional_user, "read", funder_db, oso)
+    auth.authorize(optional_user, "read", funder_db)
+    return auth.get_authorized_output_fields(optional_user, "read", funder_db)
 
 
 @funder_router.patch(
@@ -951,13 +907,12 @@ async def update_funder(
     request: Request,
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.min_load(funder_id)
-    auth.authorize(required_user, "edit", funder_db, oso)
+    auth.authorize(required_user, "edit", funder_db)
     auth.authorize_input_fields(required_user, "edit", funder_db, funder)
     edited_funder = await funder_manager.update(funder, funder_db, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", edited_funder, oso)
+    return auth.get_authorized_output_fields(required_user, "read", edited_funder)
 
 
 @funder_router.delete("/funder/{funder_id}")
@@ -966,10 +921,9 @@ async def delete_funder(
     request: Request,
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.min_load(funder_id)
-    auth.authorize(required_user, "delete", funder_db, oso)
+    auth.authorize(required_user, "delete", funder_db)
     await funder_manager.delete(funder_db, request=request)
     return Response(status_code=204)
 
@@ -982,7 +936,6 @@ async def delete_funder(
 async def get_funders(
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     name: str | None = None,
@@ -993,7 +946,7 @@ async def get_funders(
     funders_scalar = funders_result.scalars().all()
 
     filtered_funders = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        auth.get_authorized_output_fields(optional_user, "read", i)
         for i in funders_scalar
     ]
 
@@ -1020,14 +973,13 @@ async def create_regulation(
     required_user=Depends(m.required_login),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     funder_db = await funder_manager.min_load(funder_id)
-    auth.authorize(required_user, "create_regulation", funder_db, oso)
+    auth.authorize(required_user, "create_regulation", funder_db)
     regulation_db = await regulation_manager.create(
         regulation, funder_id, request=request
     )
-    return auth.get_authorized_output_fields(required_user, "read", regulation_db, oso)
+    return auth.get_authorized_output_fields(required_user, "read", regulation_db)
 
 
 @funder_router.get(
@@ -1040,11 +992,10 @@ async def get_regulation(
     regulation_id: int,
     optional_user=Depends(m.optional_login),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     regulation_db = await regulation_manager.detail_load(regulation_id)
-    auth.authorize(optional_user, "read", regulation_db, oso)
-    return auth.get_authorized_output_fields(optional_user, "read", regulation_db, oso)
+    auth.authorize(optional_user, "read", regulation_db)
+    return auth.get_authorized_output_fields(optional_user, "read", regulation_db)
 
 
 @funder_router.patch(
@@ -1059,17 +1010,14 @@ async def update_regulation(
     request: Request,
     required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     regulation_db = await regulation_manager.min_load(regulation_id)
-    auth.authorize(required_user, "edit", regulation_db, oso)
+    auth.authorize(required_user, "edit", regulation_db)
     auth.authorize_input_fields(required_user, "edit", regulation_db, regulation)
     edited_regulation = await regulation_manager.update(
         regulation, regulation_db, request=request
     )
-    return auth.get_authorized_output_fields(
-        required_user, "read", edited_regulation, oso
-    )
+    return auth.get_authorized_output_fields(required_user, "read", edited_regulation)
 
 
 @funder_router.patch(
@@ -1084,10 +1032,9 @@ async def link_officers(
     request: Request,
     required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     regulation_db = await regulation_manager.detail_load(regulation_id)
-    auth.authorize(required_user, "edit", regulation_db, oso)
+    auth.authorize(required_user, "edit", regulation_db)
     regulation_db = await regulation_manager.make_users_officer(
         regulation_db,
         regulation.user_ids,
@@ -1103,9 +1050,7 @@ async def link_officers(
         else regulation_db.policy_officers
     )
     filtered_officers = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, ent.User.REL_FIELDS)
         for i in officers
     ]
     return s.UserReadList(users=filtered_officers)
@@ -1118,10 +1063,9 @@ async def delete_regulation(
     request: Request,
     required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     regulation_db = await regulation_manager.min_load(regulation_id)
-    auth.authorize(required_user, "delete", regulation_db, oso)
+    auth.authorize(required_user, "delete", regulation_db)
     await regulation_manager.delete(regulation_db, request=request)
     return Response(status_code=204)
 
@@ -1135,7 +1079,6 @@ async def get_regulations(
     funder_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     name: str | None = None,
@@ -1146,7 +1089,7 @@ async def get_regulations(
     regulations_scalar = regulations_result.scalars().all()
 
     filtered_regulations = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        auth.get_authorized_output_fields(optional_user, "read", i)
         for i in regulations_scalar
     ]
 
@@ -1175,13 +1118,12 @@ async def create_grant(
     required_user=Depends(m.required_login),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: What to do with funder_id?
     regulation_db = await regulation_manager.min_load(regulation_id)
-    auth.authorize(required_user, "create_grant", regulation_db, oso)
+    auth.authorize(required_user, "create_grant", regulation_db)
     grant_db = await grant_manager.create(grant, regulation_id, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", grant_db, oso)
+    return auth.get_authorized_output_fields(required_user, "read", grant_db)
 
 
 @funder_router.get(
@@ -1195,11 +1137,10 @@ async def get_grant(
     grant_id: int,
     optional_user=Depends(m.optional_login),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.detail_load(grant_id)
-    auth.authorize(optional_user, "read", grant_db, oso)
-    return auth.get_authorized_output_fields(optional_user, "read", grant_db, oso)
+    auth.authorize(optional_user, "read", grant_db)
+    return auth.get_authorized_output_fields(optional_user, "read", grant_db)
 
 
 @funder_router.patch(
@@ -1215,13 +1156,12 @@ async def update_grant(
     request: Request,
     required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.min_load(grant_id)
-    auth.authorize(required_user, "edit", grant_db, oso)
+    auth.authorize(required_user, "edit", grant_db)
     auth.authorize_input_fields(required_user, "edit", grant_db, grant)
     edited_grant = await grant_manager.update(grant, grant_db, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", edited_grant, oso)
+    return auth.get_authorized_output_fields(required_user, "read", edited_grant)
 
 
 @funder_router.patch(
@@ -1237,19 +1177,16 @@ async def link_overseers(
     request: Request,
     required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.detail_load(grant_id)
-    auth.authorize(required_user, "edit", grant_db, oso)
+    auth.authorize(required_user, "edit", grant_db)
     grant_db = await grant_manager.make_users_overseer(
         grant_db, grant.user_ids, request=request
     )
     # Important for up to date relations. Has to be in this async context.
     await grant_manager.session.refresh(grant_db)
     filtered_overseers = [
-        auth.get_authorized_output_fields(
-            required_user, "read", i, oso, ent.User.REL_FIELDS
-        )
+        auth.get_authorized_output_fields(required_user, "read", i, ent.User.REL_FIELDS)
         for i in grant_db.overseers
     ]
     return s.UserReadList(users=filtered_overseers)
@@ -1263,10 +1200,9 @@ async def delete_grant(
     request: Request,
     required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.min_load(grant_id)
-    auth.authorize(required_user, "delete", grant_db, oso)
+    auth.authorize(required_user, "delete", grant_db)
     await grant_manager.delete(grant_db, request=request)
     return Response(status_code=204)
 
@@ -1281,7 +1217,6 @@ async def get_grants(
     regulation_id: int,
     async_session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     name: str | None = None,
@@ -1292,7 +1227,7 @@ async def get_grants(
     grants_scalar = grants_result.scalars().all()
 
     filtered_grants = [
-        auth.get_authorized_output_fields(optional_user, "read", i, oso)
+        auth.get_authorized_output_fields(optional_user, "read", i)
         for i in grants_scalar
     ]
     return s.GrantReadList(grants=filtered_grants)
@@ -1312,10 +1247,9 @@ async def create_initiative(
     required_user=Depends(m.required_login),
     grant_manager: m.GrantManager = Depends(m.GrantManager),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     grant_db = await grant_manager.detail_load(grant_id)
-    auth.authorize(required_user, "create_initiative", grant_db, oso)
+    auth.authorize(required_user, "create_initiative", grant_db)
     # TODO: Validate funder_id, regulation_id and grant_id.
     initiative_db = await initiative_manager.create(
         initiative, grant_id, request=request
@@ -1323,7 +1257,7 @@ async def create_initiative(
     # TODO: If we don't do this, profile_picture will have a Greenlet exception for retrieving data
     # outside of asynchronous context.
     await initiative_manager.session.refresh(initiative_db)
-    return auth.get_authorized_output_fields(required_user, "read", initiative_db, oso)
+    return auth.get_authorized_output_fields(required_user, "read", initiative_db)
 
 
 @payment_router.post(
@@ -1336,24 +1270,23 @@ async def create_payment(
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     # TODO: Make sure initiative_id in the schema is congruent with activity_id.
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
         if activity_db.initiative_id != payment.initiative_id:
             raise EntityNotFound("There exists no activity with this initiative id")
-        auth.authorize(required_user, "create_payment", activity_db, oso)
+        auth.authorize(required_user, "create_payment", activity_db)
     else:
         initiative_db = await initiative_manager.detail_load(payment.initiative_id)
-        auth.authorize(required_user, "create_payment", initiative_db, oso)
+        auth.authorize(required_user, "create_payment", initiative_db)
 
     payment_db = await payment_manager.create(
         payment, payment.initiative_id, payment.activity_id, request=request
     )
     # TODO: Also see user. How to deal with this?
     await payment_db.awaitable_attrs.attachments
-    return auth.get_authorized_output_fields(required_user, "read", payment_db, oso)
+    return auth.get_authorized_output_fields(required_user, "read", payment_db)
 
 
 @payment_router.get(
@@ -1365,11 +1298,10 @@ async def get_payment(
     payment_id: int,
     optional_login: ent.User | None = Depends(m.optional_login),
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    auth.authorize(optional_login, "read", payment_db, oso)
-    return auth.get_authorized_output_fields(optional_login, "read", payment_db, oso)
+    auth.authorize(optional_login, "read", payment_db)
+    return auth.get_authorized_output_fields(optional_login, "read", payment_db)
 
 
 @payment_router.patch(
@@ -1383,13 +1315,12 @@ async def update_payment(
     request: Request,
     required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    auth.authorize(required_user, "edit", payment_db, oso)
+    auth.authorize(required_user, "edit", payment_db)
     auth.authorize_input_fields(required_user, "edit", payment_db, payment)
     edited_payment = await payment_manager.update(payment, payment_db, request=request)
-    return auth.get_authorized_output_fields(required_user, "read", edited_payment, oso)
+    return auth.get_authorized_output_fields(required_user, "read", edited_payment)
 
 
 @payment_router.patch(
@@ -1404,14 +1335,13 @@ async def link_initiative(
     required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     initiative_manager: m.InitiativeManager = Depends(m.InitiativeManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    auth.authorize(required_user, "link_initiative", payment_db, oso)
+    auth.authorize(required_user, "link_initiative", payment_db)
 
     if payment.initiative_id is not None:
         initiative_db = await initiative_manager.detail_load(payment.initiative_id)
-        auth.authorize(required_user, "link_payment", initiative_db, oso)
+        auth.authorize(required_user, "link_payment", initiative_db)
 
     payment_db = await payment_manager.assign_payment_to_initiative(
         payment_db,
@@ -1420,9 +1350,7 @@ async def link_initiative(
     )
 
     if payment.initiative_id is not None:
-        return auth.get_authorized_output_fields(
-            required_user, "read", initiative_db, oso
-        )
+        return auth.get_authorized_output_fields(required_user, "read", initiative_db)
     else:
         return s.PaymentUncoupled(
             message="Payment was successfully uncoupled from the initiative."
@@ -1441,25 +1369,22 @@ async def link_activity(
     required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     activity_manager: m.ActivityManager = Depends(m.ActivityManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    auth.authorize(required_user, "link_activity", payment_db, oso)
+    auth.authorize(required_user, "link_activity", payment_db)
 
     if payment.activity_id is not None:
         activity_db = await activity_manager.detail_load(payment.activity_id)
         if activity_db.initiative_id != payment.initiative_id:
             raise EntityNotFound("There exists no activity with this initiative id")
-        auth.authorize(required_user, "link_payment", activity_db, oso)
+        auth.authorize(required_user, "link_payment", activity_db)
 
     payment_db = await payment_manager.assign_payment_to_activity(
         payment_db, payment.activity_id, request=request
     )
 
     if payment.activity_id is not None:
-        return auth.get_authorized_output_fields(
-            required_user, "read", activity_db, oso
-        )
+        return auth.get_authorized_output_fields(required_user, "read", activity_db)
     else:
         return s.PaymentUncoupled(
             message="Payment was successfully uncoupled from the activity."
@@ -1472,10 +1397,9 @@ async def delete_payment(
     request: Request,
     required_user=Depends(m.required_login),
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    auth.authorize(required_user, "delete", payment_db, oso)
+    auth.authorize(required_user, "delete", payment_db)
     await payment_manager.delete(payment_db, request=request)
     return Response(status_code=204)
 
@@ -1487,10 +1411,9 @@ async def upload_payment_attachments(
     files: list[UploadFile] = File(...),
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    auth.authorize(required_user, "edit", payment_db, oso)
+    auth.authorize(required_user, "edit", payment_db)
     await payment_manager.attachment_handler.set(files, payment_db, request)
 
 
@@ -1501,10 +1424,9 @@ async def delete_payment_attachment(
     request: Request,
     payment_manager: m.PaymentManager = Depends(m.PaymentManager),
     required_user: ent.User = Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     payment_db = await payment_manager.detail_load(payment_id)
-    auth.authorize(required_user, "edit", payment_db, oso)
+    auth.authorize(required_user, "edit", payment_db)
     await payment_manager.attachment_handler.delete(payment_db, attachment_id, request)
 
 
@@ -1518,7 +1440,6 @@ async def delete_payment_attachment(
 async def get_bng_payments(
     async_session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
 ):
     pass
 
@@ -1532,7 +1453,6 @@ async def get_user_payments(
     user_id: int,
     session: AsyncSession = Depends(get_async_session),
     required_user=Depends(m.required_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     initiative_name: str | None = None,
@@ -1578,7 +1498,6 @@ async def get_initiative_payments(
     initiative_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     start_date: date | None = None,
@@ -1604,7 +1523,7 @@ async def get_initiative_payments(
 
     filtered_payments = [
         (
-            auth.get_authorized_output_fields(optional_user, "read", i[0], oso),
+            auth.get_authorized_output_fields(optional_user, "read", i[0]),
             i[1],
             i[2],
         )
@@ -1629,7 +1548,6 @@ async def get_activity_payments(
     activity_id: int,
     session: AsyncSession = Depends(get_async_session),
     optional_user=Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     offset: int = 0,
     limit: int = 20,
     start_date: date | None = None,
@@ -1656,7 +1574,7 @@ async def get_activity_payments(
 
     filtered_payments = [
         (
-            auth.get_authorized_output_fields(optional_user, "read", i[0], oso),
+            auth.get_authorized_output_fields(optional_user, "read", i[0]),
             i[1],
         )
         for i in payments_scalar
@@ -1675,7 +1593,6 @@ async def get_authorized_actions(
     entity_class: s.AuthEntityClass,
     entity_id: int | None = None,
     optional_user: ent.User | None = Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     user_manager: m.UserManager = Depends(m.UserManager),
     funder_manager: m.FunderManager = Depends(m.FunderManager),
     regulation_manager: m.RegulationManager = Depends(m.RegulationManager),
@@ -1703,7 +1620,7 @@ async def get_authorized_actions(
         resource = entity_class
 
     return s.AuthActionsRead(
-        actions=auth.get_authorized_actions(optional_user, resource, oso)
+        actions=auth.get_authorized_actions(optional_user, resource)
     )
 
 
@@ -1713,7 +1630,6 @@ async def get_authorized_fields(
     entity_id: int,
     async_session: AsyncSession = Depends(get_async_session),
     optional_user: ent.User | None = Depends(m.optional_login),
-    oso=Depends(auth.set_sqlalchemy_adapter),
     user_manager: m.UserManager = Depends(m.UserManager),
     funder_manager: m.FunderManager = Depends(
         m.FunderManager,

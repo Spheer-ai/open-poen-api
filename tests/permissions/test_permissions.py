@@ -1,4 +1,4 @@
-from open_poen_api.authorization.authorization import (
+from open_poen_api.authorization import (
     OSO,
     get_authorized_output_fields,
     set_sqlalchemy_adapter,
