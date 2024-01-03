@@ -3,6 +3,7 @@ from .database import (
     get_async_session_context,
     get_user_db_context,
     create_db_and_tables,
+    drop_all,
 )
 from .schemas import UserCreateWithPassword
 from .gocardless import get_nordigen_client
@@ -74,6 +75,15 @@ def reset_db():
     )
     if confirmation:
         asyncio.run(create_db_and_tables())
+
+
+@app.command()
+def clear_db():
+    confirmation = typer.confirm(
+        "Are you sure? This will remove all data from the database."
+    )
+    if confirmation:
+        asyncio.run(drop_all())
 
 
 @app.command()
