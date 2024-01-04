@@ -14,6 +14,7 @@ services:
     depends_on:
       - db
       - mail
+      - azurite
     volumes:
       - .:/app
   db:
@@ -35,5 +36,10 @@ services:
     ports:
       - 1025:1025 # SMTP server
       - 8025:8025 # Web UI
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: "azurite-blob --blobHost 0.0.0.0"
+    ports:
+      - 10000:10000
 volumes:
   postgres_data:

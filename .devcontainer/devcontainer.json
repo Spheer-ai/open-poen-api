@@ -37,7 +37,9 @@
 				"lfs.vscode-emacs-friendly",
 				"ms-python.vscode-pylance",
 				"ms-python.mypy-type-checker",
-				"osohq.oso"
+				"ms-python.isort",
+				"osohq.oso",
+				"github.copilot"
 			],
 			"settings": {
 				"mypy-type-checker.path": "/usr/local/bin/mypy"

@@ -7,9 +7,11 @@ import random
 import datetime
 from azure.storage.blob.aio import BlobServiceClient
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas, ContentSettings
+from azure.core.exceptions import ResourceExistsError
 from pydantic import BaseModel
 from ..exc import FileTooLarge
 from typing import TypeVar
+import asyncio
 
 DEBUG = os.environ.get("ENVIRONMENT") == "debug"
 
@@ -41,6 +43,16 @@ blob_service_client = BlobServiceClient.from_connection_string(
 )
 AZURE_STORAGE_ACCOUNT_KEY = os.environ["AZURE_STORAGE_ACCOUNT_KEY"]
 container_client = blob_service_client.get_container_client("media")
+
+
+async def create_media_container():
+    # Only to be used locally when using azurite.
+    if os.environ["ENVIRONMENT"] != "debug":
+        raise ValueError("Can only create media container in debug mode")
+    try:
+        await blob_service_client.create_container("media")
+    except ResourceExistsError:
+        print("Media container already exists")
 
 
 class AttachmentUpdate(BaseModel):
