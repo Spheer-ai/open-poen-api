@@ -41,7 +41,7 @@ async def test_create_initiative(async_client, dummy_session, status_code):
     )
     assert response.status_code == status_code
     if status_code == 200:
-        db_initiative = dummy_session.get(Initiative, response.json()["id"])
+        db_initiative = await dummy_session.get(Initiative, response.json()["id"])
         assert db_initiative is not None
         initiative_data = response.json()
         assert initiative_data["name"] == body["name"]

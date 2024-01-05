@@ -13,6 +13,7 @@ from ..database import get_async_session
 from .user_manager.user_manager_ex_current_user import optional_login
 from aiohttp import ClientResponseError
 from ..logger import audit_logger
+from sqlalchemy import func
 
 
 class BankAccountManager(BaseManager):
@@ -42,16 +43,23 @@ class BankAccountManager(BaseManager):
                 )
             req.status = ent.ReqStatus.REVOKED
             self.session.add(req)
+        await self.session.commit()
 
         await self.session.execute(
             delete(ent.Payment).where(
                 and_(
-                    ent.Payment.bank_account_id == bank_account.id,
+                    ent.Payment.bank_account_id.in_(
+                        select(ent.BankAccount.id)
+                        .join(ent.BankAccount.requisitions)
+                        .group_by(ent.BankAccount.id)
+                        .having(
+                            func.every(ent.Requisition.status == ent.ReqStatus.REVOKED)
+                        )
+                    ),
                     ent.Payment.initiative_id == None,
                 )
             )
         )
-
         await self.session.commit()
         await self.session.refresh(bank_account)
         return bank_account

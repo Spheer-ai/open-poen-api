@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_async_session
 from .user_manager import optional_login
 from sqlalchemy.orm import selectinload
+from decimal import Decimal
 
 
 class PaymentManager(BaseManager):
@@ -61,6 +62,12 @@ class PaymentManager(BaseManager):
         initiative_id: int | None,
         request: Request | None = None,
     ) -> ent.Payment:
+        # https://github.com/kvesteri/sqlalchemy-utils/issues/345
+        old_transaction_amount = payment.transaction_amount
+        payment.transaction_amount = Decimal("0.00")
+        self.session.add(payment)
+        await self.session.commit()
+        payment.transaction_amount = old_transaction_amount
         payment.initiative_id = initiative_id
         self.session.add(payment)
         await self.session.commit()
@@ -75,6 +82,12 @@ class PaymentManager(BaseManager):
         activity_id: int | None,
         request: Request | None = None,
     ) -> ent.Payment:
+        # https://github.com/kvesteri/sqlalchemy-utils/issues/345
+        old_transaction_amount = payment.transaction_amount
+        payment.transaction_amount = Decimal("0.00")
+        self.session.add(payment)
+        await self.session.commit()
+        payment.transaction_amount = old_transaction_amount
         payment.activity_id = activity_id
         self.session.add(payment)
         await self.session.commit()

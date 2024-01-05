@@ -224,7 +224,7 @@ def get_user_payments_q(
 
     if initiative_name:
         q = q.where(ent.Initiative.name.ilike(f"%{initiative_name}%"))
-    if initiative_name:
+    if activity_name:
         q = q.where(ent.Activity.name.ilike(f"%{activity_name}%"))
     if iban:
         q = q.where(ent.BankAccount.iban.ilike(f"%{iban}%"))

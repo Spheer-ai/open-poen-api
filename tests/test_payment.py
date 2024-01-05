@@ -12,7 +12,8 @@ from tests.conftest import (
     payment_info,
     policy_officer,
 )
-from open_poen_api.models import Payment
+from open_poen_api.models import Payment, Initiative
+from decimal import Decimal
 
 
 @pytest.mark.parametrize(
@@ -239,3 +240,32 @@ async def test_switch_activity(
             response.json()
             == "Payment is not linked to an initiative. First couple it."
         )
+
+
+@pytest.mark.parametrize(
+    "get_mock_user, status_code, payment_id, initiative_id",
+    [
+        (superuser, 200, 6, None),
+    ],
+    ids=[
+        "Initiative aggregates are updated when payment is unlinked from it",
+    ],
+    indirect=["get_mock_user"],
+)
+async def test_initiative_budget_update(
+    async_client, dummy_session, status_code, payment_id, initiative_id
+):
+    body = {"initiative_id": initiative_id}
+    response = await async_client.patch(
+        f"/payment/{payment_id}/initiative",
+        json=body,
+    )
+    assert response.status_code == status_code
+    initiative = await dummy_session.get(Initiative, 1)
+
+    # Hardcoded: current expenses of initiative minus payment amount.
+    should_be = Decimal("2827.44") - Decimal("150.75")
+
+    assert initiative.expenses == should_be
+
+    print("stop")
