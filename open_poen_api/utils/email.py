@@ -11,7 +11,10 @@ class OpenPoenFastMail(FastMail):
         # Send email only to these persons if this runs in the acceptance environment
         # to prevent sending test emails to real users.
         if os.environ["ENVIRONMENT"] == "acceptance":
-            emails = [EmailStr(i) for i in os.environ["EMAIL_RECIPIENTS"].split(",")]
+            emails = [
+                EmailStr(i)
+                for i in os.environ["ACCEPTANCE_EMAIL_RECIPIENTS"].split(",")
+            ]
             message.recipients = emails
         await super().send_message(message)
 
