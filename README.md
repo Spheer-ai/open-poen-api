@@ -65,6 +65,16 @@ So in this case we would set:
 DOMAIN_NAME=9f2a-2a00-1370-819c-4201-bf7b-fc7-6d47-8401.ngrok-free.app
 ```
 
+### Restore a backup from Azure
+For instructions on how to do a backup from Azure, read the README in the open-poen-infra repo.
+
+The .sql file that you exported from Azure, you can load into your Postgres database in Docker Compose by using:
+```
+psql -h localhost -p 5432 -U mark -d open-poen-dev -f ./backup_20240110_122434.sql
+```
+
+Make sure that the schema of your (empty) database matches the schema of the backup source.
+
 ### Gotcha's
 * .env files have to end with an empty line. The script that parses these for Terraform otherwise skips the last key value pair.
 
