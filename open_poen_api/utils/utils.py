@@ -75,6 +75,8 @@ async def upload_attachment(
 
     ext = os.path.splitext(str(file.filename))[1][1:]
     original_blob_path = f"images/{filename}.{ext}"
+    # TODO: do not save the the entire blob path, because then we can't easily azcopy
+    # data from azure to Azurite locally and test there.
     blob_client = container_client.get_blob_client(original_blob_path)
     await blob_client.upload_blob(
         file_content,

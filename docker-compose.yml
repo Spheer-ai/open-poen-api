@@ -10,7 +10,7 @@ services:
       - 5678:5678
     env_file:
       - .env
-      - sandbox.env
+      - mail.env
     depends_on:
       - db
       - mail
