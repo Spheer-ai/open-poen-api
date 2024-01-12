@@ -42,7 +42,9 @@ blob_service_client = BlobServiceClient.from_connection_string(
     os.environ["AZURE_STORAGE_CONNECTION_STRING"]
 )
 AZURE_STORAGE_ACCOUNT_KEY = os.environ["AZURE_STORAGE_ACCOUNT_KEY"]
-container_client = blob_service_client.get_container_client("media")
+container_client = blob_service_client.get_container_client(
+    f"{os.environ['ENVIRONMENT']}-media"
+)
 
 
 async def create_media_container():
@@ -50,7 +52,7 @@ async def create_media_container():
     if os.environ["ENVIRONMENT"] != "debug":
         raise ValueError("Can only create media container in debug mode")
     try:
-        await blob_service_client.create_container("media")
+        await blob_service_client.create_container("debug-media")
     except ResourceExistsError:
         print("Media container already exists")
 
