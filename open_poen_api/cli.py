@@ -10,6 +10,7 @@ from .gocardless import get_nordigen_client
 from .utils.utils import temp_password_generator
 from .managers import UserManager
 from .gocardless.payments import get_gocardless_payments
+from .utils.utils import create_media_container
 
 # from fastapi_users.exceptions import UserAlreadyExists
 from .exc import EntityAlreadyExists
@@ -160,3 +161,11 @@ def list_institutions(country: str):
         print(institutions)
 
     asyncio.run(async_list_institutions(country))
+
+
+@app.command()
+def create_local_media_container():
+    """Azurite needs the same media container to be created every time its container is built.
+    The environments on Azure: test, acceptance and production, have the media container created
+    by Terraform."""
+    asyncio.run(create_media_container())

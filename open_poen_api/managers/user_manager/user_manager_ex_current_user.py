@@ -5,7 +5,7 @@ from ...database import get_user_db, get_async_session
 from ... import models as ent
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from ...utils.email import MessageSchema, conf, env
+from ...utils.email import MessageSchema, conf, env, OpenPoenFastMail
 import os
 from fastapi_users import BaseUserManager, IntegerIDMixin, FastAPIUsers
 from typing import Optional
@@ -18,7 +18,7 @@ from fastapi_users.authentication import (
 from fastapi_users import schemas
 from fastapi_users.exceptions import UserAlreadyExists
 import contextlib
-from fastapi_mail import MessageType, FastMail
+from fastapi_mail import MessageType
 import os
 from ...authorization import SECRET_KEY
 from ...exc import EntityAlreadyExists
@@ -57,8 +57,8 @@ class UserManagerExCurrentUser(
             body=body,
             subtype=MessageType.plain,
         )
-        fm = FastMail(conf)
-        await fm.send_message(message)
+        fm = OpenPoenFastMail(conf)
+        await fm.safe_send_message(message)
         await self.logger.after_create(user, request)
         audit_logger.info(f"{user} has been registered and received the welcome email.")
 
@@ -75,8 +75,8 @@ class UserManagerExCurrentUser(
             body=body,
             subtype=MessageType.plain,
         )
-        fm = FastMail(conf)
-        await fm.send_message(message)
+        fm = OpenPoenFastMail(conf)
+        await fm.safe_send_message(message)
         audit_logger.info(f"{user} has requested a new password.")
 
     async def on_after_login(
