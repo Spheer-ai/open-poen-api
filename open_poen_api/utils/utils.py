@@ -132,7 +132,7 @@ def generate_sas_token(blob_url: T) -> T:
 
     sas_permissions = BlobSasPermissions(read=True)
     sas_token = generate_blob_sas(
-        account_name=account_name,
+        account_name="devstoreaccount1",
         container_name=container_name,
         blob_name=blob_name,
         account_key=AZURE_STORAGE_ACCOUNT_KEY,

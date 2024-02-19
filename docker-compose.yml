@@ -38,7 +38,8 @@ services:
       - 8025:8025 # Web UI
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
-    command: "azurite-blob --blobHost 0.0.0.0"
+    command: "azurite-blob --loose --blobHost 0.0.0.0"
+    hostname: azurite
     ports:
       - 10000:10000
 volumes:
