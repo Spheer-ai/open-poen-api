@@ -38,8 +38,7 @@
 				"ms-python.vscode-pylance",
 				"ms-python.mypy-type-checker",
 				"ms-python.isort",
-				"osohq.oso",
-				"github.copilot"
+				"osohq.oso"
 			],
 			"settings": {
 				"mypy-type-checker.path": "/usr/local/bin/mypy"

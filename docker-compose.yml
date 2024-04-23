@@ -38,8 +38,11 @@ services:
       - 8025:8025 # Web UI
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
-    command: "azurite-blob --blobHost 0.0.0.0"
+    entrypoint: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "-l", "data", "-d", "data/debug_logs.txt"]
     ports:
       - 10000:10000
+    volumes:
+      - ./azurite_data:/opt/azurite/data
+
 volumes:
   postgres_data:
