@@ -100,8 +100,14 @@ def retrieve_payments(requisition_id: int, date_from: str = ""):
 
 
 @app.command()
-def retrieve_all_payments():
-    asyncio.run(get_gocardless_payments())
+def retrieve_all_payments(date_from: str = ""):
+    if date_from != "":
+        try:
+            parsed_date_from = datetime.strptime(date_from, "%Y-%m-%d")
+        except ValueError:
+            typer.echo("Invalid date format. Use YYYY-MM-DD.")
+            raise typer.Abort()
+    asyncio.run(get_gocardless_payments(date_from=parsed_date_from))
 
 
 @app.command()
