@@ -10,7 +10,9 @@ RUN sed -i -e 's/# nl_NL.UTF-8 UTF-8/nl_NL.UTF-8 UTF-8/' /etc/locale.gen \
     && dpkg-reconfigure --frontend=noninteractive locales
 
 # Libraries that Weasyprint requires and the font that is used for rendering reports.
-RUN apt install -y libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 fonts-open-sans
+RUN apt install -y libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 fonts-open-sans cron nano
+
+RUN (crontab -l ; echo "0 * * * * cd /app && open-poen retrieve-all-payments >> /var/log/cron.log 2>&1") | crontab
 
 COPY entrypoint.sh /app/
 
