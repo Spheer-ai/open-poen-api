@@ -163,3 +163,5 @@ auth/
 *.env
 .vscode/
 tests/bng/bng_data.json
+
+azurite_data/
