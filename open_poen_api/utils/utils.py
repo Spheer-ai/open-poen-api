@@ -6,7 +6,12 @@ import string
 import random
 import datetime
 from azure.storage.blob.aio import BlobServiceClient
-from azure.storage.blob import BlobSasPermissions, generate_blob_sas, ContentSettings
+from azure.storage.blob import (
+    BlobSasPermissions,
+    generate_blob_sas,
+    ContentSettings,
+    PublicAccess,
+)
 from azure.core.exceptions import ResourceExistsError
 from pydantic import BaseModel
 from ..exc import FileTooLarge
@@ -52,9 +57,15 @@ async def create_media_container():
     if os.environ["ENVIRONMENT"] != "debug":
         raise ValueError("Can only create media container in debug mode")
     try:
-        await blob_service_client.create_container("debug-media")
+        await blob_service_client.create_container(
+            "debug-media", public_access=PublicAccess.CONTAINER
+        )
     except ResourceExistsError:
-        print("Media container already exists")
+        await blob_service_client.delete_container("debug-media")
+        print("Media container deleted.")
+        await blob_service_client.create_container(
+            "debug-media", public_access=PublicAccess.CONTAINER
+        )
 
 
 class AttachmentUpdate(BaseModel):
@@ -124,6 +135,9 @@ T = TypeVar("T", str, None)
 def generate_sas_token(blob_url: T) -> T:
     if blob_url is None:
         return blob_url
+
+    if os.environ["ENVIRONMENT"] == "debug":
+        return blob_url.replace("azurite", "localhost")
 
     url_parts = blob_url.split("/")
     account_name = url_parts[2].split(".")[0]
