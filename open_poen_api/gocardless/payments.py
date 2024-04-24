@@ -13,6 +13,8 @@ from asyncio import sleep
 from ..database import async_session_maker
 from ..logger import audit_logger
 from .payment_schema import Payment, AccountMetadata, AccountDetails
+from typing import Sequence
+from aiohttp import ClientResponseError
 
 # Retrieve payments in chunks of N days.
 PAYMENT_RETRIEVAL_INTERVAL = 14
@@ -59,9 +61,16 @@ async def process_requisition(
     client = await get_nordigen_client()
     institutions = await get_institutions()
 
-    api_requisition = await client.requisition.get_requisition_by_id(
-        requisition.api_requisition_id
-    )
+    try:
+        api_requisition = await client.requisition.get_requisition_by_id(
+            requisition.api_requisition_id
+        )
+    except ClientResponseError as e:
+        if e.status == 404:
+            audit_logger.info(f"Requisition not found for {requisition}.")
+            return
+        else:
+            raise
     await sleep(0.5)
 
     requisition.status = ent.ReqStatus(api_requisition["status"])
@@ -211,15 +220,14 @@ async def get_gocardless_payments(
             requisition = requisition_q.scalars().first()
             if not requisition:
                 raise ValueError("No valid Requisition found")
-            requisitions = [requisition]
+            requisitions: Sequence = [requisition]
         elif requisition_id is None:
-            requisition_q_list = (
+            requisition_q = await session.execute(
                 select(ent.Requisition)
                 .options(selectinload(ent.Requisition.user))
                 .where(not_(ent.Requisition.status.in_(EXCLUDED_STATUSES)))
-                .execution_options(yield_per=256)
             )
-            requisitions = [i for i in await session.scalars(requisition_q_list)]
+            requisitions = requisition_q.scalars().all()
         else:
             raise ValueError()
 

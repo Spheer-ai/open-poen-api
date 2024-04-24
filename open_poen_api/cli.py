@@ -100,6 +100,11 @@ def retrieve_payments(requisition_id: int, date_from: str = ""):
 
 
 @app.command()
+def retrieve_all_payments():
+    asyncio.run(get_gocardless_payments())
+
+
+@app.command()
 def list_agreements(limit: int = 100, offset: int = 0):
     async def async_list_agreements(limit: int = 100, offset: int = 0):
         client = await get_nordigen_client()
