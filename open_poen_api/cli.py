@@ -16,7 +16,7 @@ from .utils.utils import create_media_container
 from .exc import EntityAlreadyExists
 import asyncio
 from rich import print
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = typer.Typer()
 
@@ -107,6 +107,8 @@ def retrieve_all_payments(date_from: str = ""):
         except ValueError:
             typer.echo("Invalid date format. Use YYYY-MM-DD.")
             raise typer.Abort()
+    else:
+        parsed_date_from = datetime.now() - timedelta(weeks=1)
     asyncio.run(get_gocardless_payments(date_from=parsed_date_from))
 
 
