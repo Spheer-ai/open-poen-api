@@ -13,6 +13,7 @@ RUN sed -i -e 's/# nl_NL.UTF-8 UTF-8/nl_NL.UTF-8 UTF-8/' /etc/locale.gen \
 RUN apt install -y libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 fonts-open-sans cron nano
 
 COPY entrypoint.sh /app/
+COPY loop_script.sh /app/
 
 # For SSH in Azure
 RUN apt-get update \
