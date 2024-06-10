@@ -1,11 +1,6 @@
 import pytest
-from tests.conftest import (
-    superuser,
-    userowner,
-    grant_officer,
-    user,
-    anon,
-)
+
+from tests.conftest import anon, grant_officer, superuser, user, userowner
 
 
 @pytest.mark.parametrize(
@@ -45,18 +40,3 @@ async def test_get_bank_account_detail(
     assert response.status_code == status_code
     assert all([i in response.json() for i in fields_present])
     assert all([i not in response.json() for i in fields_not_present])
-
-
-# @pytest.mark.parametrize(
-#     "get_mock_user",
-#     [userowner],
-#     ids=[
-#         "User owner can finish",
-#     ],
-#     indirect=["get_mock_user"],
-# )
-# async def test_finish_bank_account(async_client, dummy_session):
-#     user_id, bank_account_id = 1, 1
-#     response = await async_client.patch(
-#         f"/user/{user_id}/bank-account/{bank_account_id}"
-#     )

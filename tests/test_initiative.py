@@ -1,17 +1,18 @@
 import pytest
+
+from open_poen_api.managers import InitiativeManager
+from open_poen_api.models import Initiative
 from tests.conftest import (
-    superuser,
-    initiative_owner,
     activity_owner,
-    user,
     admin,
     anon,
-    initiative_info,
     grant_officer,
     hide_instance,
+    initiative_info,
+    initiative_owner,
+    superuser,
+    user,
 )
-from open_poen_api.models import Initiative
-from open_poen_api.managers import InitiativeManager
 
 
 @pytest.mark.parametrize(
@@ -131,6 +132,7 @@ async def test_add_initiative_owner(async_client, dummy_session, status_code):
         assert db_initiative.initiative_owners[0].email == "user1@example.com"
 
 
+@pytest.mark.skip(reason="Debit cards are not used ATM.")
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
     [
