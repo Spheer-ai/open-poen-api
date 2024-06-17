@@ -58,7 +58,7 @@ from .query import (
     get_initiative_media_q,
     get_activity_media_q,
 )
-import time
+from time import time
 
 user_router = APIRouter(tags=["user"])
 funder_router = APIRouter(tags=["funder"])
@@ -656,29 +656,13 @@ async def get_initiatives(
     name: str | None = None,
     only_mine: bool = False,
 ):
-    # Time the construction of the query
-    start_time_query = time.time()
     query = get_initiatives_q(optional_user, name, only_mine, offset, limit)
-    end_time_query = time.time()
-    print(f"Time to create query: {end_time_query - start_time_query} seconds")
-
-    # Time the execution of the query
-    start_time_execute = time.time()
     initiatives_result = await session.execute(query)
-    end_time_execute = time.time()
-    print(f"Time to execute query: {end_time_execute - start_time_execute} seconds")
-
     initiatives_scalar = initiatives_result.scalars().all()
-
-    # Time the filtering of the initiatives
-    start_time_filtering = time.time()
     filtered_initiatives = [
         auth.get_authorized_output_fields(optional_user, "read", i)
         for i in initiatives_scalar
     ]
-    end_time_filtering = time.time()
-    print(f"Time to filter initiatives: {end_time_filtering - start_time_filtering} seconds")
-
     return s.InitiativeReadList(initiatives=filtered_initiatives)
 
 
