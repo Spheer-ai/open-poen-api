@@ -18,13 +18,15 @@ from decimal import Decimal
 
 @pytest.mark.parametrize(
     "get_mock_user, status_code",
-    [(superuser, 200), (admin, 200), (user, 403), (grant_officer, 403), (anon, 403)],
+    [(superuser, 200), (admin, 200), (user, 403), (grant_officer, 403), (anon, 403), (initiative_owner, 200), (activity_owner, 200)],
     ids=[
         "Superuser can",
         "Administrator can",
         "User cannot",
         "Grant officer cannot",
         "Anon cannot",
+        "Initiative owner can",
+        "Activity owner can",
     ],
     indirect=["get_mock_user"],
 )
@@ -168,8 +170,8 @@ async def test_get_linkable_activities(
     "get_mock_user, status_code, payment_id, initiative_id",
     [
         (superuser, 403, 1, 1),
-        (superuser, 200, 5, 1),
-        (superuser, 200, 6, 2),
+        (admin, 200, 5, 1),  # Is not initiative owner's payment
+        (admin, 200, 6, 2),  # Is not initiative owner's payment and not his initiative.
         (superuser, 200, 6, None),
         (user, 403, 5, 1),
         (initiative_owner, 403, 5, 1),
@@ -180,8 +182,8 @@ async def test_get_linkable_activities(
     ids=[
         "Payment cannot link to initiative with activity set",
         "Payment can link to initiative with activity not set",
-        "Payment only linked to initiative can be set to other initiative",
-        "Payment only linked to initiative can be removed from initiative",
+        "Payment already linked to initiative can be set to other initiative",
+        "Payment already linked to initiative can be removed from initiative",
         "User cannot link",
         "Initiative owner cannot link if not owner on bank account or payment not under his initiative",
         "Grant officer cannot link if not owner on bank account or payment not under his regulation",
@@ -210,8 +212,8 @@ async def test_switch_initiative(
     "get_mock_user, status_code, payment_id, activity_id, initiative_id",
     [
         (superuser, 403, 2, 1, 2),
-        (superuser, 200, 6, 1, 1),
-        (superuser, 200, 1, 1, 1),
+        (initiative_owner, 200, 6, 1, 1),
+        (initiative_owner, 200, 1, 1, 1),
         (superuser, 200, 1, None, 1),
         (initiative_owner, 200, 6, 1, 1),
         (activity_owner, 403, 6, 1, 1),
